@@ -1,0 +1,364 @@
+/* =============================================================================
+   MERIDIAN — Custom Styles
+   Layered on top of bslib / Bootstrap 5 / Flatly theme
+   ============================================================================= */
+
+/* ---------- Google Font ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ---------- Root Variables ---------- */
+:root {
+  --met-green-dark:   #1e5c3a;
+  --met-green:        #2c7a51;
+  --met-green-light:  #48a868;
+  --met-sage:         #5b9279;
+  --met-wheat:        #d4a853;
+  --met-red:          #c44e52;
+  --met-navy:         #1a1a2e;
+  --met-navy-light:   #16213e;
+  --met-gray:         #6c757d;
+  --met-bg:           #f8f9fa;
+  --met-card-bg:      #ffffff;
+  --met-shadow:       0 2px 8px rgba(0, 0, 0, 0.08);
+  --met-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --met-radius:       0.5rem;
+  --met-transition:   all 0.2s ease;
+}
+
+/* ---------- Navbar ---------- */
+.navbar {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  padding: 0.5rem 1rem;
+}
+
+.navbar-brand {
+  font-weight: 700;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navbar-brand img {
+  height: 36px;
+  width: auto;
+  border-radius: 4px;
+}
+
+.navbar .nav-link {
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.6rem 1rem;
+  transition: var(--met-transition);
+  border-radius: var(--met-radius);
+  margin: 0 2px;
+}
+
+.navbar .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.navbar .nav-link.active {
+  background-color: rgba(255, 255, 255, 0.15);
+  font-weight: 600;
+}
+
+/* ---------- Cards ---------- */
+.card {
+  border: 1px solid #e0e0e0;
+  border-radius: var(--met-radius);
+  box-shadow: var(--met-shadow);
+  transition: var(--met-transition);
+  margin-bottom: 1rem;
+}
+
+.card:hover {
+  box-shadow: var(--met-shadow-hover);
+}
+
+.card-header {
+  font-weight: 600;
+  font-size: 0.95rem;
+  background-color: #f5f7f5;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0.75rem 1rem;
+}
+
+/* ---------- Value Boxes ---------- */
+.bslib-value-box {
+  border-radius: var(--met-radius);
+  box-shadow: var(--met-shadow);
+  transition: var(--met-transition);
+}
+
+.bslib-value-box:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--met-shadow-hover);
+}
+
+/* ---------- Sidebar ---------- */
+.bslib-sidebar-layout > .sidebar {
+  background-color: #f5f7f5;
+  border-right: 1px solid #e0e0e0;
+}
+
+.sidebar .form-group {
+  margin-bottom: 1rem;
+}
+
+.sidebar label {
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 0.25rem;
+}
+
+/* ---------- Buttons ---------- */
+.btn-primary {
+  background-color: var(--met-green);
+  border-color: var(--met-green);
+  font-weight: 500;
+  transition: var(--met-transition);
+}
+
+.btn-primary:hover {
+  background-color: var(--met-green-dark);
+  border-color: var(--met-green-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(44, 122, 81, 0.3);
+}
+
+.btn-success {
+  background-color: var(--met-green-light);
+  border-color: var(--met-green-light);
+}
+
+.btn-warning {
+  background-color: var(--met-wheat);
+  border-color: var(--met-wheat);
+  color: #333;
+}
+
+.btn-outline-primary {
+  color: var(--met-green);
+  border-color: var(--met-green);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--met-green);
+  color: #fff;
+}
+
+/* ---------- Action button (Run Analysis) ---------- */
+.btn-run-analysis {
+  background: linear-gradient(135deg, var(--met-green) 0%, var(--met-green-dark) 100%);
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-radius: var(--met-radius);
+  transition: var(--met-transition);
+  box-shadow: 0 2px 6px rgba(44, 122, 81, 0.25);
+}
+
+.btn-run-analysis:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(44, 122, 81, 0.35);
+}
+
+/* ---------- Tables (DT) ---------- */
+.dataTables_wrapper {
+  font-size: 0.9rem;
+}
+
+table.dataTable thead th {
+  background-color: #f5f7f5;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #333;
+  border-bottom: 2px solid var(--met-green);
+}
+
+table.dataTable tbody tr:hover {
+  background-color: #e8f5e9 !important;
+}
+
+/* ---------- Tabs (navset) ---------- */
+.nav-tabs .nav-link {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--met-gray);
+  transition: var(--met-transition);
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--met-green);
+  border-bottom: 2px solid var(--met-green);
+  font-weight: 600;
+}
+
+/* ---------- Notifications ---------- */
+.shiny-notification {
+  border-radius: var(--met-radius);
+  font-size: 0.9rem;
+  box-shadow: var(--met-shadow-hover);
+}
+
+.shiny-notification-error {
+  border-left: 4px solid var(--met-red);
+}
+
+.shiny-notification-warning {
+  border-left: 4px solid var(--met-wheat);
+}
+
+.shiny-notification-message {
+  border-left: 4px solid var(--met-green);
+}
+
+/* ---------- Loading Spinners ---------- */
+.shiny-spinner-placeholder {
+  min-height: 200px;
+}
+
+/* ---------- Tooltip Info Icons ---------- */
+.info-tooltip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--met-sage);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: help;
+  margin-left: 0.3rem;
+  transition: var(--met-transition);
+}
+
+.info-tooltip:hover {
+  background-color: var(--met-green);
+  transform: scale(1.1);
+}
+
+/* ---------- Welcome Modal ---------- */
+.modal-content {
+  border-radius: var(--met-radius);
+  border: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  background: linear-gradient(135deg, var(--met-navy) 0%, var(--met-navy-light) 100%);
+  color: #fff;
+  border-radius: var(--met-radius) var(--met-radius) 0 0;
+}
+
+.modal-header .btn-close {
+  filter: brightness(0) invert(1);
+}
+
+/* ---------- Empty State ---------- */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--met-gray);
+}
+
+.empty-state .icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-state h4 {
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  font-size: 0.95rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* ---------- Badge Design ---------- */
+.badge-design {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4em 0.8em;
+  border-radius: var(--met-radius);
+}
+
+.badge-rcbd {
+  background-color: var(--met-green);
+  color: #fff;
+}
+
+.badge-alpha {
+  background-color: var(--met-sage);
+  color: #fff;
+}
+
+.badge-augmented {
+  background-color: var(--met-wheat);
+  color: #333;
+}
+
+.badge-unknown {
+  background-color: var(--met-gray);
+  color: #fff;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .navbar-brand {
+    font-size: 1rem;
+  }
+
+  .bslib-sidebar-layout > .sidebar {
+    max-width: 100%;
+  }
+
+  .card {
+    margin-bottom: 0.75rem;
+  }
+}
+
+/* ---------- Animations ---------- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card, .bslib-value-box {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #bbb;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}

@@ -1,0 +1,29 @@
+# R project files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+# renv library (large, reproducible from lock file)
+renv/library/
+renv/staging/
+renv/sandbox/
+renv/cellar/
+renv/python/
+
+# Shiny deployment
+rsconnect/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Private data
+data/*.private.*
+
+# Session files
+.httr-oauth
+*.log
+
+# Build artifacts
+inst/doc
