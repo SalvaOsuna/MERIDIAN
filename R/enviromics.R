@@ -64,14 +64,19 @@ run_finlay_wilkinson <- function(df, gen_col, env_col, trait) {
   fw_data <- cell_means |>
     dplyr::left_join(env_means |> dplyr::select(!!rlang::sym(env_col), EI), by = env_col)
 
-  # 4. Fit regressions for each genotype
-  gen_slopes <- fw_data |>
-    dplyr::group_by(!!rlang::sym(gen_col)) |>
-    dplyr::summarise(
-      slope = coef(lm(mean_val ~ EI))[2],
-      intercept = coef(lm(mean_val ~ EI))[1],
-      .groups = "drop"
-    )
+  # 4. Fit regressions using fast C++ kernel
+  gen_fct <- as.factor(fw_data[[gen_col]])
+  gen_ids <- as.integer(gen_fct)
+  n_gen   <- nlevels(gen_fct)
+  
+  cpp_res <- cpp_fw_regression(fw_data$mean_val, fw_data$EI, gen_ids, n_gen)
+  
+  gen_slopes <- data.frame(
+    slope     = cpp_res$slope,
+    intercept = cpp_res$intercept,
+    stringsAsFactors = FALSE
+  )
+  gen_slopes[[gen_col]] <- levels(gen_fct)
 
   list(
     fw_data = fw_data,

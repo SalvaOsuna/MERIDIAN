@@ -318,6 +318,14 @@ mod_stability_server <- function(id, data_result) {
       req(db(), input$trait)
       shiny::withProgress(message = "Running Stability Analyses...", value = 0, {
 
+        # ---- Prepare metan data ONCE (expensive: pruning, balancing) ----
+        shiny::incProgress(0.05, detail = "Preparing balanced data...")
+        df_prepared <- safe_analysis(
+          prepare_metan_data(db()$data, db()$gen_col, db()$env_col,
+                             db()$rep_col, input$trait),
+          session
+        )
+
         # Native AMMI (ammi.R)
         shiny::incProgress(0.20, detail = "AMMI analysis (native SVD)")
         ammi_res <- safe_analysis(
@@ -332,42 +340,41 @@ mod_stability_server <- function(id, data_result) {
           session
         )
 
-        # GGE (metan)
+        # GGE (metan) — use pre-prepared data
         shiny::incProgress(0.15, detail = "GGE biplot")
         gge_res <- safe_analysis(
-          run_gge(db()$data, db()$gen_col, db()$env_col,
-                  db()$rep_col, input$trait),
+          run_gge_fast(df_prepared, db()$gen_col, db()$env_col, input$trait),
           session
         )
 
-        # Eberhart-Russell (metan)
+        # Eberhart-Russell (metan) — use pre-prepared data
         shiny::incProgress(0.15, detail = "Eberhart-Russell")
         er_res <- safe_analysis(
-          run_eberhart_russell(db()$data, db()$gen_col, db()$env_col,
+          run_eberhart_russell_fast(df_prepared, db()$gen_col, db()$env_col,
                               db()$rep_col, input$trait),
           session
         )
 
-        # Wricke (metan)
+        # Wricke (metan) — use pre-prepared data
         shiny::incProgress(0.15, detail = "Wricke ecovalence")
         wricke_res <- safe_analysis(
-          compute_wricke(db()$data, db()$gen_col, db()$env_col,
+          compute_wricke_fast(df_prepared, db()$gen_col, db()$env_col,
                          db()$rep_col, input$trait),
           session
         )
 
-        # Shukla (metan)
+        # Shukla (metan) — use pre-prepared data
         shiny::incProgress(0.10, detail = "Shukla variance")
         shukla_res <- safe_analysis(
-          compute_shukla(db()$data, db()$gen_col, db()$env_col,
+          compute_shukla_fast(df_prepared, db()$gen_col, db()$env_col,
                          db()$rep_col, input$trait),
           session
         )
 
-        # Combined ge_stats (metan)
-        shiny::incProgress(0.15, detail = "Combined stability stats")
+        # Combined ge_stats (metan) — use pre-prepared data
+        shiny::incProgress(0.10, detail = "Combined stability stats")
         all_res <- safe_analysis(
-          run_all_stability(db()$data, db()$gen_col, db()$env_col,
+          run_all_stability_fast(df_prepared, db()$gen_col, db()$env_col,
                             db()$rep_col, input$trait),
           session
         )

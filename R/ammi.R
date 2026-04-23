@@ -124,42 +124,22 @@ run_ammi <- function(data, gen, env, rep = NULL, trait, n_axis = 2) {
     Cumulative  = axis_cum
   )
   
-  # ── 7. Métricas de estabilidad ────────────────────────────────────────────
-  
-  # ASV — AMMI Stability Value (Purchase et al. 2000)
-  # ASV = sqrt[ (SS_IPCA1/SS_IPCA2 * IPCA1)^2 + IPCA2^2 ]
-  # Requiere al menos 2 ejes
+  # ── 7. Métricas de estabilidad (C++ accelerated) ────────────────────────────
   
   stability <- gen_scores %>% select(GEN, gen_mean, starts_with("IPCA"))
   
-  if (n_axis >= 2) {
-    ss_ratio <- axis_ss[1] / axis_ss[2]
-    stability <- stability %>%
-      mutate(
-        ASV = sqrt((ss_ratio * IPCA1)^2 + IPCA2^2)
-      )
-  }
-  
-  # WAAS — Weighted Average of Absolute Scores (Olivoto et al. 2019)
-  # WAAS = sum(|IPCA_k| * SS_k%) / sum(SS_k%)  para k ejes retenidos
+  # Build matrix of IPCA scores for C++ function
   ipca_cols   <- paste0("IPCA", 1:n_axis)
-  weights     <- axis_pct[1:n_axis]
+  ipca_matrix <- as.matrix(stability[, ipca_cols, drop = FALSE])
   
-  stability <- stability %>%
-    rowwise() %>%
-    mutate(
-      WAAS = sum(abs(c_across(all_of(ipca_cols))) * weights) / sum(weights)
-    ) %>%
-    ungroup()
+  # Call C++ kernel for ASV, WAAS, SIPC
+  cpp_metrics <- cpp_ammi_stability(ipca_matrix, axis_ss, axis_pct, n_axis)
   
-  # SIPC — Sums of IPCA scores (Sneller et al.)
-  stability <- stability %>%
-    rowwise() %>%
-    mutate(
-      SIPC = sum(abs(c_across(all_of(ipca_cols))))
-    ) %>%
-    ungroup() %>%
-    arrange(WAAS)  # ordenar por estabilidad (menor WAAS = más estable)
+  stability$ASV  <- round(cpp_metrics$ASV, 4)
+  stability$WAAS <- round(cpp_metrics$WAAS, 4)
+  stability$SIPC <- round(cpp_metrics$SIPC, 4)
+  
+  stability <- stability %>% arrange(WAAS)
   
   # ── 8. ANOVA tabla formal ─────────────────────────────────────────────────
   # Para el ANOVA completo (con reps), usar lm si hay repeticiones

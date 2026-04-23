@@ -239,3 +239,76 @@ stability_ranking <- function(stats_table) {
 
   ranking
 }
+
+
+# =============================================================================
+# Fast variants — accept pre-prepared data (skip redundant pruning)
+# =============================================================================
+
+#' GGE Biplot — fast variant (pre-prepared data)
+run_gge_fast <- function(df_std, gen_col, env_col, trait) {
+  model <- metan::gge(
+    .data = df_std,
+    env   = !!rlang::sym(env_col),
+    gen   = !!rlang::sym(gen_col),
+    resp  = !!rlang::sym(trait)
+  )
+  list(model = model)
+}
+
+#' Eberhart & Russell — fast variant (pre-prepared data)
+run_eberhart_russell_fast <- function(df_std, gen_col, env_col, rep_col, trait) {
+  model <- metan::ge_reg(
+    .data = df_std,
+    env   = !!rlang::sym(env_col),
+    gen   = !!rlang::sym(gen_col),
+    rep   = !!rlang::sym(rep_col),
+    resp  = !!rlang::sym(trait)
+  )
+  params <- tryCatch({
+    as.data.frame(model[[trait]]$regression)
+  }, error = function(e) {
+    as.data.frame(metan::get_model_data(model))
+  })
+  list(model = model, params = params)
+}
+
+#' Wricke ecovalence — fast variant (pre-prepared data)
+compute_wricke_fast <- function(df_std, gen_col, env_col, rep_col, trait) {
+  model <- metan::ecovalence(
+    .data = df_std,
+    env   = !!rlang::sym(env_col),
+    gen   = !!rlang::sym(gen_col),
+    rep   = !!rlang::sym(rep_col),
+    resp  = !!rlang::sym(trait)
+  )
+  params <- metan::get_model_data(model)
+  list(model = model, params = params)
+}
+
+#' Shukla stability variance — fast variant (pre-prepared data)
+compute_shukla_fast <- function(df_std, gen_col, env_col, rep_col, trait) {
+  model <- metan::Shukla(
+    .data = df_std,
+    env   = !!rlang::sym(env_col),
+    gen   = !!rlang::sym(gen_col),
+    rep   = !!rlang::sym(rep_col),
+    resp  = !!rlang::sym(trait)
+  )
+  params <- metan::get_model_data(model)
+  list(model = model, params = params)
+}
+
+#' Run all stability indices — fast variant (pre-prepared data)
+run_all_stability_fast <- function(df_std, gen_col, env_col, rep_col, trait) {
+  model <- metan::ge_stats(
+    .data = df_std,
+    env   = !!rlang::sym(env_col),
+    gen   = !!rlang::sym(gen_col),
+    rep   = !!rlang::sym(rep_col),
+    resp  = !!rlang::sym(trait)
+  )
+  stats_table <- metan::get_model_data(model)
+  list(model = model, stats_table = stats_table)
+}
+
