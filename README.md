@@ -41,7 +41,14 @@ A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenot
 - Covariate-Phenotype Correlation heatmaps
 - Interactive Geo-Spatial Trial Maps showing site productivity
 
-### Module 6 — Reports & Export *(coming soon)*
+### Module 6 — Spatial Trends
+- Fit SpATS spatial models to visualize within-environment spatial trends
+- Dynamic P-spline segments and user-defined Fixed/Random terms
+- Extract and download adjusted phenotypic means (BLUPs/BLUEs)
+- Perform single environment spatial analysis or batch process across all environments
+- Auto-detects row and column coordinates
+
+### Module 7 — Reports & Export *(coming soon)*
 
 ## Installation
 
@@ -59,7 +66,8 @@ A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenot
 install.packages(c(
   "shiny", "bslib", "shinyWidgets", "DT", "shinycssloaders",
   "thematic", "readr", "readxl", "dplyr", "tidyr",
-  "ggplot2", "plotly", "heatmaply", "scales", "openxlsx"
+  "ggplot2", "plotly", "heatmaply", "scales", "openxlsx",
+  "metan", "lme4", "emmeans", "SpATS", "Rcpp"
 ))
 
 # Run the app
@@ -85,15 +93,17 @@ The app expects data in **long format** with at minimum:
 | `env` / `Environment` | Environment identifier |
 | `rep` / `Rep` | Replicate number |
 | `block` (optional) | Block within replicate |
+| `row` / `Row` (optional) | Row coordinate for spatial analysis |
+| `col` / `Col` (optional) | Column coordinate for spatial analysis |
 | *numeric columns* | Phenotypic traits (yield, height, etc.) |
 
 ### Example
 
-| Genotype | Environment | Rep | GrainYield | PlantHeight |
-|----------|-------------|-----|------------|-------------|
-| G01 | ENV1 | 1 | 3.52 | 78.2 |
-| G01 | ENV1 | 2 | 3.71 | 80.1 |
-| G02 | ENV1 | 1 | 4.10 | 65.4 |
+| Genotype | Environment | Rep | Row | Col | GrainYield | PlantHeight |
+|----------|-------------|-----|-----|-----|------------|-------------|
+| G01 | ENV1 | 1 | 1 | 1 | 3.52 | 78.2 |
+| G01 | ENV1 | 2 | 2 | 3 | 3.71 | 80.1 |
+| G02 | ENV1 | 1 | 1 | 2 | 4.10 | 65.4 |
 
 An example dataset is included and can be loaded directly from the app.
 
@@ -114,7 +124,8 @@ rsconnect::deployApp()
 - **UI Framework:** [bslib](https://rstudio.github.io/bslib/) (Bootstrap 5)
 - **Visualization:** ggplot2, plotly, heatmaply
 - **Data handling:** dplyr, tidyr, readr, readxl
-- **Statistical analysis:** metan, lme4, emmeans *(Phase 2)*
+- **Statistical analysis:** metan, lme4, emmeans, SpATS
+- **Performance integrations:** Rcpp (C++ algorithms for handling large G×E datasets)
 
 ## Author
 
