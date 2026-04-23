@@ -31,7 +31,8 @@ Imports:
     sommer,
     openxlsx,
     rmarkdown,
-    scales
+    scales,
+    SpATS
 Suggests:
     shinytest2,
     testthat (>= 3.0.0)

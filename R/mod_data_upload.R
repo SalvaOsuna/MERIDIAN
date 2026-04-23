@@ -81,6 +81,8 @@ mod_data_upload_ui <- function(id) {
       shiny::selectInput(ns("col_env"),   LABELS$m1_select_env,   choices = NULL),
       shiny::selectInput(ns("col_rep"),   LABELS$m1_select_rep,   choices = NULL),
       shiny::selectInput(ns("col_block"), LABELS$m1_select_block, choices = NULL),
+      shiny::selectInput(ns("col_row"),   LABELS$m1_select_row,   choices = NULL),
+      shiny::selectInput(ns("col_col"),   LABELS$m1_select_col,   choices = NULL),
 
       shinyWidgets::pickerInput(
         ns("col_traits"),
@@ -310,11 +312,22 @@ mod_data_upload_server <- function(id) {
         selected = detected$block %||% ""
       )
 
+      # Update row and col dropdowns
+      shiny::updateSelectInput(session, "col_row",
+        choices  = choices_with_none,
+        selected = detected$row %||% ""
+      )
+      
+      shiny::updateSelectInput(session, "col_col",
+        choices  = choices_with_none,
+        selected = detected$col %||% ""
+      )
+
       # Detect numeric columns for traits
       numeric_cols <- col_names[sapply(df, is.numeric)]
       # Remove already-mapped columns from trait candidates
       mapped <- c(detected$genotype, detected$environment,
-                  detected$rep, detected$block)
+                  detected$rep, detected$block, detected$row, detected$col)
       trait_candidates <- setdiff(numeric_cols, mapped)
 
       shinyWidgets::updatePickerInput(session, "col_traits",
@@ -337,6 +350,8 @@ mod_data_upload_server <- function(id) {
       env_col   <- input$col_env
       rep_col   <- input$col_rep
       block_col <- if (is.null(input$col_block) || input$col_block == "") NULL else input$col_block
+      row_col   <- if (is.null(input$col_row) || input$col_row == "") NULL else input$col_row
+      col_col   <- if (is.null(input$col_col) || input$col_col == "") NULL else input$col_col
       traits    <- input$col_traits
 
       # Validate
@@ -351,6 +366,8 @@ mod_data_upload_server <- function(id) {
         env_col    = env_col,
         rep_col    = rep_col,
         block_col  = block_col,
+        row_col    = row_col,
+        col_col    = col_col,
         traits     = traits,
         design     = design,
         validation = validation,

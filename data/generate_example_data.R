@@ -68,10 +68,10 @@ for (env in environments) {
         Environment     = env,
         Rep             = rep,
         Block           = paste0("B", rep),
-        GrainYield      = round(gy, 2),
-        PlantHeight     = round(ph, 1),
-        DaysToFlowering = round(dtf, 0),
-        TKW             = round(tkw, 1),
+        GrainYield      = gy,
+        PlantHeight     = ph,
+        DaysToFlowering = dtf,
+        TKW             = tkw,
         stringsAsFactors = FALSE
       )
       row_idx <- row_idx + 1
@@ -80,6 +80,41 @@ for (env in environments) {
 }
 
 df <- do.call(rbind, data_rows)
+
+# Assign spatial coordinates (Row and Col) and add a spatial gradient
+# For each environment, assign a 10 rows x 6 cols grid.
+# Rep 1: Cols 1-2; Rep 2: Cols 3-4; Rep 3: Cols 5-6
+df <- do.call(rbind, lapply(split(df, df$Environment), function(env_df) {
+  env_df <- env_df[order(env_df$Rep), ]
+  
+  # For each rep (20 plots), assign 10 rows x 2 cols
+  coords <- do.call(rbind, lapply(1:3, function(r) {
+    data.frame(
+      Row = rep(1:10, times = 2),
+      Col = rep(c(r*2 - 1, r*2), each = 10)
+    )
+  }))
+  
+  # Randomize plots within each rep slightly to mix genotypes, but we keep the Rep structure
+  env_df$Row <- coords$Row
+  env_df$Col <- coords$Col
+  
+  # Add spatial gradient: row trend + column trend
+  spatial_trend <- 0.1 * env_df$Row + 0.15 * env_df$Col + 0.05 * env_df$Row * env_df$Col
+  env_df$GrainYield <- env_df$GrainYield + spatial_trend * 0.2
+  env_df$PlantHeight <- env_df$PlantHeight + spatial_trend * 0.5
+  
+  # Round values after adding spatial trend
+  env_df$GrainYield <- round(env_df$GrainYield, 2)
+  env_df$PlantHeight <- round(env_df$PlantHeight, 1)
+  env_df$DaysToFlowering <- round(env_df$DaysToFlowering, 0)
+  env_df$TKW <- round(env_df$TKW, 1)
+  
+  env_df
+}))
+
+# Reorder columns
+df <- df[, c("Genotype", "Environment", "Rep", "Block", "Row", "Col", "GrainYield", "PlantHeight", "DaysToFlowering", "TKW")]
 
 # Introduce ~2% missing values (6 cells across traits)
 set.seed(123)

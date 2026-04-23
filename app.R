@@ -23,6 +23,7 @@ library(emmeans)
 library(metan)
 library(rlang)
 library(ggrepel)
+library(SpATS)
 
 # ---- Source R files ----
 source("R/utils.R")
@@ -38,6 +39,7 @@ source("R/mod_eda.R")
 source("R/mod_anova.R")
 source("R/mod_stability.R")
 source("R/mod_adaptation.R")
+source("R/mod_spatial.R")
 
 # ---- Theme ----
 app_theme <- bs_theme(
@@ -125,7 +127,14 @@ ui <- page_navbar(
     mod_adaptation_ui("adaptation")
   ),
 
-  # ---- Module 6: Reports (placeholder) ----
+  # ---- Module 6: Spatial ----
+  nav_panel(
+    title = tags$span(icon("map"), " Spatial Trends"),
+    value = "tab_spatial",
+    mod_spatial_ui("spatial")
+  ),
+
+  # ---- Module 7: Reports (placeholder) ----
   nav_panel(
     title = tags$span(icon("file-alt"), " Reports"),
     value = "tab_reports",
@@ -196,6 +205,9 @@ server <- function(input, output, session) {
   # ---- Initialize Module 5 ----
   adapt_result <- mod_adaptation_server("adaptation", data_result)
 
+  # ---- Initialize Module 6 ----
+  mod_spatial_server("spatial", data_result)
+
   # ---- Handle startup modal buttons ----
   observeEvent(input$btn_load_example, {
     removeModal()
@@ -219,7 +231,7 @@ server <- function(input, output, session) {
     }
 
     # Guard: require data for analysis modules
-    data_tabs <- c("tab_eda", "tab_anova", "tab_stability", "tab_adaptation")
+    data_tabs <- c("tab_eda", "tab_anova", "tab_stability", "tab_adaptation", "tab_spatial")
     if (input$main_navbar %in% data_tabs) {
       db <- data_result$data_bundle()
       if (is.null(db)) {

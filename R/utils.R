@@ -29,6 +29,8 @@ LABELS <- list(
   m1_select_env    = "Environment Column",
   m1_select_rep    = "Replicate Column",
   m1_select_block  = "Block Column (optional)",
+  m1_select_row    = "Row Column (optional)",
+  m1_select_col    = "Column Column (optional)",
   m1_select_traits = "Response Variables (traits)",
   m1_download_ex   = "Download Example Dataset",
   m1_design        = "Detected Design",
@@ -68,6 +70,15 @@ LABELS <- list(
   # Module 6 — Reports (placeholder)
   m6_title         = "Reports & Export",
 
+  # Module 7 — Spatial
+  m7_title         = "Spatial Trends",
+  m7_select_trait  = "Select Trait",
+  m7_select_env    = "Select Environment",
+  m7_fixed_terms   = "Fixed Terms (optional)",
+  m7_random_terms  = "Random Terms (optional)",
+  m7_nseg_row      = "Number of Row Segments",
+  m7_nseg_col      = "Number of Column Segments",
+
   # Common
   coming_soon      = "Coming soon — this module will be available in a future update.",
   no_data_warning  = "Please load data in the Data Upload tab first.",
@@ -94,7 +105,9 @@ auto_detect_columns <- function(col_names) {
                     "^site$", "^trial$"),
     rep         = c("^rep$", "^replicate$", "^replication$"),
     block       = c("^block$", "^blk$", "^iblock$", "^sub_block$",
-                    "^subblock$", "^incomplete_block$")
+                    "^subblock$", "^incomplete_block$"),
+    row         = c("^row$", "^row_coord$", "^r$"),
+    col         = c("^col$", "^column$", "^col_coord$", "^c$")
   )
 
   result <- list()
