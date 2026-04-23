@@ -33,26 +33,17 @@ prepare_metan_data <- function(df, gen_col, env_col, rep_col, trait = NULL) {
       df_std <- df_std[!cur_pairs %in% bad_pairs, , drop = FALSE]
     }
 
-    # Step 2: iteratively prune to fully crossed design
-    changed <- TRUE
-    while (changed) {
-      changed <- FALSE
-      cell_counts <- table(df_std[[gen_col]], df_std[[env_col]])
-      n_env <- ncol(cell_counts)
-      n_gen <- nrow(cell_counts)
-
-      gen_ok <- rowSums(cell_counts > 0) == n_env
-      if (any(!gen_ok)) {
-        df_std <- df_std[df_std[[gen_col]] %in% names(which(gen_ok)), , drop = FALSE]
-        changed <- TRUE
-      }
-
-      env_ok <- colSums(cell_counts > 0) == n_gen
-      if (any(!env_ok)) {
-        df_std <- df_std[df_std[[env_col]] %in% names(which(env_ok)), , drop = FALSE]
-        changed <- TRUE
-      }
-    }
+    # Step 2: iteratively prune to fully crossed design using fast C++ routine
+    gen_fct <- as.factor(df_std[[gen_col]])
+    env_fct <- as.factor(df_std[[env_col]])
+    gen_int <- as.integer(gen_fct)
+    env_int <- as.integer(env_fct)
+    
+    n_gen_levels <- nlevels(gen_fct)
+    n_env_levels <- nlevels(env_fct)
+    
+    keep_rows <- cpp_find_balanced_subset(gen_int, env_int, n_gen_levels, n_env_levels)
+    df_std <- df_std[keep_rows, , drop = FALSE]
 
     # Drop unused factor levels
     df_std[[gen_col]] <- droplevels(as.factor(df_std[[gen_col]]))

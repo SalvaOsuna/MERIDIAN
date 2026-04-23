@@ -24,6 +24,12 @@ library(metan)
 library(rlang)
 library(ggrepel)
 library(SpATS)
+library(Rcpp)
+
+# ---- Compile C++ Functions ----
+if (file.exists("src/fast_pruning.cpp")) {
+  Rcpp::sourceCpp("src/fast_pruning.cpp")
+}
 
 # ---- Source R files ----
 source("R/utils.R")

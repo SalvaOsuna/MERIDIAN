@@ -23,7 +23,7 @@ mod_spatial_ui <- function(id) {
 
       shiny::checkboxInput(ns("gen_random"), "Genotype as Random (BLUPs)", value = TRUE),
 
-      shiny::layout_columns(
+      bslib::layout_columns(
         col_widths = c(6, 6),
         shiny::numericInput(ns("nseg_row"), LABELS$m7_nseg_row, value = 10, min = 2),
         shiny::numericInput(ns("nseg_col"), LABELS$m7_nseg_col, value = 10, min = 2)

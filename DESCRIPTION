@@ -32,7 +32,8 @@ Imports:
     openxlsx,
     rmarkdown,
     scales,
-    SpATS
+    SpATS,
+    Rcpp
 Suggests:
     shinytest2,
     testthat (>= 3.0.0)

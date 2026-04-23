@@ -92,7 +92,11 @@ run_mixed_model <- function(df, gen_col, env_col, rep_col, trait) {
                         "`) + (1|`", env_col, "`:`", rep_col, "`)")
   formula_obj <- as.formula(formula_str)
 
-  model <- lme4::lmer(formula_obj, data = df_clean)
+  model <- lme4::lmer(
+    formula_obj, 
+    data = df_clean,
+    control = lme4::lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE)
+  )
 
   # Extract variance components
   vc <- as.data.frame(lme4::VarCorr(model))
@@ -166,7 +170,11 @@ compute_blues <- function(df, gen_col, env_col, rep_col, trait) {
                         "`) + (1|`", env_col, "`:`", rep_col, "`)")
   formula_obj <- as.formula(formula_str)
 
-  model <- lme4::lmer(formula_obj, data = df_clean)
+  model <- lme4::lmer(
+    formula_obj, 
+    data = df_clean,
+    control = lme4::lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE)
+  )
 
   # Extract estimated marginal means using emmeans
   emm <- emmeans::emmeans(model, specs = gen_col)
@@ -209,7 +217,11 @@ compute_blups <- function(df, gen_col, env_col, rep_col, trait) {
                         "`) + (1|`", env_col, "`:`", rep_col, "`)")
   formula_obj <- as.formula(formula_str)
 
-  model <- lme4::lmer(formula_obj, data = df_clean)
+  model <- lme4::lmer(
+    formula_obj, 
+    data = df_clean,
+    control = lme4::lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE)
+  )
 
   # Extract BLUPs (random effect predictions)
   ranef_gen <- lme4::ranef(model)[[gen_col]]
