@@ -1,12 +1,10 @@
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-<img src="www/logo.png" align="right" height="140/"/>
+# MERIDIAN 🌾 <img src="www/logo.png" align="right" height="140/"/>
 
 <!-- badges: start -->
 
-`MERIDIAN`**M**ulti-**E**nvironment **R**esearch **I**ntegration: **D**ata **I**ntelligence & **A**gronomic **N**etworks
-
-A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenotypic data analysis. Built for plant breeders, geneticists, and agronomists to streamline the statistical analysis workflow from raw data to publication-ready results.
+`MERIDIAN` (**M**ulti-**E**nvironment **R**esearch **I**ntegration: **D**ata **I**ntelligence & **A**gronomic **N**etworks) is a comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenotypic data analysis. Built for plant breeders, geneticists, and agronomists to streamline the statistical analysis workflow from raw data to publication-ready results.
 
 ## Features
 
