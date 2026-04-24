@@ -351,6 +351,8 @@ mod_adaptation_server <- function(id, data_result) {
           )
         )
     })
-    
+    return(list(
+      adapt_results = adapt_results
+    ))
   })
 }

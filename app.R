@@ -25,6 +25,7 @@ library(rlang)
 library(ggrepel)
 library(SpATS)
 library(Rcpp)
+library(pagedown)
 
 # ---- Compile C++ Functions ----
 if (file.exists("src/fast_pruning.cpp")) {
@@ -51,6 +52,10 @@ source("R/mod_anova.R")
 source("R/mod_stability.R")
 source("R/mod_adaptation.R")
 source("R/mod_spatial.R")
+source("R/export.R")
+source("R/composer.R")
+source("R/report.R")
+source("R/mod_reports.R")
 
 # ---- Theme ----
 app_theme <- bs_theme(
@@ -145,11 +150,11 @@ ui <- page_navbar(
     mod_spatial_ui("spatial")
   ),
 
-  # ---- Module 7: Reports (placeholder) ----
+  # ---- Module 7: Reports ----
   nav_panel(
     title = tags$span(icon("file-alt"), " Reports"),
     value = "tab_reports",
-    placeholder_ui(LABELS$m6_title)
+    mod_reports_ui("reports")
   )
 )
 
@@ -158,6 +163,7 @@ ui <- page_navbar(
 # Server
 # =============================================================================
 server <- function(input, output, session) {
+  plot_registry <- reactiveValues()
 
   # ---- Auto-theme ggplot2 to match app ----
   thematic::thematic_shiny()
@@ -219,6 +225,16 @@ server <- function(input, output, session) {
   # ---- Initialize Module 6 ----
   mod_spatial_server("spatial", data_result)
 
+  # ---- Initialize Module 7 ----
+  mod_reports_server(
+    "reports",
+    data_result = data_result,
+    anova_result = anova_result,
+    stab_result = stab_result,
+    adapt_result = adapt_result,
+    plot_registry = plot_registry
+  )
+
   # ---- Handle startup modal buttons ----
   observeEvent(input$btn_load_example, {
     removeModal()
@@ -232,8 +248,8 @@ server <- function(input, output, session) {
 
   # ---- Guard: Show notification if user navigates to empty module ----
   observeEvent(input$main_navbar, {
-    # Only Phase 3 modules are still placeholders
-    empty_tabs <- c("tab_reports")
+    # Placeholder tabs
+    empty_tabs <- character(0)
     if (input$main_navbar %in% empty_tabs) {
       showNotification(
         paste("This module will be available in a future update."),
@@ -242,7 +258,7 @@ server <- function(input, output, session) {
     }
 
     # Guard: require data for analysis modules
-    data_tabs <- c("tab_eda", "tab_anova", "tab_stability", "tab_adaptation", "tab_spatial")
+    data_tabs <- c("tab_eda", "tab_anova", "tab_stability", "tab_adaptation", "tab_spatial", "tab_reports")
     if (input$main_navbar %in% data_tabs) {
       db <- data_result$data_bundle()
       if (is.null(db)) {

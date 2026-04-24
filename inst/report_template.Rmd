@@ -1,0 +1,145 @@
+---
+title: "`r params$report_title`"
+author: "`r params$author`"
+date: "`r if (isTRUE(params$include_date)) format(Sys.Date()) else ''`"
+output:
+  html_document:
+    self_contained: true
+    css: report_styles.css
+  pdf_document: default
+params:
+  report_title:
+    value: "MERIDIAN Analysis Report"
+  author:
+    value: ""
+  institution:
+    value: ""
+  notes:
+    value: ""
+  include_date:
+    value: true
+  sections:
+    value: []
+  tables:
+    value: !r list()
+  plots:
+    value: !r list()
+  methods_text:
+    value: ""
+  meta:
+    value: !r list()
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, dpi = 300, fig.width = 7, fig.height = 5)
+`%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || identical(x, "")) y else x
+is_html <- knitr::is_html_output()
+safe_kable <- function(df, caption = NULL) {
+  if (is.null(df) || nrow(df) == 0) return(invisible(NULL))
+  k <- knitr::kable(df, caption = caption, format = if (is_html) "html" else "latex", booktabs = TRUE)
+  if (requireNamespace("kableExtra", quietly = TRUE)) {
+    if (is_html) {
+      k <- kableExtra::kable_styling(k, bootstrap_options = c("striped", "condensed"), full_width = FALSE)
+    } else {
+      k <- kableExtra::kable_styling(k, latex_options = c("striped", "hold_position"))
+    }
+  }
+  k
+}
+plot_names <- names(params$plots)
+table_names <- names(params$tables)
+table_by_prefix <- function(prefix) {
+  idx <- grep(paste0("^", prefix), table_names)
+  if (length(idx) == 0) return(NULL)
+  params$tables[[idx[1]]]
+}
+```
+
+`r if (nzchar(params$institution %||% "")) paste0("**Institution:** ", params$institution)`
+
+`r if (nzchar(params$notes %||% "")) paste0("**Notes:** ", params$notes)`
+
+```{r executive}
+if ("Executive Summary" %in% params$sections) {
+  cat("## Executive Summary\n")
+  cat(paste0("This report summarizes MET analyses generated in MERIDIAN for ",
+             params$meta$n_gen %||% "NA", " genotypes across ",
+             params$meta$n_env %||% "NA", " environments under the ",
+             params$meta$design %||% "Unknown", " design.\n\n"))
+}
+```
+
+```{r data-description}
+if ("Data Description" %in% params$sections) {
+  cat("## Data Description\n")
+  t1 <- table_by_prefix("AMMI Genotype Means")
+  t2 <- table_by_prefix("AMMI Environment Means")
+  if (!is.null(t1)) print(safe_kable(head(t1, 20), "Genotype Means"))
+  if (!is.null(t2)) print(safe_kable(head(t2, 20), "Environment Means"))
+}
+```
+
+```{r eda}
+if ("Exploratory Analysis" %in% params$sections) {
+  cat("## Exploratory Analysis\n")
+  idx <- grep("^EDA Boxplot", plot_names)
+  if (length(idx) > 0) print(params$plots[[idx[1]]])
+}
+```
+
+```{r anova}
+if ("ANOVA & Variance Components" %in% params$sections) {
+  cat("## ANOVA & Variance Components\n")
+  ta <- table_by_prefix("ANOVA Table")
+  tb <- table_by_prefix("BLUEs")
+  tc <- table_by_prefix("BLUPs")
+  if (!is.null(ta)) print(safe_kable(ta, "ANOVA Table"))
+  if (!is.null(tb)) print(safe_kable(head(tb, 25), "BLUEs"))
+  if (!is.null(tc)) print(safe_kable(head(tc, 25), "BLUPs"))
+}
+```
+
+```{r stability}
+if ("Stability Analysis" %in% params$sections) {
+  cat("## Stability Analysis\n")
+  p_idx <- grep("AMMI1|AMMI2|GGE Biplot|Stability Ranking", plot_names)
+  for (i in p_idx) print(params$plots[[i]])
+  ts <- table_by_prefix("Stability Metrics")
+  tc <- table_by_prefix("Combined Stability Indices")
+  if (!is.null(ts)) print(safe_kable(ts, "Stability Metrics"))
+  if (!is.null(tc)) print(safe_kable(tc, "Combined Stability Indices"))
+}
+```
+
+```{r enviromics}
+if ("Enviromics" %in% params$sections) {
+  cat("## Enviromics\n")
+  p_idx <- grep("EnvironmentalPCA|ReactionNorms|MegaEnvironments|Environmental PCA|Reaction Norms|Mega-Environments", plot_names)
+  for (i in p_idx) print(params$plots[[i]])
+}
+```
+
+```{r adapted}
+if ("Adapted Genotypes per Environment" %in% params$sections) {
+  cat("## Adapted Genotypes per Environment\n")
+  tm <- table_by_prefix("Mega-Environment Table")
+  if (!is.null(tm)) print(safe_kable(tm, "Adapted Genotypes by Environment"))
+}
+```
+
+```{r methods}
+if ("Methods Description" %in% params$sections) {
+  cat("## Methods\n")
+  cat(params$methods_text)
+}
+```
+
+```{r appendix}
+if ("Appendix" %in% params$sections) {
+  cat("## Appendix\n")
+  for (nm in table_names) {
+    cat("\n\n### ", nm, "\n")
+    print(safe_kable(params$tables[[nm]], nm))
+  }
+}
+```

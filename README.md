@@ -56,7 +56,11 @@ A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenot
 - Perform single environment spatial analysis or batch process across all environments
 - Auto-detects row and column coordinates
 
-### Module 7 — Reports & Export *(coming soon)*
+### Module 7 — Reports & Export
+- Unified table export center with CSV and Excel downloads (metadata cover sheet + formatting)
+- Plot export studio with typography, label, theme, and resolution controls
+- Patchwork figure composer with panel labels, global annotations, and ZIP panel export
+- Automated HTML/PDF report generation via parameterized R Markdown template
 
 ## Installation
 
