@@ -49,12 +49,18 @@ render_meridian_report <- function(output_file, output_format, params, session =
       envir = new.env(parent = globalenv()),
       quiet = quiet
     )
-    tryCatch(
+    pdf_out <- tryCatch(
       pagedown::chrome_print(input = html_tmp, output = output_file),
       error = function(e) {
         stop("PDF generation via pagedown failed. Ensure Chrome/Chromium is available. Details: ", conditionMessage(e))
       }
     )
+    if (!file.exists(output_file) && !is.null(pdf_out) && file.exists(pdf_out)) {
+      file.copy(pdf_out, output_file, overwrite = TRUE)
+    }
+    if (!file.exists(output_file)) {
+      stop("PDF generation completed without a readable output file.")
+    }
   } else {
     rmarkdown::render(
       input = template_path,

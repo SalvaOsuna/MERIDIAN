@@ -222,13 +222,22 @@ make_gge_static_plot <- function(gge_model, trait, cfg) {
 create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res = NULL) {
   cfg0 <- default_plot_cfg()
   lib <- list()
-  add_plot <- function(key, builder) lib[[key]] <<- list(label = key, builder = builder)
+  add_plot <- function(module, trait, builder, label = NULL) {
+    key <- make_registry_key(module, trait)
+    lib[[key]] <<- list(
+      key = key,
+      module = module,
+      trait = trait,
+      label = label %||% paste0(module, " — ", trait),
+      builder = builder
+    )
+  }
 
   if (!is.null(stab_res$ammi)) {
     ammi <- stab_res$ammi
     trait <- stab_res$trait %||% (ammi$params$trait %||% "Trait")
 
-    add_plot(paste0("AMMI1 — ", trait), function(cfg = cfg0) {
+    add_plot("AMMI1", trait, function(cfg = cfg0) {
       cfg <- modifyList(cfg0, cfg %||% list())
       gen_df <- ammi$gen_scores |> dplyr::rename(mean_val = gen_mean, ipca = IPCA1)
       env_df <- ammi$env_scores |> dplyr::rename(mean_val = env_mean, ipca = IPCA1)
@@ -243,7 +252,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
       apply_common_theme_controls(p, cfg)
     })
 
-    add_plot(paste0("AMMI2 — ", trait), function(cfg = cfg0) {
+    add_plot("AMMI2", trait, function(cfg = cfg0) {
       cfg <- modifyList(cfg0, cfg %||% list())
       gen_df <- ammi$gen_scores |> dplyr::transmute(label = GEN, x = IPCA1, y = IPCA2)
       env_df <- ammi$env_scores |> dplyr::transmute(label = ENV, x = IPCA1, y = IPCA2)
@@ -262,7 +271,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
       apply_common_theme_controls(p, cfg)
     })
 
-    add_plot(paste0("Stability Ranking — ", trait), function(cfg = cfg0) {
+    add_plot("StabilityRanking", trait, function(cfg = cfg0) {
       cfg <- modifyList(cfg0, cfg %||% list())
       df <- ammi$stability
       p <- ggplot2::ggplot(df, ggplot2::aes(gen_mean, WAAS)) +
@@ -274,7 +283,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
       apply_common_theme_controls(p, cfg)
     })
 
-    add_plot(paste0("GxE Heatmap — ", trait), function(cfg = cfg0) {
+    add_plot("GxEHeatmap", trait, function(cfg = cfg0) {
       cfg <- modifyList(cfg0, cfg %||% list())
       df <- ammi$interaction_long
       p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = GEN, fill = interaction)) +
@@ -287,7 +296,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
 
   if (!is.null(stab_res$gge$model)) {
     trait <- stab_res$trait %||% "Trait"
-    add_plot(paste0("GGE Biplot — ", trait), function(cfg = cfg0) {
+    add_plot("GGE", trait, function(cfg = cfg0) {
       cfg <- modifyList(cfg0, cfg %||% list())
       make_gge_static_plot(stab_res$gge$model, trait, cfg)
     })
@@ -296,7 +305,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
   if (!is.null(adapt_res$fw$fw_data) && !is.null(adapt_res$fw$gen_slopes)) {
     trait <- adapt_res$trait %||% "Trait"
     gen_col <- db$gen_col
-    add_plot(paste0("Reaction Norms — ", trait), function(cfg = cfg0) {
+    add_plot("ReactionNorms", trait, function(cfg = cfg0) {
       cfg <- modifyList(cfg0, cfg %||% list())
       fw_data <- adapt_res$fw$fw_data
       slopes <- adapt_res$fw$gen_slopes
@@ -311,7 +320,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
 
   if (!is.null(adapt_res$mega_env$env_strat)) {
     trait <- adapt_res$trait %||% "Trait"
-    add_plot(paste0("Mega-Environments — ", trait), function(cfg = cfg0) {
+    add_plot("MegaEnvironments", trait, function(cfg = cfg0) {
       cfg <- modifyList(cfg0, cfg %||% list())
       df <- adapt_res$mega_env$env_strat
       p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = MEAN, fill = MEGA_ENV)) +
@@ -322,7 +331,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
   }
 
   if (!is.null(adapt_res$env_pca$pca_res)) {
-    add_plot("Environmental PCA", function(cfg = cfg0) {
+    add_plot("EnvironmentalPCA", "Global", function(cfg = cfg0) {
       cfg <- modifyList(cfg0, cfg %||% list())
       pca <- adapt_res$env_pca$pca_res
       df <- as.data.frame(pca$x)
@@ -341,7 +350,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
   if (!is.null(db$data) && length(db$traits %||% character(0)) > 0) {
     trait <- db$traits[1]
     env_col <- db$env_col
-    add_plot(paste0("EDA Boxplot — ", trait), function(cfg = cfg0) {
+    add_plot("EDABoxplot", trait, function(cfg = cfg0) {
       cfg <- modifyList(cfg0, cfg %||% list())
       p <- ggplot2::ggplot(db$data, ggplot2::aes(x = .data[[env_col]], y = .data[[trait]], fill = .data[[env_col]])) +
         ggplot2::geom_boxplot(alpha = cfg$point_alpha, outlier.shape = NA) +
@@ -358,13 +367,14 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
 collect_plot_registry_entries <- function(db, anova_res = NULL, stab_res = NULL, adapt_res = NULL) {
   lib <- create_plot_library(db, anova_res = anova_res, stab_res = stab_res, adapt_res = adapt_res)
   out <- list()
-  for (nm in names(lib)) {
-    parts <- strsplit(nm, " — ", fixed = TRUE)[[1]]
-    module <- parts[1] %||% "Plot"
-    trait <- if (length(parts) >= 2) parts[2] else "Global"
-    key <- make_registry_key(module, trait)
-    p <- lib[[nm]]$builder(default_plot_cfg())
-    if (inherits(p, "gg")) out[[key]] <- p
+  for (key in names(lib)) {
+    p <- lib[[key]]$builder(default_plot_cfg())
+    if (inherits(p, "gg")) {
+      attr(p, "meridian_key") <- key
+      attr(p, "meridian_module") <- lib[[key]]$module
+      attr(p, "meridian_trait") <- lib[[key]]$trait
+      out[[key]] <- p
+    }
   }
   out
 }

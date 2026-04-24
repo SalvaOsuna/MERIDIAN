@@ -95,7 +95,7 @@ mod_reports_ui <- function(id) {
           plot_export_controls_ui(ns, "plt"),
           shiny::downloadButton(ns("dl_plot_file"), "Download Plot", class = "btn-success w-100")
         ),
-        plotly::plotlyOutput(ns("plot_export_preview"), height = "560px")
+        shiny::plotOutput(ns("plot_export_preview"), height = "560px")
       )
     ),
     bslib::nav_panel(
@@ -378,32 +378,34 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
 
     assert_plot_matches_trait <- function(p, trait, key) {
       if (!inherits(p, "gg")) stop("Retrieved object is not a ggplot for key: ", key)
-      ttl <- p$labels$title %||% ""
-      if (nzchar(ttl) && grepl("—", ttl, fixed = TRUE) && !grepl(trait, ttl, fixed = TRUE)) {
+      key_attr <- attr(p, "meridian_key")
+      tr_attr <- attr(p, "meridian_trait")
+      if (!is.null(key_attr) && !identical(key_attr, key)) {
+        stop("Registry mismatch for selected key ", key, ". Please regenerate this trait and try again.")
+      }
+      if (!is.null(tr_attr) && !identical(as.character(tr_attr), as.character(trait))) {
         stop("Registry mismatch for selected key ", key, ". Please regenerate this trait and try again.")
       }
       TRUE
     }
 
-    output$plot_export_preview <- plotly::renderPlotly({
+    output$plot_export_preview <- shiny::renderPlot({
       key <- selected_plot_key()
       p <- selected_plot()
       if (is.null(p)) {
-        return(
-          plotly::plotly_empty() |>
-            plotly::layout(title = "This plot has not been generated yet. Please run the analysis for this trait first.")
-        )
+        graphics::plot.new()
+        graphics::text(0.5, 0.5, "This plot has not been generated yet.\nPlease run the analysis for this trait first.")
+        return(invisible(NULL))
       }
       validate(need(inherits(p, "gg"), paste0("Invalid plot object at key: ", key)))
       ok <- tryCatch(assert_plot_matches_trait(p, input$plot_trait, key), error = function(e) e)
       if (inherits(ok, "error")) {
-        return(
-          plotly::plotly_empty() |>
-            plotly::layout(title = conditionMessage(ok))
-        )
+        graphics::plot.new()
+        graphics::text(0.5, 0.5, conditionMessage(ok))
+        return(invisible(NULL))
       }
-      plotly::ggplotly(apply_common_theme_controls(p, plot_cfg()))
-    })
+      print(apply_common_theme_controls(p, plot_cfg()))
+    }, res = 96)
 
     output$dl_plot_file <- shiny::downloadHandler(
       filename = function() {
@@ -437,8 +439,16 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
           fill = FALSE,
           lapply(ixs, function(i) {
             id <- ids[i]
+            p <- plot_registry[[id]]
+            lbl <- paste0(
+              id,
+              if (inherits(p, "gg")) {
+                t <- p$labels$title %||% ""
+                if (nzchar(t)) paste0(" | ", t) else ""
+              } else ""
+            )
             bslib::card(
-              bslib::card_header(id),
+              bslib::card_header(lbl),
               shiny::plotOutput(ns(paste0("thumb_", i)), height = "180px"),
               shiny::checkboxInput(ns(paste0("sel_", i)), "Include", value = FALSE)
             )
@@ -539,7 +549,13 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
           cex = 1
         )
       })
-    })
+    }, width = function() {
+      w <- session$clientData[[paste0("output_", ns("composer_preview"), "_width")]] %||% 900
+      max(400, as.numeric(w))
+    }, height = function() {
+      h <- session$clientData[[paste0("output_", ns("composer_preview"), "_height")]] %||% 600
+      max(300, as.numeric(h))
+    }, res = 96)
 
     output$comp_warning_ui <- shiny::renderUI({
       ids <- selected_comp_ids()
@@ -589,6 +605,10 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
 
     # ---- Report generation ----
     report_file <- shiny::reactiveVal(NULL)
+    report_meta <- shiny::reactiveVal(list(
+      filename = "MERIDIAN_Report.html",
+      content_type = "text/html"
+    ))
     report_error <- shiny::reactiveVal("")
     report_status <- shiny::reactiveVal("No report generated yet.")
 
@@ -601,14 +621,14 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
     output$report_error <- shiny::renderText(report_error())
 
     output$download_report_auto <- shiny::downloadHandler(
-      filename = function() basename(report_file() %||% "report.html"),
+      filename = function() report_meta()$filename %||% "MERIDIAN_Report.html",
       content = function(file) {
         req(report_file(), file.exists(report_file()))
         file.copy(report_file(), file, overwrite = TRUE)
       }
     )
     output$download_report_manual <- shiny::downloadHandler(
-      filename = function() basename(report_file() %||% "report.html"),
+      filename = function() report_meta()$filename %||% "MERIDIAN_Report.html",
       content = function(file) {
         req(report_file(), file.exists(report_file()))
         file.copy(report_file(), file, overwrite = TRUE)
@@ -659,9 +679,15 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
 
         render_meridian_report(out, fmt, params, session = session)
         report_file(out)
+        report_meta(list(
+          filename = basename(out),
+          content_type = if (identical(fmt, "PDF")) "application/pdf" else "text/html"
+        ))
         report_status(paste0("Report ready: ", basename(out)))
         removeModal()
-        session$sendCustomMessage("meridian-auto-download", ns("download_report_auto"))
+        session$onFlushed(function() {
+          session$sendCustomMessage("meridian-auto-download", ns("download_report_auto"))
+        }, once = TRUE)
       }, error = function(e) {
         report_error(conditionMessage(e))
         report_status("Report generation failed.")
