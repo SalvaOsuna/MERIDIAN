@@ -1,6 +1,6 @@
 # =============================================================================
 # MERIDIAN — Module 4: Stability Analysis
-# Native AMMI (ammi.R + ammi_plots.R), GGE (metan), Eberhart-Russell,
+# Native AMMI (ammi.R + ammi_plots.R), GGE (metan), native fast Eberhart-Russell,
 # Wricke, Shukla, Combined rankings
 # =============================================================================
 
@@ -275,7 +275,7 @@ mod_stability_ui <- function(id) {
         bslib::card(
           bslib::card_header(
             shiny::tagList(
-              "Combined Stability Indices (metan::ge_stats)",
+              "Combined Stability Indices (native fast kernel)",
               shiny::downloadButton(ns("dl_rankings_csv"), "CSV",
                 class = "btn-outline-primary btn-sm float-end ms-1"),
               shiny::downloadButton(ns("dl_rankings_xlsx"), "Excel",
@@ -343,36 +343,50 @@ mod_stability_server <- function(id, data_result) {
         # GGE (metan) — use pre-prepared data
         shiny::incProgress(0.15, detail = "GGE biplot")
         gge_res <- safe_analysis(
-          run_gge_fast(df_prepared, db()$gen_col, db()$env_col, input$trait),
+          run_gge_fast(db()$data, db()$gen_col, db()$env_col, input$trait),
+          session
+        )
+        if (!is.null(gge_res$n_imputed) && gge_res$n_imputed > 0) {
+          shiny::showNotification(
+            paste0(
+              "GGE: preserved all environments by imputing ",
+              gge_res$n_imputed, " missing GxE mean cell(s)."
+            ),
+            type = "message",
+            duration = 8
+          )
+        }
+
+        # Native stability kernels share one precomputed GxE matrix
+        shiny::incProgress(0.05, detail = "Precomputing GxE matrices")
+        ge_cache <- safe_analysis(
+          build_ge_matrices(df_prepared, db()$gen_col, db()$env_col, input$trait),
           session
         )
 
-        # Eberhart-Russell (metan) — use pre-prepared data
-        shiny::incProgress(0.15, detail = "Eberhart-Russell")
+        # Eberhart-Russell (native fast)
+        shiny::incProgress(0.10, detail = "Eberhart-Russell")
         er_res <- safe_analysis(
-          run_eberhart_russell_fast(df_prepared, db()$gen_col, db()$env_col,
-                              db()$rep_col, input$trait),
+          list(model = NULL, params = compute_er_table_fast(ge_cache)),
           session
         )
 
-        # Wricke (metan) — use pre-prepared data
-        shiny::incProgress(0.15, detail = "Wricke ecovalence")
+        # Wricke (native fast)
+        shiny::incProgress(0.10, detail = "Wricke ecovalence")
         wricke_res <- safe_analysis(
-          compute_wricke_fast(df_prepared, db()$gen_col, db()$env_col,
-                         db()$rep_col, input$trait),
+          list(model = NULL, params = compute_wricke_table_fast(ge_cache)),
           session
         )
 
-        # Shukla (metan) — use pre-prepared data
+        # Shukla (native fast)
         shiny::incProgress(0.10, detail = "Shukla variance")
         shukla_res <- safe_analysis(
-          compute_shukla_fast(df_prepared, db()$gen_col, db()$env_col,
-                         db()$rep_col, input$trait),
+          list(model = NULL, params = compute_shukla_table_fast(ge_cache)),
           session
         )
 
-        # Combined ge_stats (metan) — use pre-prepared data
-        shiny::incProgress(0.10, detail = "Combined stability stats")
+        # Combined stability table (native fast)
+        shiny::incProgress(0.15, detail = "Combined stability stats")
         all_res <- safe_analysis(
           run_all_stability_fast(df_prepared, db()$gen_col, db()$env_col,
                             db()$rep_col, input$trait),
@@ -501,7 +515,7 @@ mod_stability_server <- function(id, data_result) {
     })
 
     # ===========================================================================
-    # GGE / Eberhart-Russell / Wricke / Shukla (metan-based)
+    # GGE / Eberhart-Russell / Wricke / Shukla
     # ===========================================================================
 
     # ---- GGE Biplot (custom plotly) ----
@@ -602,7 +616,7 @@ mod_stability_server <- function(id, data_result) {
       render_stability_dt(stab_results()$shukla)
     })
 
-    # ---- Combined Rankings (ge_stats) ----
+    # ---- Combined Rankings ----
     rankings_data <- shiny::reactive({
       req(stab_results(), stab_results()$all)
       stability_ranking(stab_results()$all$stats_table)

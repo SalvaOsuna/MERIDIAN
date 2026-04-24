@@ -33,7 +33,7 @@ LABELS <- list(
   m1_select_col    = "Column Column (optional)",
   m1_select_traits = "Response Variables (traits)",
   m1_download_ex   = "Download Example Dataset",
-  m1_design        = "Detected Design",
+  m1_design        = "Experimental Design",
   m1_preview       = "Data Preview",
   m1_missing       = "Missing Values",
   m1_summary_env   = "Summary by Environment",

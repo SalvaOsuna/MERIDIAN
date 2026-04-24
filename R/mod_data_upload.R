@@ -66,6 +66,36 @@ mod_data_upload_ui <- function(id) {
       shiny::checkboxInput(ns("header"), LABELS$m1_header, value = TRUE),
 
       shiny::tags$hr(),
+      shiny::tags$h6(shiny::icon("sliders-h"), " Experimental Design"),
+      shiny::selectInput(
+        ns("design_manual"),
+        "Design Selection",
+        choices = c(
+          "Auto-detect" = "Auto",
+          "RCBD" = "RCBD",
+          "Alpha-Lattice" = "Alpha-Lattice",
+          "Augmented" = "Augmented",
+          "Unbalanced" = "Unbalanced"
+        ),
+        selected = "Auto"
+      ),
+      shiny::conditionalPanel(
+        condition = sprintf("input['%s'] == 'Augmented'", ns("design_manual")),
+        shinyWidgets::pickerInput(
+          ns("aug_checks"),
+          "Control Checks (Genotypes)",
+          choices = NULL,
+          multiple = TRUE,
+          options = list(
+            `actions-box` = TRUE,
+            `live-search` = TRUE,
+            `selected-text-format` = "count > 3",
+            `count-selected-text` = "{0} checks selected"
+          )
+        )
+      ),
+
+      shiny::tags$hr(),
 
       # Column mapping
       shiny::tags$h6(
@@ -341,6 +371,51 @@ mod_data_upload_server <- function(id) {
       )
     })
 
+    # ---- Observe: Update augmented check choices from selected genotype column ----
+    shiny::observeEvent(
+      list(raw_data(), input$col_gen, input$design_manual),
+      {
+        req(raw_data(), input$col_gen)
+        df <- raw_data()
+        if (!input$col_gen %in% names(df)) return(NULL)
+
+        gen_vals <- sort(unique(as.character(df[[input$col_gen]])))
+        gen_vals <- gen_vals[!is.na(gen_vals) & nzchar(gen_vals)]
+        if (length(gen_vals) == 0) return(NULL)
+
+        detected_aug_checks <- character(0)
+        design_sel <- input$design_manual %||% "Auto"
+        if (design_sel %in% c("Auto", "Augmented")) {
+          rep_guess <- input$col_rep
+          env_guess <- input$col_env
+          if (!is.null(rep_guess) && rep_guess %in% names(df) &&
+              !is.null(env_guess) && env_guess %in% names(df)) {
+            rep_counts <- df |>
+              dplyr::group_by(.data[[env_guess]], .data[[input$col_gen]]) |>
+              dplyr::summarise(n_rep = dplyr::n_distinct(.data[[rep_guess]]), .groups = "drop") |>
+              dplyr::group_by(.data[[input$col_gen]]) |>
+              dplyr::summarise(avg_rep = mean(n_rep, na.rm = TRUE), .groups = "drop")
+            if (nrow(rep_counts) > 0) {
+              max_rep <- max(rep_counts$avg_rep, na.rm = TRUE)
+              detected_aug_checks <- rep_counts |>
+                dplyr::filter(avg_rep >= max_rep - 1e-8, avg_rep > 1) |>
+                dplyr::pull(.data[[input$col_gen]]) |>
+                as.character()
+            }
+          }
+        }
+
+        selected_now <- intersect(input$aug_checks %||% character(0), gen_vals)
+        selected_final <- unique(c(selected_now, detected_aug_checks))
+        shinyWidgets::updatePickerInput(
+          session, "aug_checks",
+          choices = gen_vals,
+          selected = selected_final
+        )
+      },
+      ignoreInit = FALSE
+    )
+
     # ---- Reactive: Validated data bundle ----
     data_bundle <- shiny::reactive({
       req(raw_data())
@@ -358,7 +433,27 @@ mod_data_upload_server <- function(id) {
       validation <- validate_met_data(df, gen_col, env_col, rep_col, traits)
 
       # Detect design
-      design <- detect_design(df, gen_col, env_col, rep_col, block_col)
+      detected_design <- detect_design(df, gen_col, env_col, rep_col, block_col)
+      selected_design <- input$design_manual %||% "Auto"
+
+      design <- if (!identical(selected_design, "Auto")) {
+        list(
+          design = selected_design,
+          description = paste0(
+            selected_design, " selected manually by user."
+          ),
+          icon = "sliders-h",
+          source = "Manual"
+        )
+      } else {
+        detected_design$source <- "Auto"
+        detected_design
+      }
+
+      aug_checks <- character(0)
+      if (identical(design$design, "Augmented")) {
+        aug_checks <- intersect(input$aug_checks %||% character(0), unique(as.character(df[[gen_col]])))
+      }
 
       list(
         data       = df,
@@ -370,6 +465,7 @@ mod_data_upload_server <- function(id) {
         col_col    = col_col,
         traits     = traits,
         design     = design,
+        augmented_checks = aug_checks,
         validation = validation,
         env_data   = raw_env_data()
       )
@@ -458,6 +554,7 @@ mod_data_upload_server <- function(id) {
     output$design_details <- shiny::renderUI({
       req(data_bundle())
       design <- data_bundle()$design
+      checks <- data_bundle()$augmented_checks %||% character(0)
 
       badge_class <- switch(tolower(design$design),
         "rcbd"        = "badge-rcbd",
@@ -470,16 +567,29 @@ mod_data_upload_server <- function(id) {
         shiny::tags$p(
           shiny::tags$span(class = paste("badge badge-design", badge_class),
                            design$design),
+          shiny::tags$span(
+            style = "margin-left: 8px; color: #666; font-size: 0.8rem;",
+            paste0("(", design$source %||% "Auto", ")")
+          ),
           style = "margin-bottom: 0.5rem;"
         ),
-        shiny::tags$p(design$description, style = "font-size: 0.9rem; color: #555;")
+        shiny::tags$p(design$description, style = "font-size: 0.9rem; color: #555;"),
+        if (identical(design$design, "Augmented")) {
+          shiny::tags$p(
+            paste0("Selected check genotypes: ", length(checks),
+                   if (length(checks) > 0) paste0(" (", paste(utils::head(checks, 8), collapse = ", "),
+                                                if (length(checks) > 8) ", ..." else "", ")") else ""),
+            style = "font-size: 0.85rem; color: #444;"
+          )
+        }
       )
     })
 
     # ---- Output: Validation messages ----
     output$validation_messages <- shiny::renderUI({
       req(data_bundle())
-      v <- data_bundle()$validation
+      db <- data_bundle()
+      v <- db$validation
 
       msgs <- shiny::tagList()
 
@@ -508,6 +618,20 @@ mod_data_upload_server <- function(id) {
           class = "alert alert-success py-1 px-2",
           style = "font-size: 0.85rem;",
           shiny::icon("check-circle"), " All validations passed."
+        )
+      }
+
+      # Augmented-design specific validation
+      if (db$design$design == "Augmented" &&
+          length(db$augmented_checks %||% character(0)) == 0) {
+        msgs <- shiny::tagList(
+          msgs,
+          shiny::tags$div(
+            class = "alert alert-warning py-1 px-2 mb-1",
+            style = "font-size: 0.85rem;",
+            shiny::icon("exclamation-triangle"),
+            " Augmented design selected but no control checks were selected."
+          )
         )
       }
 

@@ -150,36 +150,141 @@ mod_spatial_server <- function(id, data_result) {
       env_data[[col_col]] <- as.numeric(as.character(env_data[[col_col]]))
       env_data[[gen_col]] <- as.factor(env_data[[gen_col]])
 
-      # Fixed terms
-      fixed_form <- as.formula(paste(trait, "~ 1"))
-      if (length(fixed_terms) > 0) {
-        for (term in fixed_terms) {
-          env_data[[term]] <- as.factor(env_data[[term]])
-        }
-        fixed_form <- as.formula(paste(trait, "~", paste(fixed_terms, collapse = " + ")))
+      qn <- function(x) paste0("`", x, "`")
+      clean_terms <- function(x) unique(x[!is.na(x) & nzchar(x)])
+
+      fixed_terms_req <- clean_terms(fixed_terms)
+      random_terms_req <- clean_terms(random_terms)
+
+      fixed_terms <- fixed_terms_req[fixed_terms_req %in% names(env_data)]
+      random_terms <- random_terms_req[random_terms_req %in% names(env_data)]
+
+      # Keep terms explicit for users: if duplicated across fixed/random, preserve in fixed.
+      dropped_random_overlap <- intersect(random_terms, fixed_terms)
+      random_terms <- setdiff(random_terms, fixed_terms)
+
+      for (term in unique(c(fixed_terms, random_terms))) {
+        env_data[[term]] <- droplevels(as.factor(env_data[[term]]))
       }
+
+      is_nested_in <- function(child, parent, dat) {
+        x <- dat[[child]]
+        y <- dat[[parent]]
+        ok <- !is.na(x) & !is.na(y)
+        if (!any(ok)) return(FALSE)
+        x <- x[ok]
+        y <- y[ok]
+        split_y <- split(as.character(y), as.character(x))
+        all(vapply(split_y, function(v) length(unique(v)) <= 1L, logical(1)))
+      }
+
+      # Reparameterize nested factors (e.g., block within rep) instead of dropping.
+      fixed_labels <- if (length(fixed_terms) > 0) {
+        stats::setNames(vapply(fixed_terms, qn, character(1)), fixed_terms)
+      } else {
+        character(0)
+      }
+      nested_rewrites <- character(0)
+
+      if (length(fixed_terms) > 1) {
+        for (child in fixed_terms) {
+          parents <- setdiff(fixed_terms, child)
+          nested_parents <- parents[vapply(parents, function(p) is_nested_in(child, p, env_data), logical(1))]
+          if (length(nested_parents) > 0) {
+            parent <- nested_parents[which.min(vapply(nested_parents, function(p) nlevels(env_data[[p]]), integer(1)))]
+            fixed_labels[child] <- paste0(qn(parent), ":", qn(child))
+            nested_rewrites <- c(nested_rewrites, paste0(child, " nested in ", parent, " -> modeled as ", parent, ":", child))
+          }
+        }
+      }
+
+      # Build fixed formulas (primary with intercept, retry without intercept if needed)
+      make_fixed_form <- function(use_intercept = TRUE) {
+        if (length(fixed_labels) == 0) {
+          return(stats::reformulate(termlabels = "1", response = qn(trait)))
+        }
+        rhs <- paste(unique(unname(fixed_labels)), collapse = " + ")
+        if (use_intercept) {
+          stats::as.formula(paste0(qn(trait), " ~ ", rhs))
+        } else {
+          stats::as.formula(paste0(qn(trait), " ~ 0 + ", rhs))
+        }
+      }
+
+      fixed_form <- make_fixed_form(use_intercept = TRUE)
+      used_no_intercept <- FALSE
+      dropped_fixed <- character(0)
 
       # Random terms
       random_form <- NULL
       if (length(random_terms) > 0) {
-        for (term in random_terms) {
-          env_data[[term]] <- as.factor(env_data[[term]])
-        }
-        random_form <- as.formula(paste("~", paste(random_terms, collapse = " + ")))
+        random_form <- stats::reformulate(termlabels = qn(random_terms))
       }
 
       # Spatial formula
-      spatial_form <- as.formula(paste0("~ PSANOVA(", col_col, ", ", row_col, ", nseg = c(", nseg_col, ", ", nseg_row, "))"))
-
-      SpATS::SpATS(
-        response = trait,
-        spatial = spatial_form,
-        genotype = gen_col,
-        fixed = fixed_form,
-        random = random_form,
-        data = env_data,
-        genotype.as.random = gen_random
+      spatial_form <- stats::as.formula(
+        paste0("~ PSANOVA(", qn(col_col), ", ", qn(row_col),
+               ", nseg = c(", nseg_col, ", ", nseg_row, "))")
       )
+
+      run_spats_core <- function(form) {
+        SpATS::SpATS(
+          response = trait,
+          spatial = spatial_form,
+          genotype = gen_col,
+          fixed = form,
+          random = random_form,
+          data = env_data,
+          genotype.as.random = gen_random
+        )
+      }
+
+      mod <- tryCatch(
+        run_spats_core(fixed_form),
+        error = function(e1) {
+          msg1 <- conditionMessage(e1)
+          if (grepl("not of full rank", msg1, ignore.case = TRUE) && length(fixed_terms) > 0) {
+            used_no_intercept <<- TRUE
+            fixed_form_0 <- make_fixed_form(use_intercept = FALSE)
+
+            return(
+              tryCatch(
+                run_spats_core(fixed_form_0),
+                error = function(e2) {
+                  msg2 <- conditionMessage(e2)
+                  # Last-resort fallback only when structure is still singular
+                  if (grepl("not of full rank", msg2, ignore.case = TRUE) && length(fixed_terms) > 0) {
+                    mm <- tryCatch(stats::model.matrix(fixed_form_0, data = env_data), error = function(e) NULL)
+                    if (!is.null(mm)) {
+                      qr_mm <- qr(mm)
+                      keep_cols <- qr_mm$pivot[seq_len(qr_mm$rank)]
+                      col_names <- colnames(mm)[keep_cols]
+                      drop_names <- setdiff(colnames(mm), col_names)
+                      dropped_fixed <<- unique(c(dropped_fixed, drop_names))
+                    }
+                    fixed_final <- stats::reformulate(termlabels = "1", response = qn(trait))
+                    return(run_spats_core(fixed_final))
+                  }
+                  stop(e2)
+                }
+              )
+            )
+          }
+          stop(e1)
+        }
+      )
+
+      attr(mod, "meridian_meta") <- list(
+        requested_fixed = fixed_terms_req,
+        requested_random = random_terms_req,
+        used_fixed = unique(unname(fixed_labels)),
+        used_random = random_terms,
+        nested_rewrites = unique(nested_rewrites),
+        used_no_intercept = used_no_intercept,
+        dropped_fixed = unique(dropped_fixed),
+        dropped_random_overlap = unique(dropped_random_overlap)
+      )
+      mod
     }
 
     # ---- Fit Single Env SpATS Model ----
@@ -195,7 +300,7 @@ mod_spatial_server <- function(id, data_result) {
       env_data <- db$data[db$data[[db$env_col]] == input$env, ]
 
       safe_analysis({
-        fit_spats(
+        mod <- fit_spats(
           env_data = env_data,
           trait = input$trait,
           row_col = db$row_col,
@@ -207,6 +312,46 @@ mod_spatial_server <- function(id, data_result) {
           nseg_col = input$nseg_col,
           gen_random = input$gen_random
         )
+
+        meta <- attr(mod, "meridian_meta")
+        if (!is.null(meta)) {
+          if (!is.null(meta$nested_rewrites) && length(meta$nested_rewrites) > 0) {
+            shiny::showNotification(
+              paste0("Applied nested fixed-effect reparameterization: ", paste(meta$nested_rewrites, collapse = " | ")),
+              type = "message",
+              duration = 8
+            )
+          }
+          if (isTRUE(meta$used_no_intercept)) {
+            shiny::showNotification(
+              "Fixed-effect coding was switched to no-intercept parameterization to resolve linear dependencies while retaining selected terms.",
+              type = "message",
+              duration = 8
+            )
+          }
+          if (!is.null(meta$dropped_fixed) && length(meta$dropped_fixed) > 0) {
+            shiny::showNotification(
+              paste0(
+                "Last-resort simplification applied (severe confounding in fixed effects). Dropped: ",
+                paste(meta$dropped_fixed, collapse = ", "),
+                "."
+              ),
+              type = "warning",
+              duration = 8
+            )
+          }
+          if (!is.null(meta$dropped_random_overlap) && length(meta$dropped_random_overlap) > 0) {
+            shiny::showNotification(
+              paste0(
+                "Removed duplicated term(s) from random effects (already in fixed): ",
+                paste(meta$dropped_random_overlap, collapse = ", ")
+              ),
+              type = "message",
+              duration = 6
+            )
+          }
+        }
+        mod
       }, session)
     })
 
@@ -370,6 +515,7 @@ mod_spatial_server <- function(id, data_result) {
 
       envs <- unique(db$data[[db$env_col]])
       all_preds <- list()
+      dropped_env_msgs <- character(0)
 
       shiny::withProgress(message = 'Fitting SpATS models...', value = 0, {
         for (i in seq_along(envs)) {
@@ -402,6 +548,14 @@ mod_spatial_server <- function(id, data_result) {
           })
           
           if (!is.null(mod)) {
+            meta <- attr(mod, "meridian_meta")
+            if (!is.null(meta$dropped_fixed) && length(meta$dropped_fixed) > 0) {
+              dropped_env_msgs <- c(
+                dropped_env_msgs,
+                paste0(env_name, ": ", paste(meta$dropped_fixed, collapse = ", "))
+              )
+            }
+
             preds <- predict(mod, which = db$gen_col)
             all_preds[[env_name]] <- data.frame(
               Genotype = preds[[db$gen_col]],
@@ -412,6 +566,20 @@ mod_spatial_server <- function(id, data_result) {
           }
         }
       })
+
+      if (length(dropped_env_msgs) > 0) {
+        shown <- paste(utils::head(dropped_env_msgs, 5), collapse = " | ")
+        extra_n <- length(dropped_env_msgs) - min(length(dropped_env_msgs), 5)
+        suffix <- if (extra_n > 0) paste0(" | ... +", extra_n, " more") else ""
+        shiny::showNotification(
+          paste0(
+            "Some fixed terms were dropped in across-environment fitting to ensure full-rank models: ",
+            shown, suffix
+          ),
+          type = "warning",
+          duration = 10
+        )
+      }
       
       req(length(all_preds) > 0)
       

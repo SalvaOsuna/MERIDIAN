@@ -357,6 +357,8 @@ plot_gge_custom <- function(gge_model, trait, biplot_type = 2) {
   all_y <- c(gen_df$PC2, env_df$PC2, 0)
   x_pad <- (max(all_x) - min(all_x)) * 0.12
   y_pad <- (max(all_y) - min(all_y)) * 0.12
+  if (!is.finite(x_pad) || x_pad <= 0) x_pad <- 0.5
+  if (!is.finite(y_pad) || y_pad <= 0) y_pad <- 0.5
   x_lim <- c(min(all_x) - x_pad, max(all_x) + x_pad)
   y_lim <- c(min(all_y) - y_pad, max(all_y) + y_pad)
 
@@ -477,7 +479,9 @@ plot_gge_custom <- function(gge_model, trait, biplot_type = 2) {
       range = x_lim),
     yaxis = list(title = paste0("PC2 (", round(varexpl[2], 1), "%)"),
       zeroline = TRUE, zerolinecolor = "grey70", zerolinewidth = 1,
-      range = y_lim),
+      range = y_lim,
+      scaleanchor = "x",
+      scaleratio = 1),
     legend = list(orientation = "h", y = 1.05, x = 0.3),
     plot_bgcolor = "white", paper_bgcolor = "white", shapes = shapes)
 

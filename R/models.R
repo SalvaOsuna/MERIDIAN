@@ -9,9 +9,13 @@
 #' @param gen_col Genotype column name
 #' @param env_col Environment column name
 #' @param rep_col Replicate column name
+#' @param block_col Optional block column name
 #' @param trait Trait column name
+#' @param design_type Experimental design label
+#' @param augmented_checks Character vector of check genotypes (for augmented)
 #' @return List with anova_table, model, type3_table
-run_anova_met <- function(df, gen_col, env_col, rep_col, trait) {
+run_anova_met <- function(df, gen_col, env_col, rep_col, block_col = NULL, trait,
+                          design_type = "RCBD", augmented_checks = NULL) {
   # Remove NAs for this trait
   df_clean <- df[!is.na(df[[trait]]), ]
 
@@ -19,12 +23,45 @@ run_anova_met <- function(df, gen_col, env_col, rep_col, trait) {
   df_clean[[gen_col]] <- as.factor(df_clean[[gen_col]])
   df_clean[[env_col]] <- as.factor(df_clean[[env_col]])
   df_clean[[rep_col]] <- as.factor(df_clean[[rep_col]])
+  if (!is.null(block_col) && block_col %in% names(df_clean)) {
+    df_clean[[block_col]] <- as.factor(df_clean[[block_col]])
+  }
 
-  # Build formula: trait ~ gen + env + gen:env + env:rep
-  formula_str <- paste0("`", trait, "` ~ `", gen_col, "` + `", env_col,
-                        "` + `", gen_col, "`:`", env_col,
-                        "` + `", env_col, "`:`", rep_col, "`")
-  formula_obj <- as.formula(formula_str)
+  qn <- function(x) paste0("`", x, "`")
+
+  # Model terms by design
+  if (identical(design_type, "Augmented")) {
+    check_vals <- as.character(augmented_checks %||% character(0))
+    df_clean$.is_check <- factor(
+      ifelse(as.character(df_clean[[gen_col]]) %in% check_vals, "Check", "Test")
+    )
+
+    termlabels <- c(
+      qn(env_col),
+      ".is_check",
+      paste0(qn(env_col), ":.is_check"),
+      paste0(qn(gen_col), ":.is_check"),
+      paste0(qn(env_col), ":", qn(rep_col))
+    )
+    if (!is.null(block_col) && block_col %in% names(df_clean)) {
+      termlabels <- c(termlabels, paste0(qn(env_col), ":", qn(block_col)))
+    }
+  } else {
+    termlabels <- c(
+      qn(gen_col),
+      qn(env_col),
+      paste0(qn(gen_col), ":", qn(env_col)),
+      paste0(qn(env_col), ":", qn(rep_col))
+    )
+    if (!is.null(block_col) && block_col %in% names(df_clean)) {
+      termlabels <- c(termlabels, paste0(qn(env_col), ":", qn(block_col)))
+    }
+  }
+
+  formula_obj <- stats::reformulate(
+    termlabels = unique(termlabels),
+    response = qn(trait)
+  )
 
   # Fit model
  model <- stats::aov(formula_obj, data = df_clean)
@@ -47,6 +84,10 @@ run_anova_met <- function(df, gen_col, env_col, rep_col, trait) {
   anova_table$Source <- gsub(paste0("`", gen_col, "`"), "Genotype (G)", anova_table$Source)
   anova_table$Source <- gsub(paste0("`", env_col, "`"), "Environment (E)", anova_table$Source)
   anova_table$Source <- gsub(paste0("`", rep_col, "`"), "Rep", anova_table$Source)
+  if (!is.null(block_col)) {
+    anova_table$Source <- gsub(paste0("`", block_col, "`"), "Block", anova_table$Source)
+  }
+  anova_table$Source <- gsub("\\.is_check", "CheckStatus", anova_table$Source)
   anova_table$Source <- gsub(":", " x ", anova_table$Source)
   anova_table$Source[nrow(anova_table)] <- "Residuals"
 
@@ -86,11 +127,16 @@ run_mixed_model <- function(df, gen_col, env_col, rep_col, trait) {
   df_clean[[env_col]] <- as.factor(df_clean[[env_col]])
   df_clean[[rep_col]] <- as.factor(df_clean[[rep_col]])
 
-  # Mixed model: genotype as random
-  formula_str <- paste0("`", trait, "` ~ `", env_col, "` + (1|`", gen_col,
-                        "`) + (1|`", gen_col, "`:`", env_col,
-                        "`) + (1|`", env_col, "`:`", rep_col, "`)")
-  formula_obj <- as.formula(formula_str)
+  qn <- function(x) paste0("`", x, "`")
+  formula_obj <- stats::reformulate(
+    termlabels = c(
+      qn(env_col),
+      paste0("(1|", qn(gen_col), ")"),
+      paste0("(1|", qn(gen_col), ":", qn(env_col), ")"),
+      paste0("(1|", qn(env_col), ":", qn(rep_col), ")")
+    ),
+    response = qn(trait)
+  )
 
   model <- lme4::lmer(
     formula_obj, 
@@ -164,11 +210,15 @@ compute_blues <- function(df, gen_col, env_col, rep_col, trait) {
   df_clean[[env_col]] <- as.factor(df_clean[[env_col]])
   df_clean[[rep_col]] <- as.factor(df_clean[[rep_col]])
 
-  # Genotype as fixed, environment as random
-  formula_str <- paste0("`", trait, "` ~ `", gen_col,
-                        "` + (1|`", env_col,
-                        "`) + (1|`", env_col, "`:`", rep_col, "`)")
-  formula_obj <- as.formula(formula_str)
+  qn <- function(x) paste0("`", x, "`")
+  formula_obj <- stats::reformulate(
+    termlabels = c(
+      qn(gen_col),
+      paste0("(1|", qn(env_col), ")"),
+      paste0("(1|", qn(env_col), ":", qn(rep_col), ")")
+    ),
+    response = qn(trait)
+  )
 
   model <- lme4::lmer(
     formula_obj, 
@@ -210,12 +260,16 @@ compute_blups <- function(df, gen_col, env_col, rep_col, trait) {
   df_clean[[env_col]] <- as.factor(df_clean[[env_col]])
   df_clean[[rep_col]] <- as.factor(df_clean[[rep_col]])
 
-  # Genotype as random, environment as fixed
-  formula_str <- paste0("`", trait, "` ~ `", env_col,
-                        "` + (1|`", gen_col,
-                        "`) + (1|`", gen_col, "`:`", env_col,
-                        "`) + (1|`", env_col, "`:`", rep_col, "`)")
-  formula_obj <- as.formula(formula_str)
+  qn <- function(x) paste0("`", x, "`")
+  formula_obj <- stats::reformulate(
+    termlabels = c(
+      qn(env_col),
+      paste0("(1|", qn(gen_col), ")"),
+      paste0("(1|", qn(gen_col), ":", qn(env_col), ")"),
+      paste0("(1|", qn(env_col), ":", qn(rep_col), ")")
+    ),
+    response = qn(trait)
+  )
 
   model <- lme4::lmer(
     formula_obj, 

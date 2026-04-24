@@ -15,24 +15,41 @@
 #' @return List with env_strat dataframe
 run_mega_envs <- function(df, gen_col, env_col, trait) {
   df_std <- df[!is.na(df[[trait]]), ]
-  
-  # Calculate genotype means per environment
-  env_means <- df_std |>
-    dplyr::group_by(!!rlang::sym(env_col), !!rlang::sym(gen_col)) |>
-    dplyr::summarise(mean_val = mean(!!rlang::sym(trait), na.rm = TRUE), .groups = "drop")
-  
-  # Find winner per environment
-  winners <- env_means |>
-    dplyr::group_by(!!rlang::sym(env_col)) |>
-    dplyr::slice_max(mean_val, n = 1, with_ties = FALSE) |>
-    dplyr::ungroup() |>
-    dplyr::rename(Winning_Genotype = !!rlang::sym(gen_col), Max_Mean = mean_val)
-  
-  # Group environments by winner to form mega-environments
-  env_strat <- winners |>
-    dplyr::mutate(MEGA_ENV = paste0("ME: ", Winning_Genotype)) |>
-    dplyr::select(ENV = !!rlang::sym(env_col), MEGA_ENV, MEAN = Max_Mean, Winning_Genotype)
-  
+
+  gen_f <- as.factor(df_std[[gen_col]])
+  env_f <- as.factor(df_std[[env_col]])
+  y <- as.numeric(df_std[[trait]])
+
+  n_gen <- nlevels(gen_f)
+  n_env <- nlevels(env_f)
+
+  ge_means <- if (exists("cpp_ge_means", mode = "function")) {
+    cpp_ge_means(as.integer(gen_f), as.integer(env_f), y, n_gen, n_env)
+  } else {
+    tapply(y, list(gen_f, env_f), mean, na.rm = TRUE)
+  }
+
+  ge_means <- as.matrix(ge_means)
+  dimnames(ge_means) <- list(levels(gen_f), levels(env_f))
+
+  if (anyNA(ge_means)) {
+    valid_env <- colSums(!is.na(ge_means)) == n_gen
+    ge_means <- ge_means[, valid_env, drop = FALSE]
+  }
+  if (ncol(ge_means) == 0) return(list(env_strat = NULL))
+
+  winner_idx <- apply(ge_means, 2, which.max)
+  winning_gen <- rownames(ge_means)[winner_idx]
+  max_mean <- ge_means[cbind(winner_idx, seq_len(ncol(ge_means)))]
+
+  env_strat <- data.frame(
+    ENV = colnames(ge_means),
+    MEGA_ENV = paste0("ME: ", winning_gen),
+    MEAN = as.numeric(max_mean),
+    Winning_Genotype = winning_gen,
+    stringsAsFactors = FALSE
+  )
+
   list(
     env_strat = env_strat
   )
@@ -46,37 +63,63 @@ run_mega_envs <- function(df, gen_col, env_col, trait) {
 #' @return Data frame with fitted lines and scatter data
 run_finlay_wilkinson <- function(df, gen_col, env_col, trait) {
   df_std <- df[!is.na(df[[trait]]), ]
+  gen_f <- as.factor(df_std[[gen_col]])
+  env_f <- as.factor(df_std[[env_col]])
+  y <- as.numeric(df_std[[trait]])
 
-  # 1. Compute means
-  cell_means <- df_std |>
-    dplyr::group_by(!!rlang::sym(gen_col), !!rlang::sym(env_col)) |>
-    dplyr::summarise(mean_val = mean(!!rlang::sym(trait), na.rm = TRUE), .groups = "drop")
+  n_gen <- nlevels(gen_f)
+  n_env <- nlevels(env_f)
 
-  grand_mean <- mean(cell_means$mean_val, na.rm = TRUE)
+  ge_means <- if (exists("cpp_ge_means", mode = "function")) {
+    cpp_ge_means(as.integer(gen_f), as.integer(env_f), y, n_gen, n_env)
+  } else {
+    tapply(y, list(gen_f, env_f), mean, na.rm = TRUE)
+  }
 
-  # 2. Compute Environmental Index (EI)
-  env_means <- cell_means |>
-    dplyr::group_by(!!rlang::sym(env_col)) |>
-    dplyr::summarise(env_mean = mean(mean_val, na.rm = TRUE), .groups = "drop") |>
-    dplyr::mutate(EI = env_mean - grand_mean)
+  ge_means <- as.matrix(ge_means)
+  dimnames(ge_means) <- list(levels(gen_f), levels(env_f))
 
-  # 3. Merge EI back to cell means
-  fw_data <- cell_means |>
-    dplyr::left_join(env_means |> dplyr::select(!!rlang::sym(env_col), EI), by = env_col)
+  if (anyNA(ge_means)) {
+    keep_gen <- rowSums(!is.na(ge_means)) == ncol(ge_means)
+    keep_env <- colSums(!is.na(ge_means)) == nrow(ge_means)
+    ge_means <- ge_means[keep_gen, keep_env, drop = FALSE]
+  }
+  if (nrow(ge_means) < 2 || ncol(ge_means) < 2) {
+    return(list(fw_data = NULL, gen_slopes = NULL, env_means = NULL))
+  }
 
-  # 4. Fit regressions using fast C++ kernel
-  gen_fct <- as.factor(fw_data[[gen_col]])
-  gen_ids <- as.integer(gen_fct)
-  n_gen   <- nlevels(gen_fct)
-  
-  cpp_res <- cpp_fw_regression(fw_data$mean_val, fw_data$EI, gen_ids, n_gen)
-  
+  grand_mean <- mean(ge_means)
+  env_mean_vec <- colMeans(ge_means)
+  ei <- env_mean_vec - grand_mean
+
+  fw_data <- expand.grid(
+    GEN_TMP = rownames(ge_means),
+    ENV_TMP = colnames(ge_means),
+    KEEP.OUT.ATTRS = FALSE,
+    stringsAsFactors = FALSE
+  )
+  fw_data$mean_val <- as.numeric(ge_means)
+  fw_data$EI <- rep(ei, each = nrow(ge_means))
+  names(fw_data)[1] <- gen_col
+  names(fw_data)[2] <- env_col
+
+  env_means <- data.frame(
+    ENV_TMP = colnames(ge_means),
+    env_mean = as.numeric(env_mean_vec),
+    EI = as.numeric(ei),
+    stringsAsFactors = FALSE
+  )
+  names(env_means)[1] <- env_col
+
+  gen_ids <- rep(seq_len(nrow(ge_means)), times = ncol(ge_means))
+  cpp_res <- cpp_fw_regression(fw_data$mean_val, fw_data$EI, gen_ids, nrow(ge_means))
+
   gen_slopes <- data.frame(
-    slope     = cpp_res$slope,
+    slope = cpp_res$slope,
     intercept = cpp_res$intercept,
     stringsAsFactors = FALSE
   )
-  gen_slopes[[gen_col]] <- levels(gen_fct)
+  gen_slopes[[gen_col]] <- rownames(ge_means)
 
   list(
     fw_data = fw_data,

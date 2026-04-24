@@ -1,5 +1,7 @@
 # MERIDIAN 🌾
 
+![MERIDIAN Logo](www/logo.png)
+
 **M**ulti-**E**nvironment **R**esearch **I**ntegration: **D**ata **I**ntelligence & **A**gronomic **N**etworks
 
 A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenotypic data analysis. Built for plant breeders, geneticists, and agronomists to streamline the statistical analysis workflow from raw data to publication-ready results.
@@ -9,6 +11,8 @@ A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenot
 ### Module 1 — Data Upload & Validation
 - Upload CSV or Excel files
 - Dynamic column mapping with auto-detection
+- Manual experimental design selection (or auto-detection)
+- Augmented design support with user-selected control checks
 - Experimental design detection (RCBD, Alpha-Lattice, Augmented)
 - Data preview with interactive tables
 - Missing value and duplicate detection
@@ -33,6 +37,7 @@ A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenot
 - AMMI (Additive Main effects and Multiplicative Interaction) analysis and biplots (AMMI1, AMMI2)
 - GGE (Genotype main effect plus G×E interaction) biplots
 - Interactive stability ranking plots and tables
+- Fast native stability kernels for large datasets (C++-accelerated GxE means, AMMI metrics, and Finlay-Wilkinson regression)
 
 ### Module 5 — Adaptation & Enviromics
 - Native Mega-Environment clustering (Which-won-where)
@@ -40,6 +45,7 @@ A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenot
 - Environmental Typology via Principal Component Analysis (PCA)
 - Covariate-Phenotype Correlation heatmaps
 - Interactive Geo-Spatial Trial Maps showing site productivity
+- Optimized phenotypic adaptation rendering (native plotly traces for large METs)
 
 ### Module 6 — Spatial Trends
 - Fit SpATS spatial models to visualize within-environment spatial trends
@@ -62,7 +68,7 @@ A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenot
 
 ```r
 # Clone the repository
-# git clone https://github.com/SalvaOsuna/MET-Analyzer.git
+# git clone https://github.com/SalvaOsuna/MERIDIAN.git
 
 # Install required packages
 install.packages(c(
@@ -120,6 +126,11 @@ shiny::runApp()
 ```r
 rsconnect::deployApp()
 ```
+
+## Notes
+
+- If the app logo does not appear, hard refresh the browser (`Ctrl+F5`) to clear cached static assets.
+- The app now serves the logo via `/assets/logo.png` (mapped from `www/`), which is robust for local and deployed runs.
 
 ## Tech Stack
 

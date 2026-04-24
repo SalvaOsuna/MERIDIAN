@@ -145,7 +145,10 @@ run_ammi <- function(data, gen, env, rep = NULL, trait, n_axis = 2) {
   # Para el ANOVA completo (con reps), usar lm si hay repeticiones
   
   if (!is.null(rep)) {
-    formula_full <- as.formula("TRAIT ~ GEN + ENV + GEN:ENV")
+    formula_full <- stats::reformulate(
+      termlabels = c("GEN", "ENV", "GEN:ENV"),
+      response = "TRAIT"
+    )
     model_full   <- lm(formula_full, data = df)
     anova_table  <- as.data.frame(anova(model_full))
     anova_table$Source <- rownames(anova_table)

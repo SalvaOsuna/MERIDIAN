@@ -31,6 +31,11 @@ if (file.exists("src/fast_pruning.cpp")) {
   Rcpp::sourceCpp("src/fast_pruning.cpp")
 }
 
+# ---- Static assets ----
+if (dir.exists("www")) {
+  shiny::addResourcePath("assets", "www")
+}
+
 # ---- Source R files ----
 source("R/utils.R")
 source("R/data_processing.R")
@@ -86,7 +91,7 @@ placeholder_ui <- function(module_name) {
 # =============================================================================
 ui <- page_navbar(
   title = tags$span(
-    tags$img(src = "logo.png", height = "32px", style = "margin-right: 8px;"),
+    tags$img(src = "assets/logo.png", height = "32px", style = "margin-right: 8px;"),
     LABELS$app_title
   ),
   id     = "main_navbar",
@@ -161,7 +166,7 @@ server <- function(input, output, session) {
   showModal(modalDialog(
     title = tags$div(
       style = "display: flex; align-items: center; gap: 10px;",
-      tags$img(src = "logo.png", height = "40px"),
+      tags$img(src = "assets/logo.png", height = "40px"),
       tags$span("Welcome to MERIDIAN", style = "font-weight: 600;")
     ),
     tags$div(

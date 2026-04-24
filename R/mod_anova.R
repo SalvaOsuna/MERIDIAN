@@ -201,7 +201,9 @@ mod_anova_server <- function(id, data_result) {
         shiny::incProgress(0.1, detail = "Fixed-effects ANOVA")
         anova_res <- safe_analysis(
           run_anova_met(db()$data, db()$gen_col, db()$env_col,
-                        db()$rep_col, input$trait),
+                        db()$rep_col, db()$block_col, input$trait,
+                        design_type = db()$design$design %||% "RCBD",
+                        augmented_checks = db()$augmented_checks %||% character(0)),
           session
         )
 
