@@ -3,6 +3,8 @@
 .Rhistory
 .RData
 .Ruserdata
+Shiny_MET.code-workspace
+
 # renv library (large, reproducible from lock file)
 renv/library/
 renv/staging/

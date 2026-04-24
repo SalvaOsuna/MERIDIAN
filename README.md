@@ -43,7 +43,9 @@ A comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenot
 
 ### Module 6 — Spatial Trends
 - Fit SpATS spatial models to visualize within-environment spatial trends
+- Customizable plot outputs (annotations, missing data, raw/percentage scales)
 - Dynamic P-spline segments and user-defined Fixed/Random terms
+- Variance Components tab with Generalized Heritability and interactive variance partitioning
 - Extract and download adjusted phenotypic means (BLUPs/BLUEs)
 - Perform single environment spatial analysis or batch process across all environments
 - Auto-detects row and column coordinates

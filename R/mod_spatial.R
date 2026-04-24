@@ -28,6 +28,12 @@ mod_spatial_ui <- function(id) {
         shiny::numericInput(ns("nseg_row"), LABELS$m7_nseg_row, value = 10, min = 2),
         shiny::numericInput(ns("nseg_col"), LABELS$m7_nseg_col, value = 10, min = 2)
       ),
+      
+      shiny::tags$hr(),
+      shiny::tags$h6("Plot Options"),
+      shiny::checkboxInput(ns("plot_annotated"), "Annotated Plot", value = FALSE),
+      shiny::checkboxInput(ns("plot_missing"), "Depict Missing Data", value = FALSE),
+      shiny::selectInput(ns("plot_spatrend"), "Spatial Trend Scale", choices = c("raw", "percentage"), selected = "raw"),
 
       shiny::actionButton(ns("run_spats"), "Fit SpATS (Single Env)", class = "btn-primary w-100 mb-2", icon = shiny::icon("play")),
       
@@ -49,6 +55,31 @@ mod_spatial_ui <- function(id) {
           shinycssloaders::withSpinner(
             shiny::plotOutput(ns("spats_plot"), height = "700px"),
             type = 6, color = "#2c7a51"
+          )
+        )
+      ),
+      bslib::nav_panel(
+        title = shiny::tagList(shiny::icon("chart-pie"), " Variance Components"),
+        style = "min-height: 400px;",
+        shiny::uiOutput(ns("spats_summary_boxes")),
+        bslib::layout_column_wrap(
+          width = 1 / 2,
+          fill  = FALSE,
+          bslib::card(
+            bslib::card_header("Variance Components (SpATS)"),
+            full_screen = TRUE,
+            shinycssloaders::withSpinner(
+              DT::dataTableOutput(ns("var_table")),
+              type = 6, color = "#2c7a51"
+            )
+          ),
+          bslib::card(
+            bslib::card_header("Variance Partition"),
+            full_screen = TRUE,
+            shinycssloaders::withSpinner(
+              plotly::plotlyOutput(ns("var_pie"), height = "320px"),
+              type = 6, color = "#2c7a51"
+            )
           )
         )
       ),
@@ -195,7 +226,100 @@ mod_spatial_server <- function(id, data_result) {
     output$spats_plot <- shiny::renderPlot({
       mod <- spats_model()
       req(mod)
-      plot(mod, main = paste("Spatial Trend for", input$trait, "in", input$env))
+      plot(mod, 
+           main = paste("Spatial Trend for", input$trait, "in", input$env),
+           annotated = input$plot_annotated,
+           depict.missing = input$plot_missing,
+           spaTrend = input$plot_spatrend)
+    })
+
+    # ---- Output: Variance Components ----
+    output$spats_summary_boxes <- shiny::renderUI({
+      mod <- spats_model()
+      req(mod)
+      
+      h2 <- SpATS::getHeritability(mod)
+      if (is.null(h2) || length(h2) == 0) h2 <- NA
+
+      eff_dim <- sum(mod$eff.dim)
+      n_obs <- mod$nobs
+
+      bslib::layout_column_wrap(
+        width = 1 / 3,
+        fill  = FALSE,
+        bslib::value_box(
+          title = "Generalized H\u00B2",
+          value = if (is.na(h2[1])) "N/A" else round(h2[1], 3),
+          showcase = shiny::icon("seedling"),
+          theme = if (is.na(h2[1])) "secondary" else if (h2[1] >= 0.5) "success" else if (h2[1] >= 0.3) "warning" else "danger"
+        ),
+        bslib::value_box(
+          title = "Effective Dimensions",
+          value = round(eff_dim, 1),
+          showcase = shiny::icon("cube"),
+          theme = "info"
+        ),
+        bslib::value_box(
+          title = "Observations",
+          value = n_obs,
+          showcase = shiny::icon("table"),
+          theme = "primary"
+        )
+      )
+    })
+
+    var_components_df <- shiny::reactive({
+      mod <- spats_model()
+      req(mod)
+
+      vc <- mod$var.comp
+      
+      df <- data.frame(
+        Component = names(vc),
+        Variance = as.numeric(vc),
+        stringsAsFactors = FALSE
+      )
+      
+      if (!is.null(mod$psi) && length(mod$psi) > 0) {
+        df <- rbind(df, data.frame(Component = "Residuals", Variance = as.numeric(mod$psi[1])))
+      }
+      
+      total <- sum(df$Variance, na.rm = TRUE)
+      df$Pct <- round(100 * df$Variance / total, 2)
+      df$Variance <- round(df$Variance, 4)
+      
+      # Clean up names for better readability
+      df$Component <- gsub("f\\(", "Spatial(", df$Component)
+      df
+    })
+
+    output$var_table <- DT::renderDataTable({
+      req(var_components_df())
+      DT::datatable(
+        var_components_df(),
+        options  = list(dom = "t", scrollX = TRUE),
+        class    = "compact stripe hover",
+        rownames = FALSE
+      )
+    })
+
+    output$var_pie <- plotly::renderPlotly({
+      df <- var_components_df()
+      req(df)
+
+      plotly::plot_ly(
+        data   = df,
+        labels = ~Component,
+        values = ~Variance,
+        type   = "pie",
+        textinfo = "label+percent",
+        hovertemplate = "%{label}<br>Var = %{value:.4f}<br>%{percent}%<extra></extra>"
+      ) |>
+        plotly::layout(
+          title       = "Variance Component Partition",
+          showlegend  = FALSE,
+          margin      = list(t = 40)
+        )
     })
 
     # ---- Output: Single Env Adjusted Means ----
