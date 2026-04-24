@@ -1,6 +1,11 @@
-# MERIDIAN 🌾
 
-![MERIDIAN Logo](www/logo.png){width="253"}
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+<img src="www/logo.png" align="right" height="140/"/>
+
+<!-- badges: start -->
+
+# MERIDIAN 🌾
 
 **M**ulti-**E**nvironment **R**esearch **I**ntegration: **D**ata **I**ntelligence & **A**gronomic **N**etworks
 
