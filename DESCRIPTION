@@ -41,7 +41,8 @@ Imports:
     zip,
     scales,
     SpATS,
-    Rcpp
+    Rcpp,
+    colourpicker
 Suggests:
     shinytest2,
     testthat (>= 3.0.0)

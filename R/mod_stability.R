@@ -297,7 +297,7 @@ mod_stability_ui <- function(id) {
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
-mod_stability_server <- function(id, data_result) {
+mod_stability_server <- function(id, data_result, results_store) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -395,7 +395,7 @@ mod_stability_server <- function(id, data_result) {
 
         shiny::incProgress(0.10, detail = "Done!")
 
-        list(
+        res_list <- list(
           ammi   = ammi_res,
           gge    = gge_res,
           er     = er_res,
@@ -404,6 +404,15 @@ mod_stability_server <- function(id, data_result) {
           all    = all_res,
           trait  = input$trait
         )
+        
+        results_store[[make_results_key("AMMI", input$trait)]] <- ammi_res
+        results_store[[make_results_key("GGE", input$trait)]] <- gge_res
+        results_store[[make_results_key("Eberhart_Russell", input$trait)]] <- er_res
+        results_store[[make_results_key("Wricke", input$trait)]] <- wricke_res
+        results_store[[make_results_key("Shukla", input$trait)]] <- shukla_res
+        results_store[[make_results_key("Combined_Stability", input$trait)]] <- all_res
+        
+        res_list
       })
     })
 

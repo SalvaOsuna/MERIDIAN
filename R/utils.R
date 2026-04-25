@@ -419,3 +419,14 @@ detect_outliers <- function(df, trait, group_col, method = "iqr", threshold = NU
     ) |>
     dplyr::ungroup()
 }
+
+# ---------------------------------------------------------------------------
+# Results Store Key Generator
+# ---------------------------------------------------------------------------
+#' Generate a standard key for the global results_store
+#' @param analysis_type Base analysis name (e.g., "AMMI", "GGE")
+#' @param trait Trait name (defaults to "Global")
+#' @return String key
+make_results_key <- function(analysis_type, trait = "Global") {
+  paste0(analysis_type, "__", trait)
+}

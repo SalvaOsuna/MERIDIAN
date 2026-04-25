@@ -90,12 +90,22 @@ mod_reports_ui <- function(id) {
       bslib::layout_sidebar(
         sidebar = bslib::sidebar(
           width = 360,
-          shiny::selectInput(ns("plot_module"), "Module", choices = NULL),
-          shiny::selectInput(ns("plot_trait"), "Trait", choices = NULL),
+          shiny::selectInput(ns("export_analysis_type"), "Analysis Type", choices = AVAILABLE_ANALYSIS_TYPES),
+          shiny::selectInput(ns("export_trait"), "Trait", choices = NULL),
+          shiny::div(
+            class = "d-flex align-items-center gap-2 mb-2",
+            shiny::actionButton(ns("generate_plot"), "Generate Plot", class = "btn-primary flex-grow-1"),
+            shiny::uiOutput(ns("plot_status_indicator"))
+          ),
           plot_export_controls_ui(ns, "plt"),
           shiny::downloadButton(ns("dl_plot_file"), "Download Plot", class = "btn-success w-100")
         ),
-        shiny::plotOutput(ns("plot_export_preview"), height = "560px")
+        shiny::plotOutput(ns("plot_export_preview"), height = "560px"),
+        shiny::tags$div(
+          class = "mt-3 d-flex align-items-center gap-3",
+          shiny::actionButton(ns("include_in_composer"), "+ Include in Figure Composer", class = "btn-success"),
+          shiny::uiOutput(ns("composer_registry_status"))
+        )
       )
     ),
     bslib::nav_panel(
@@ -136,7 +146,8 @@ mod_reports_ui <- function(id) {
         shiny::textInput(ns("comp_caption"), "Figure Caption", value = ""),
         shiny::checkboxInput(ns("comp_shared_theme"), "Apply Shared Theme", value = FALSE),
         shiny::selectInput(ns("comp_shared_font"), "Shared Font", choices = c("sans", "serif", "mono"), selected = "serif"),
-        shiny::numericInput(ns("comp_shared_base"), "Shared Base Size", value = 11, min = 6)
+        shiny::numericInput(ns("comp_shared_base"), "Shared Base Size", value = 11, min = 6),
+        colourpicker::colourInput(ns("comp_bg_color"), "Figure Background", value = "#FFFFFF")
       ),
       shiny::actionButton(ns("comp_refresh"), "Refresh Preview", class = "btn-outline-primary"),
       shiny::uiOutput(ns("comp_warning_ui")),
@@ -194,7 +205,7 @@ mod_reports_ui <- function(id) {
 }
 
 mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result = NULL,
-                               adapt_result = NULL, plot_registry = NULL) {
+                               adapt_result = NULL, plot_registry = NULL, results_store = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -317,110 +328,197 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       }
     )
 
-    observeEvent(list(db(), anova_res(), stab_res(), adapt_res()), {
-      new_plots <- collect_plot_registry_entries(
-        db(),
-        anova_res = anova_res(),
-        stab_res = stab_res(),
-        adapt_res = adapt_res()
-      )
-      if (length(new_plots) > 0) {
-        for (k in names(new_plots)) {
-          plot_registry[[k]] <- new_plots[[k]]
-        }
-      }
-    }, ignoreInit = FALSE)
-
-    registry_keys <- shiny::reactive({
-      names(shiny::reactiveValuesToList(plot_registry))
-    })
-
-    registry_modules <- shiny::reactive({
-      keys <- registry_keys()
-      if (length(keys) == 0) return(character(0))
-      unique(vapply(strsplit(keys, "__", fixed = TRUE), function(x) x[1], character(1)))
-    })
+    current_base_plot <- shiny::reactiveVal(NULL)
+    composer_registry <- shiny::reactiveValues()
+    composer_order <- shiny::reactiveVal(character(0))
 
     observe({
-      mods <- registry_modules()
-      cur <- isolate(input$plot_module)
-      sel <- if (!is.null(cur) && cur %in% mods) cur else (mods[1] %||% "")
-      shiny::updateSelectInput(session, "plot_module", choices = mods, selected = sel)
-    })
-
-    module_traits <- shiny::reactive({
-      req(input$plot_module)
-      keys <- registry_keys()
-      if (length(keys) == 0) return(character(0))
-      parts <- strsplit(keys, "__", fixed = TRUE)
-      traits <- vapply(parts, function(x) if (length(x) >= 2 && x[1] == input$plot_module) x[2] else NA_character_, character(1))
-      unique(stats::na.omit(traits))
-    })
-
-    observe({
-      tr <- module_traits()
-      cur <- isolate(input$plot_trait)
+      tr <- db()$traits %||% character(0)
+      cur <- shiny::isolate(input$export_trait)
       sel <- if (!is.null(cur) && cur %in% tr) cur else (tr[1] %||% "")
-      shiny::updateSelectInput(session, "plot_trait", choices = tr, selected = sel)
+      shiny::updateSelectInput(session, "export_trait", choices = tr, selected = sel)
     })
+    
+    observeEvent(input$export_trait, {
+      current_base_plot(list(error = "Trait changed. Please click 'Generate Plot' to re-run the analysis for the new trait."))
+    }, ignoreInit = TRUE)
+    observeEvent(input$export_analysis_type, {
+      current_base_plot(list(error = "Analysis type changed. Please click 'Generate Plot' to run this analysis."))
+    }, ignoreInit = TRUE)
 
-    selected_plot_key <- shiny::reactive({
-      req(input$plot_module, input$plot_trait)
-      paste(input$plot_module, input$plot_trait, sep = "__")
-    })
+    observeEvent(input$generate_plot, {
+      shiny::updateSelectInput(session, "plt_theme_name", selected = "theme_bw")
+      shiny::updateSelectInput(session, "plt_font_family", selected = "sans")
+      shiny::updateNumericInput(session, "plt_base_size", value = 12)
+      shiny::updateNumericInput(session, "plt_axis_title_size", value = 12)
+      shiny::updateNumericInput(session, "plt_axis_text_size", value = 10)
+      shiny::updateNumericInput(session, "plt_legend_title_size", value = 10)
+      shiny::updateNumericInput(session, "plt_legend_text_size", value = 9)
+      shiny::updateNumericInput(session, "plt_plot_title_size", value = 14)
+      shiny::updateNumericInput(session, "plt_caption_size", value = 9)
+      shiny::updateCheckboxInput(session, "plt_show_labels", value = TRUE)
+      shiny::updateCheckboxInput(session, "plt_use_repel", value = TRUE)
+      shiny::updateNumericInput(session, "plt_label_size", value = 3.5)
+      shiny::updateSelectInput(session, "plt_label_face", selected = "plain")
+      shiny::updateTextInput(session, "plt_label_color", value = "#222222")
+      shiny::updateNumericInput(session, "plt_max_overlaps", value = 30)
+      shiny::updateNumericInput(session, "plt_label_force", value = 1.0)
+      shiny::updateNumericInput(session, "plt_min_seg_len", value = 0.1)
+      shiny::updateTextInput(session, "plt_segment_color", value = "#666666")
+      shiny::updateSelectInput(session, "plt_segment_linetype", selected = "solid")
+      shiny::updateTextInput(session, "plt_exclude_labels", value = "")
+      shiny::updateTextInput(session, "plt_geno_color", value = "#1f77b4")
+      shiny::updateTextInput(session, "plt_env_color", value = "#d62728")
+      shiny::updateTextInput(session, "plt_pos_fill", value = "#1B5E20")
+      shiny::updateTextInput(session, "plt_neg_fill", value = "#B71C1C")
+      shiny::updateSliderInput(session, "plt_point_size", value = 2.8)
+      shiny::updateSliderInput(session, "plt_point_alpha", value = 0.9)
+      shiny::updateSliderInput(session, "plt_line_width", value = 0.8)
+      shiny::updateSliderInput(session, "plt_arrow_size", value = 0.2)
+      shiny::updateCheckboxInput(session, "plt_show_grid_major", value = TRUE)
+      shiny::updateCheckboxInput(session, "plt_show_grid_minor", value = FALSE)
+      shiny::updateCheckboxInput(session, "plt_show_legend", value = TRUE)
+      shiny::updateSelectInput(session, "plt_legend_position", selected = "right")
+      shiny::updateCheckboxInput(session, "plt_show_plot_title", value = TRUE)
+      shiny::updateCheckboxInput(session, "plt_show_axis_titles", value = TRUE)
 
-    selected_plot <- shiny::reactive({
-      key <- selected_plot_key()
-      obj <- plot_registry[[key]]
-      if (is.null(obj)) return(NULL)
-      obj
-    })
-
-    assert_plot_matches_trait <- function(p, trait, key) {
-      if (!inherits(p, "gg")) stop("Retrieved object is not a ggplot for key: ", key)
-      key_attr <- attr(p, "meridian_key")
-      tr_attr <- attr(p, "meridian_trait")
-      if (!is.null(key_attr) && !identical(key_attr, key)) {
-        stop("Registry mismatch for selected key ", key, ". Please regenerate this trait and try again.")
+      req(input$export_analysis_type, input$export_trait)
+      p <- generate_specific_plot(
+        analysis_type = input$export_analysis_type,
+        trait = input$export_trait,
+        db = db(),
+        results_store = results_store,
+        cfg = default_plot_cfg()
+      )
+      
+      if (is.null(p)) {
+        current_base_plot(list(error = sprintf("Results for %s — %s have not been computed yet. Please run the analysis first in the corresponding module.", input$export_analysis_type, input$export_trait)))
+      } else {
+        attr(p, "meridian_analysis") <- input$export_analysis_type
+        attr(p, "meridian_trait") <- input$export_trait
+        current_base_plot(p)
       }
-      if (!is.null(tr_attr) && !identical(as.character(tr_attr), as.character(trait))) {
-        stop("Registry mismatch for selected key ", key, ". Please regenerate this trait and try again.")
+    })
+
+    output$plot_status_indicator <- shiny::renderUI({
+      shiny::req(input$export_analysis_type, input$export_trait)
+      store_type <- map_analysis_to_store_key(input$export_analysis_type)
+      key <- make_results_key(store_type, input$export_trait)
+      
+      if (!is.null(results_store[[key]])) {
+        shiny::tags$span(class = "badge bg-success", shiny::icon("check-circle"), " Results available")
+      } else {
+        shiny::tags$span(class = "badge bg-warning text-dark", shiny::icon("exclamation-triangle"), " Not yet computed")
       }
-      TRUE
-    }
+    })
 
     output$plot_export_preview <- shiny::renderPlot({
-      key <- selected_plot_key()
-      p <- selected_plot()
+      p <- current_base_plot()
       if (is.null(p)) {
         graphics::plot.new()
-        graphics::text(0.5, 0.5, "This plot has not been generated yet.\nPlease run the analysis for this trait first.")
+        graphics::text(0.5, 0.5, "Please select an Analysis Type and Trait, then click 'Generate Plot'.")
         return(invisible(NULL))
       }
-      validate(need(inherits(p, "gg"), paste0("Invalid plot object at key: ", key)))
-      ok <- tryCatch(assert_plot_matches_trait(p, input$plot_trait, key), error = function(e) e)
-      if (inherits(ok, "error")) {
+      if (is.list(p) && !is.null(p$error)) {
         graphics::plot.new()
-        graphics::text(0.5, 0.5, conditionMessage(ok))
+        graphics::text(0.5, 0.5, p$error)
         return(invisible(NULL))
       }
-      print(apply_common_theme_controls(p, plot_cfg()))
+      
+      customized_p <- apply_common_theme_controls(p, plot_cfg())
+      print(customized_p)
     }, res = 96)
+
+    observe({
+      p <- current_base_plot()
+      is_valid_plot <- inherits(p, "gg")
+      if (requireNamespace("shinyjs", quietly = TRUE)) {
+        shinyjs::toggleState("include_in_composer", condition = is_valid_plot)
+      }
+    })
+
+    observeEvent(input$include_in_composer, {
+      p <- current_base_plot()
+      req(inherits(p, "gg"))
+      
+      key_base <- paste0(input$export_analysis_type, "__", input$export_trait)
+      customized_p <- apply_common_theme_controls(p, plot_cfg())
+      
+      if (key_base %in% names(composer_registry)) {
+        shiny::showModal(shiny::modalDialog(
+          title = "Duplicate Plot Detected",
+          shiny::tags$p(sprintf("A plot for '%s' already exists in the Figure Composer. Do you want to replace it or keep both?", key_base)),
+          footer = shiny::tagList(
+            shiny::actionButton(ns("modal_replace_plot"), "Replace", class = "btn-danger"),
+            shiny::actionButton(ns("modal_keep_both_plot"), "Keep Both", class = "btn-primary"),
+            shiny::modalButton("Cancel")
+          )
+        ))
+      } else {
+        composer_registry[[key_base]] <- customized_p
+        composer_order(c(composer_order(), key_base))
+        shiny::showNotification(paste("Plot added to Figure Composer:", key_base), type = "message")
+      }
+    })
+
+    observeEvent(input$modal_replace_plot, {
+      shiny::removeModal()
+      p <- current_base_plot()
+      req(inherits(p, "gg"))
+      key_base <- paste0(input$export_analysis_type, "__", input$export_trait)
+      customized_p <- apply_common_theme_controls(p, plot_cfg())
+      composer_registry[[key_base]] <- customized_p
+      if (!(key_base %in% composer_order())) {
+        composer_order(c(composer_order(), key_base))
+      }
+      shiny::showNotification(paste("Plot updated in Figure Composer:", key_base), type = "message")
+    })
+
+    observeEvent(input$modal_keep_both_plot, {
+      shiny::removeModal()
+      p <- current_base_plot()
+      req(inherits(p, "gg"))
+      key_base <- paste0(input$export_analysis_type, "__", input$export_trait)
+      
+      suffix <- 2
+      new_key <- paste0(key_base, "__", suffix)
+      while (new_key %in% names(composer_registry)) {
+        suffix <- suffix + 1
+        new_key <- paste0(key_base, "__", suffix)
+      }
+      
+      customized_p <- apply_common_theme_controls(p, plot_cfg())
+      composer_registry[[new_key]] <- customized_p
+      composer_order(c(composer_order(), new_key))
+      shiny::showNotification(paste("Plot added to Figure Composer:", new_key), type = "message")
+    })
+
+    output$composer_registry_status <- shiny::renderUI({
+      keys <- names(composer_registry)
+      if (length(keys) == 0) {
+        shiny::tags$span(class = "badge bg-secondary", "0 plots in composer")
+      } else {
+        shiny::tags$span(class = "badge bg-info", sprintf("%d plots in composer", length(keys)))
+      }
+    })
 
     output$dl_plot_file <- shiny::downloadHandler(
       filename = function() {
         ext <- tolower(input$plt_format %||% "png")
-        paste0(gsub("[^A-Za-z0-9_\\-]+", "_", selected_plot_key()), ".", ext)
+        paste0(gsub("[^A-Za-z0-9_\\-]+", "_", paste0(input$export_analysis_type, "_", input$export_trait)), ".", ext)
       },
       content = function(file) {
-        key <- selected_plot_key()
-        p <- selected_plot()
-        if (is.null(p)) stop("This plot has not been generated yet. Please run the analysis for this trait first.")
-        assert_plot_matches_trait(p, input$plot_trait, key)
+        p <- current_base_plot()
+        if (is.null(p) || (is.list(p) && !is.null(p$error))) stop("This plot has not been generated yet. Please run the analysis for this trait first.")
+        
+        fmt <- input$plt_format
+        if (toupper(fmt) == "PDF" && !requireNamespace("Cairo", quietly = TRUE)) {
+          shiny::showNotification("Cairo not available — font embedding may be limited. Install the Cairo package for publication-quality PDF output.", type = "warning", duration = 10)
+        }
         save_ggplot_by_format(
           plot_obj = apply_common_theme_controls(p, plot_cfg()),
           file = file,
-          format = input$plt_format,
+          format = fmt,
           width = input$plt_width,
           height = input$plt_height,
           dpi = input$plt_dpi
@@ -429,9 +527,11 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
     )
 
     # ---- Figure Composer ----
+    composer_selection_state <- shiny::reactiveValues()
+
     output$composer_library_ui <- shiny::renderUI({
-      ids <- registry_keys()
-      if (length(ids) == 0) return(shiny::tags$div("No plots available yet. Run analyses first."))
+      ids <- composer_order()
+      if (length(ids) == 0) return(shiny::tags$div(class = "alert alert-secondary", "No plots added to Composer yet. Go to Plot Export to include some."))
       rows <- split(seq_along(ids), ceiling(seq_along(ids) / 3))
       shiny::tagList(lapply(rows, function(ixs) {
         bslib::layout_column_wrap(
@@ -439,7 +539,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
           fill = FALSE,
           lapply(ixs, function(i) {
             id <- ids[i]
-            p <- plot_registry[[id]]
+            p <- composer_registry[[id]]
             lbl <- paste0(
               id,
               if (inherits(p, "gg")) {
@@ -448,9 +548,19 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
               } else ""
             )
             bslib::card(
-              bslib::card_header(lbl),
-              shiny::plotOutput(ns(paste0("thumb_", i)), height = "180px"),
-              shiny::checkboxInput(ns(paste0("sel_", i)), "Include", value = FALSE)
+              bslib::card_header(
+                shiny::tags$div(
+                  class = "d-flex justify-content-between align-items-center",
+                  shiny::tags$span(lbl, style = "font-size: 0.85em; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%;", title = lbl),
+                  shiny::tags$div(
+                    shiny::actionButton(ns(paste0("comp_up_", i)), shiny::icon("arrow-up"), class = "btn-sm p-1", title = "Move Up"),
+                    shiny::actionButton(ns(paste0("comp_down_", i)), shiny::icon("arrow-down"), class = "btn-sm p-1", title = "Move Down"),
+                    shiny::actionButton(ns(paste0("comp_remove_", i)), shiny::icon("times"), class = "btn-sm btn-danger p-1", title = "Remove")
+                  )
+                )
+              ),
+              shiny::plotOutput(ns(paste0("comp_thumb_", i)), height = "180px"),
+              shiny::checkboxInput(ns(paste0("comp_sel_", i)), "Selected for Composition", value = shiny::isolate(composer_selection_state[[id]] %||% TRUE))
             )
           })
         )
@@ -458,34 +568,61 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
     })
 
     observe({
-      ids <- registry_keys()
+      ids <- composer_order()
       for (i in seq_along(ids)) {
         local({
           ii <- i
-          output[[paste0("thumb_", ii)]] <- shiny::renderPlot({
+          cur_id <- ids[ii]
+          
+          output[[paste0("comp_thumb_", ii)]] <- shiny::renderPlot({
             tryCatch({
               op <- graphics::par(no.readonly = TRUE)
               on.exit(graphics::par(op), add = TRUE)
               graphics::par(mar = c(2, 2, 2, 1))
-              p <- plot_registry[[ids[ii]]]
-              validate(need(inherits(p, "gg"), paste0("Invalid plot object for key: ", ids[ii])))
+              p <- composer_registry[[cur_id]]
+              validate(need(inherits(p, "gg"), paste0("Invalid plot object for key: ", cur_id)))
               print(p)
             }, error = function(e) {
               graphics::plot.new()
-              graphics::text(
-                x = 0.5, y = 0.5,
-                labels = "Preview unavailable",
-                cex = 0.9
-              )
+              graphics::text(x = 0.5, y = 0.5, labels = "Preview unavailable", cex = 0.9)
             })
           })
+          
+          shiny::observeEvent(input[[paste0("comp_sel_", ii)]], {
+            composer_selection_state[[cur_id]] <- input[[paste0("comp_sel_", ii)]]
+          }, ignoreNULL = FALSE, ignoreInit = TRUE)
+          
+          shiny::observeEvent(input[[paste0("comp_remove_", ii)]], {
+            shiny::req(cur_id %in% names(composer_registry))
+            composer_registry[[cur_id]] <- NULL
+            composer_selection_state[[cur_id]] <- NULL
+            composer_order(setdiff(composer_order(), cur_id))
+          }, ignoreInit = TRUE)
+          
+          shiny::observeEvent(input[[paste0("comp_up_", ii)]], {
+            current_order <- composer_order()
+            idx <- match(cur_id, current_order)
+            if (idx > 1) {
+              current_order[c(idx - 1, idx)] <- current_order[c(idx, idx - 1)]
+              composer_order(current_order)
+            }
+          }, ignoreInit = TRUE)
+          
+          shiny::observeEvent(input[[paste0("comp_down_", ii)]], {
+            current_order <- composer_order()
+            idx <- match(cur_id, current_order)
+            if (idx > 0 && idx < length(current_order)) {
+              current_order[c(idx, idx + 1)] <- current_order[c(idx + 1, idx)]
+              composer_order(current_order)
+            }
+          }, ignoreInit = TRUE)
         })
       }
     })
 
     selected_comp_ids <- shiny::reactive({
-      ids <- registry_keys()
-      keep <- vapply(seq_along(ids), function(i) isTRUE(input[[paste0("sel_", i)]]), logical(1))
+      ids <- composer_order()
+      keep <- vapply(ids, function(id) isTRUE(composer_selection_state[[id]] %||% TRUE), logical(1))
       ids[keep]
     })
 
@@ -507,28 +644,33 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
         caption = input$comp_caption,
         shared_theme = isTRUE(input$comp_shared_theme),
         shared_font_family = input$comp_shared_font,
-        shared_base_size = input$comp_shared_base
+        shared_base_size = input$comp_shared_base,
+        bg_color = input$comp_bg_color
       )
     })
 
-    comp_refresh_tick <- shiny::reactiveVal(0L)
-    observeEvent(input$comp_refresh, comp_refresh_tick(comp_refresh_tick() + 1L))
-
-    composed_plot <- shiny::reactive({
-      comp_refresh_tick()
+    composed_plot <- shiny::eventReactive({
+      input$comp_refresh
+      selected_comp_ids()
+    }, {
       ids <- selected_comp_ids()
-      req(length(ids) >= 2)
+      if (length(ids) < 2) return(NULL)
       built <- lapply(ids, function(id) {
-        p <- plot_registry[[id]]
+        p <- composer_registry[[id]]
         if (!inherits(p, "gg")) stop("Invalid plot object for key: ", id)
-        apply_common_theme_controls(p, plot_cfg())
+        p
       })
       names(built) <- ids
       compose_patchwork_figure(built, ids, comp_cfg())
-    })
+    }, ignoreNULL = FALSE)
 
     output$composer_preview <- shiny::renderPlot({
-      req(composed_plot())
+      p_comp <- composed_plot()
+      if (is.null(p_comp)) {
+        graphics::plot.new()
+        graphics::text(0.5, 0.5, "Please select at least two plots and click 'Refresh Preview'.")
+        return(invisible(NULL))
+      }
       tryCatch({
         w <- session$clientData[[paste0("output_", ns("composer_preview"), "_width")]] %||% 0
         h <- session$clientData[[paste0("output_", ns("composer_preview"), "_height")]] %||% 0
@@ -540,7 +682,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
         op <- graphics::par(no.readonly = TRUE)
         on.exit(graphics::par(op), add = TRUE)
         graphics::par(mar = c(0.5, 0.5, 1.5, 0.5))
-        print(composed_plot())
+        print(p_comp)
       }, error = function(e) {
         graphics::plot.new()
         graphics::text(
@@ -560,7 +702,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
     output$comp_warning_ui <- shiny::renderUI({
       ids <- selected_comp_ids()
       if (length(ids) < 2) return(shiny::tags$div(class = "alert alert-info", "Select at least two plots to compose."))
-      built <- lapply(ids, function(id) plot_registry[[id]])
+      built <- lapply(ids, function(id) composer_registry[[id]])
       warns <- check_composer_warnings(built)
       if (length(warns) == 0) return(NULL)
       shiny::tagList(lapply(warns, function(w) shiny::tags$div(class = "alert alert-warning", w)))
@@ -572,13 +714,18 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
         paste0("composed_figure.", ext)
       },
       content = function(file) {
+        fmt <- input$comp_format
+        if (toupper(fmt) == "PDF" && !requireNamespace("Cairo", quietly = TRUE)) {
+          shiny::showNotification("Cairo not available — font embedding may be limited. Install the Cairo package for publication-quality PDF output.", type = "warning", duration = 10)
+        }
         save_ggplot_by_format(
           plot_obj = composed_plot(),
           file = file,
-          format = input$comp_format,
+          format = fmt,
           width = input$comp_width,
           height = input$comp_height,
-          dpi = input$comp_dpi
+          dpi = input$comp_dpi,
+          bg = comp_cfg()$bg_color
         )
       }
     )
@@ -589,15 +736,15 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
         ids <- selected_comp_ids()
         req(length(ids) >= 1)
         built <- lapply(ids, function(id) {
-          p <- plot_registry[[id]]
+          p <- composer_registry[[id]]
           if (!inherits(p, "gg")) stop("Invalid plot object for key: ", id)
-          apply_common_theme_controls(p, plot_cfg())
+          p
         })
         names(built) <- ids
         export_panels_zip(
           plot_list = built,
           selected_ids = ids,
-          cfg = list(format = input$comp_format, width = input$comp_width, height = input$comp_height, dpi = input$comp_dpi),
+          cfg = list(format = input$comp_format, width = input$comp_width, height = input$comp_height, dpi = input$comp_dpi, bg_color = comp_cfg()$bg_color),
           zip_file = file
         )
       }
@@ -648,7 +795,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
 
       tryCatch({
         report_status("Rendering plots...")
-        plot_objs <- shiny::reactiveValuesToList(plot_registry)
+        plot_objs <- shiny::reactiveValuesToList(composer_registry)
         plot_objs <- plot_objs[vapply(plot_objs, function(x) inherits(x, "gg"), logical(1))]
 
         report_status("Compiling tables...")
@@ -696,7 +843,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
 
     invisible(list(
       tables = tables_avail,
-      plots = registry_keys
+      plots = composer_order
     ))
   })
 }
