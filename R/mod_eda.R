@@ -170,7 +170,7 @@ mod_eda_ui <- function(id) {
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
-mod_eda_server <- function(id, data_result, results_store) {
+mod_eda_server <- function(id, data_result) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -189,24 +189,6 @@ mod_eda_server <- function(id, data_result, results_store) {
         shiny::updateSelectInput(session, sel_id,
           choices = traits, selected = traits[1])
       }
-    })
-
-    shiny::observeEvent(list(db(), input$box_trait), {
-      shiny::req(db(), input$box_trait)
-      key <- make_results_key("EDA_Boxplot", input$box_trait)
-      results_store[[key]] <- list(data = db()$data, trait = input$box_trait, env_col = db()$env_col, gen_col = db()$gen_col)
-    })
-
-    shiny::observeEvent(list(db(), input$heat_trait), {
-      shiny::req(db(), input$heat_trait)
-      key <- make_results_key("EDA_Heatmap", input$heat_trait)
-      results_store[[key]] <- list(data = db()$data, trait = input$heat_trait, env_col = db()$env_col, gen_col = db()$gen_col)
-    })
-
-    shiny::observeEvent(list(db(), input$cor_trait), {
-      shiny::req(db(), input$cor_trait)
-      key <- make_results_key("EDA_Correlation", input$cor_trait)
-      results_store[[key]] <- list(data = db()$data, trait = input$cor_trait, env_col = db()$env_col, gen_col = db()$gen_col)
     })
 
     # ---- Reactive: Resolve grouping column name ----

@@ -171,19 +171,19 @@ write_table_excel_with_metadata <- function(df, file, table_name, metadata) {
   openxlsx::saveWorkbook(wb, file = file, overwrite = TRUE)
 }
 
-save_ggplot_by_format <- function(plot_obj, file, format, width, height, dpi, bg = "white") {
+save_ggplot_by_format <- function(plot_obj, file, format, width, height, dpi) {
   fmt <- toupper(format %||% "PNG")
   if (fmt == "PDF") {
     ggplot2::ggsave(file, plot = plot_obj, width = width, height = height,
-      device = grDevices::cairo_pdf, bg = bg)
+      device = grDevices::cairo_pdf)
   } else if (fmt == "SVG") {
     ggplot2::ggsave(file, plot = plot_obj, width = width, height = height,
-      device = svglite::svglite, bg = bg)
+      device = svglite::svglite)
   } else if (fmt == "TIFF") {
     ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi,
-      device = "tiff", compression = "lzw", bg = bg)
+      device = "tiff", compression = "lzw")
   } else {
-    ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi, device = "png", bg = bg)
+    ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi, device = "png")
   }
 }
 
@@ -215,183 +215,166 @@ make_gge_static_plot <- function(gge_model, trait, cfg) {
     )
 
   base <- add_label_layer(base, gen_df, "PC1", "PC2", "label", cfg, cfg$geno_color)
-  add_label_layer(base, env_df, "PC1", "PC2", "label", cfg, cfg$env_color)
+  base <- add_label_layer(base, env_df, "PC1", "PC2", "label", cfg, cfg$env_color)
+  apply_common_theme_controls(base, cfg)
 }
 
-AVAILABLE_ANALYSIS_TYPES <- c(
-  "Exploratory Analysis — Boxplot",
-  "Exploratory Analysis — Heatmap G×E",
-  "Exploratory Analysis — Correlation Matrix",
-  "Exploratory Analysis — Outlier Detection",
-  "ANOVA — Variance Components",
-  "ANOVA — BLUEs/BLUPs",
-  "Stability — AMMI1 Biplot",
-  "Stability — AMMI2 Biplot",
-  "Stability — Variance Explained (IPCA)",
-  "Stability — GGE Biplot",
-  "Stability — Eberhart & Russell",
-  "Stability — Wricke / Shukla",
-  "Stability — Stability Ranking",
-  "Enviromics — Environmental PCA",
-  "Enviromics — Env Typology Heatmap",
-  "Enviromics — Reaction Norms",
-  "Enviromics — RDA Triplot",
-  "Enviromics — Sensitivity Ranking",
-  "Adaptation — Winner per Environment",
-  "Adaptation — Mega-environment Map"
-)
+create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res = NULL) {
+  cfg0 <- default_plot_cfg()
+  lib <- list()
+  add_plot <- function(module, trait, builder, label = NULL) {
+    key <- make_registry_key(module, trait)
+    lib[[key]] <<- list(
+      key = key,
+      module = module,
+      trait = trait,
+      label = label %||% paste0(module, " — ", trait),
+      builder = builder
+    )
+  }
 
-map_analysis_to_store_key <- function(analysis_type) {
-  if (is.null(analysis_type)) return(NULL)
-  
-  if (startsWith(analysis_type, "Exploratory Analysis — Boxplot")) return("EDA_Boxplot")
-  if (startsWith(analysis_type, "Exploratory Analysis — Heatmap G×E")) return("EDA_Heatmap")
-  if (startsWith(analysis_type, "Exploratory Analysis — Correlation Matrix")) return("EDA_Correlation")
-  if (startsWith(analysis_type, "Exploratory Analysis — Outlier Detection")) return("EDA_Outlier")
-  if (startsWith(analysis_type, "ANOVA")) return("ANOVA")
-  if (grepl("AMMI", analysis_type)) return("AMMI")
-  if (grepl("GGE", analysis_type)) return("GGE")
-  if (grepl("Eberhart", analysis_type)) return("Eberhart_Russell")
-  if (grepl("Wricke", analysis_type)) return("Wricke")
-  if (grepl("Shukla", analysis_type)) return("Shukla")
-  if (grepl("Stability Ranking", analysis_type)) return("Combined_Stability")
-  if (grepl("Environmental PCA", analysis_type)) return("Enviromics_PCA")
-  if (grepl("Env Typology Heatmap", analysis_type)) return("Enviromics_Heatmap")
-  if (grepl("Reaction Norms", analysis_type)) return("Reaction_Norms")
-  if (grepl("RDA Triplot", analysis_type)) return("RDA_Triplot")
-  if (grepl("Sensitivity Ranking", analysis_type)) return("Sensitivity_Ranking")
-  if (grepl("Winner per Environment", analysis_type)) return("Mega_Env")
-  if (grepl("Mega-environment Map", analysis_type)) return("Mega_Env")
-  if (grepl("Spatial", analysis_type)) return("Spatial")
-  
-  return("Unknown")
-}
+  if (!is.null(stab_res$ammi)) {
+    ammi <- stab_res$ammi
+    trait <- stab_res$trait %||% (ammi$params$trait %||% "Trait")
 
-generate_specific_plot <- function(analysis_type, trait, db, results_store, cfg = default_plot_cfg()) {
-  if (is.null(analysis_type) || is.null(trait)) return(NULL)
-  
-  store_type <- map_analysis_to_store_key(analysis_type)
-  key_trait <- if (store_type %in% c("Enviromics_PCA", "Enviromics_Heatmap")) "Global" else trait
-  key <- make_results_key(store_type, key_trait)
-  res <- results_store[[key]]
-  
-  if (is.null(res)) return(NULL)
-  
-  if (analysis_type == "Exploratory Analysis — Boxplot") {
-    env_col <- res$env_col %||% db$env_col
-    p <- ggplot2::ggplot(res$data, ggplot2::aes(x = .data[[env_col]], y = .data[[trait]], fill = .data[[env_col]])) +
-      ggplot2::geom_boxplot(alpha = cfg$point_alpha, outlier.shape = NA) +
-      ggplot2::geom_jitter(width = 0.15, size = cfg$point_size * 0.5, alpha = cfg$point_alpha * 0.6) +
-      ggplot2::labs(title = paste0("EDA Boxplot — ", trait), x = "Environment", y = trait) +
-      ggplot2::theme(legend.position = "none")
-    return(p)
+    add_plot("AMMI1", trait, function(cfg = cfg0) {
+      cfg <- modifyList(cfg0, cfg %||% list())
+      gen_df <- ammi$gen_scores |> dplyr::rename(mean_val = gen_mean, ipca = IPCA1)
+      env_df <- ammi$env_scores |> dplyr::rename(mean_val = env_mean, ipca = IPCA1)
+      p <- ggplot2::ggplot() +
+        ggplot2::geom_point(data = gen_df, ggplot2::aes(mean_val, ipca), color = cfg$geno_color, size = cfg$point_size, alpha = cfg$point_alpha) +
+        ggplot2::geom_point(data = env_df, ggplot2::aes(mean_val, ipca), color = cfg$env_color, size = cfg$point_size + 0.5, alpha = cfg$point_alpha) +
+        ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "grey60", linewidth = cfg$line_width) +
+        ggplot2::geom_vline(xintercept = ammi$grand_mean, linetype = "dashed", color = "grey60", linewidth = cfg$line_width) +
+        ggplot2::labs(title = paste0("AMMI1 — ", trait), x = paste0("Mean (", trait, ")"), y = "IPCA1")
+      p <- add_label_layer(p, dplyr::transmute(gen_df, x = mean_val, y = ipca, label = GEN), "x", "y", "label", cfg, cfg$geno_color)
+      p <- add_label_layer(p, dplyr::transmute(env_df, x = mean_val, y = ipca, label = ENV), "x", "y", "label", cfg, cfg$env_color)
+      apply_common_theme_controls(p, cfg)
+    })
+
+    add_plot("AMMI2", trait, function(cfg = cfg0) {
+      cfg <- modifyList(cfg0, cfg %||% list())
+      gen_df <- ammi$gen_scores |> dplyr::transmute(label = GEN, x = IPCA1, y = IPCA2)
+      env_df <- ammi$env_scores |> dplyr::transmute(label = ENV, x = IPCA1, y = IPCA2)
+      p <- ggplot2::ggplot() +
+        ggplot2::geom_segment(data = env_df, ggplot2::aes(x = 0, y = 0, xend = x, yend = y),
+          color = cfg$env_color, linewidth = cfg$line_width,
+          arrow = ggplot2::arrow(length = grid::unit(cfg$arrow_size, "cm"))) +
+        ggplot2::geom_point(data = gen_df, ggplot2::aes(x, y), color = cfg$geno_color, size = cfg$point_size, alpha = cfg$point_alpha) +
+        ggplot2::geom_point(data = env_df, ggplot2::aes(x, y), color = cfg$env_color, size = cfg$point_size + 0.5, alpha = cfg$point_alpha) +
+        ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "grey60") +
+        ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
+        ggplot2::coord_equal() +
+        ggplot2::labs(title = paste0("AMMI2 — ", trait), x = "IPCA1", y = "IPCA2")
+      p <- add_label_layer(p, gen_df, "x", "y", "label", cfg, cfg$geno_color)
+      p <- add_label_layer(p, env_df, "x", "y", "label", cfg, cfg$env_color)
+      apply_common_theme_controls(p, cfg)
+    })
+
+    add_plot("StabilityRanking", trait, function(cfg = cfg0) {
+      cfg <- modifyList(cfg0, cfg %||% list())
+      df <- ammi$stability
+      p <- ggplot2::ggplot(df, ggplot2::aes(gen_mean, WAAS)) +
+        ggplot2::geom_point(color = cfg$geno_color, size = cfg$point_size, alpha = cfg$point_alpha) +
+        ggplot2::geom_hline(yintercept = mean(df$WAAS, na.rm = TRUE), linetype = "dashed", color = "grey60") +
+        ggplot2::geom_vline(xintercept = mean(df$gen_mean, na.rm = TRUE), linetype = "dashed", color = "grey60") +
+        ggplot2::labs(title = paste0("Stability Ranking — ", trait), x = paste0("Mean (", trait, ")"), y = "WAAS")
+      p <- add_label_layer(p, dplyr::transmute(df, x = gen_mean, y = WAAS, label = GEN), "x", "y", "label", cfg, cfg$geno_color)
+      apply_common_theme_controls(p, cfg)
+    })
+
+    add_plot("GxEHeatmap", trait, function(cfg = cfg0) {
+      cfg <- modifyList(cfg0, cfg %||% list())
+      df <- ammi$interaction_long
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = GEN, fill = interaction)) +
+        ggplot2::geom_tile(color = "white", linewidth = 0.2) +
+        ggplot2::scale_fill_gradient2(low = cfg$neg_fill, mid = "white", high = cfg$pos_fill, midpoint = 0) +
+        ggplot2::labs(title = paste0("GxE Interaction Heatmap — ", trait), x = "Environment", y = "Genotype")
+      apply_common_theme_controls(p, cfg)
+    })
   }
-  
-  if (analysis_type == "Stability — AMMI1 Biplot") {
-    ammi <- res
-    gen_df <- ammi$gen_scores |> dplyr::rename(mean_val = gen_mean, ipca = IPCA1)
-    env_df <- ammi$env_scores |> dplyr::rename(mean_val = env_mean, ipca = IPCA1)
-    p <- ggplot2::ggplot() +
-      ggplot2::geom_point(data = gen_df, ggplot2::aes(mean_val, ipca), color = cfg$geno_color, size = cfg$point_size, alpha = cfg$point_alpha) +
-      ggplot2::geom_point(data = env_df, ggplot2::aes(mean_val, ipca), color = cfg$env_color, size = cfg$point_size + 0.5, alpha = cfg$point_alpha) +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "grey60", linewidth = cfg$line_width) +
-      ggplot2::geom_vline(xintercept = ammi$grand_mean, linetype = "dashed", color = "grey60", linewidth = cfg$line_width) +
-      ggplot2::labs(title = paste0("AMMI1 — ", trait), x = paste0("Mean (", trait, ")"), y = "IPCA1")
-    p <- add_label_layer(p, dplyr::transmute(gen_df, x = mean_val, y = ipca, label = GEN), "x", "y", "label", cfg, cfg$geno_color)
-    p <- add_label_layer(p, dplyr::transmute(env_df, x = mean_val, y = ipca, label = ENV), "x", "y", "label", cfg, cfg$env_color)
-    return(p)
+
+  if (!is.null(stab_res$gge$model)) {
+    trait <- stab_res$trait %||% "Trait"
+    add_plot("GGE", trait, function(cfg = cfg0) {
+      cfg <- modifyList(cfg0, cfg %||% list())
+      make_gge_static_plot(stab_res$gge$model, trait, cfg)
+    })
   }
-  
-  if (analysis_type == "Stability — AMMI2 Biplot") {
-    ammi <- res
-    gen_df <- ammi$gen_scores |> dplyr::transmute(label = GEN, x = IPCA1, y = IPCA2)
-    env_df <- ammi$env_scores |> dplyr::transmute(label = ENV, x = IPCA1, y = IPCA2)
-    p <- ggplot2::ggplot() +
-      ggplot2::geom_segment(data = env_df, ggplot2::aes(x = 0, y = 0, xend = x, yend = y),
-        color = cfg$env_color, linewidth = cfg$line_width,
-        arrow = ggplot2::arrow(length = grid::unit(cfg$arrow_size, "cm"))) +
-      ggplot2::geom_point(data = gen_df, ggplot2::aes(x, y), color = cfg$geno_color, size = cfg$point_size, alpha = cfg$point_alpha) +
-      ggplot2::geom_point(data = env_df, ggplot2::aes(x, y), color = cfg$env_color, size = cfg$point_size + 0.5, alpha = cfg$point_alpha) +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "grey60") +
-      ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
-      ggplot2::coord_equal() +
-      ggplot2::labs(title = paste0("AMMI2 — ", trait), x = "IPCA1", y = "IPCA2")
-    p <- add_label_layer(p, gen_df, "x", "y", "label", cfg, cfg$geno_color)
-    p <- add_label_layer(p, env_df, "x", "y", "label", cfg, cfg$env_color)
-    return(p)
-  }
-  
-  if (analysis_type == "Stability — Stability Ranking") {
-    ammi <- res
-    df <- ammi$stability
-    p <- ggplot2::ggplot(df, ggplot2::aes(gen_mean, WAAS)) +
-      ggplot2::geom_point(color = cfg$geno_color, size = cfg$point_size, alpha = cfg$point_alpha) +
-      ggplot2::geom_hline(yintercept = mean(df$WAAS, na.rm = TRUE), linetype = "dashed", color = "grey60") +
-      ggplot2::geom_vline(xintercept = mean(df$gen_mean, na.rm = TRUE), linetype = "dashed", color = "grey60") +
-      ggplot2::labs(title = paste0("Stability Ranking — ", trait), x = paste0("Mean (", trait, ")"), y = "WAAS")
-    p <- add_label_layer(p, dplyr::transmute(df, x = gen_mean, y = WAAS, label = GEN), "x", "y", "label", cfg, cfg$geno_color)
-    return(p)
-  }
-  
-  if (analysis_type == "Exploratory Analysis — Heatmap G×E") {
-    ammi <- res
-    df <- ammi$interaction_long
-    p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = GEN, fill = interaction)) +
-      ggplot2::geom_tile(color = "white", linewidth = 0.2) +
-      ggplot2::scale_fill_gradient2(low = cfg$neg_fill, mid = "white", high = cfg$pos_fill, midpoint = 0) +
-      ggplot2::labs(title = paste0("GxE Interaction Heatmap — ", trait), x = "Environment", y = "Genotype")
-    return(p)
-  }
-  
-  if (analysis_type == "Stability — GGE Biplot") {
-    return(make_gge_static_plot(res$model, trait, cfg))
-  }
-  
-  if (analysis_type == "Enviromics — Reaction Norms") {
-    fw_data <- res$fw_data
-    slopes <- res$gen_slopes
+
+  if (!is.null(adapt_res$fw$fw_data) && !is.null(adapt_res$fw$gen_slopes)) {
+    trait <- adapt_res$trait %||% "Trait"
     gen_col <- db$gen_col
-    p <- ggplot2::ggplot(fw_data, ggplot2::aes(x = EI, y = mean_val, color = .data[[gen_col]])) +
-      ggplot2::geom_point(size = cfg$point_size, alpha = cfg$point_alpha) +
-      ggplot2::geom_abline(data = slopes, ggplot2::aes(intercept = intercept, slope = slope, color = .data[[gen_col]]),
-        linewidth = cfg$line_width, alpha = 0.8, show.legend = FALSE) +
-      ggplot2::labs(title = paste0("Reaction Norms — ", trait), x = "Environmental Index", y = paste0("Mean ", trait))
-    return(p)
+    add_plot("ReactionNorms", trait, function(cfg = cfg0) {
+      cfg <- modifyList(cfg0, cfg %||% list())
+      fw_data <- adapt_res$fw$fw_data
+      slopes <- adapt_res$fw$gen_slopes
+      p <- ggplot2::ggplot(fw_data, ggplot2::aes(x = EI, y = mean_val, color = .data[[gen_col]])) +
+        ggplot2::geom_point(size = cfg$point_size, alpha = cfg$point_alpha) +
+        ggplot2::geom_abline(data = slopes, ggplot2::aes(intercept = intercept, slope = slope, color = .data[[gen_col]]),
+          linewidth = cfg$line_width, alpha = 0.8, show.legend = FALSE) +
+        ggplot2::labs(title = paste0("Reaction Norms — ", trait), x = "Environmental Index", y = paste0("Mean ", trait))
+      apply_common_theme_controls(p, cfg)
+    })
   }
-  
-  if (analysis_type == "Adaptation — Mega-environment Map") {
-    df <- res$env_strat
-    p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = MEAN, fill = MEGA_ENV)) +
-      ggplot2::geom_col(alpha = cfg$point_alpha) +
-      ggplot2::labs(title = paste0("Mega-Environments — ", trait), x = "Environment", y = "Winning Mean")
-    return(p)
+
+  if (!is.null(adapt_res$mega_env$env_strat)) {
+    trait <- adapt_res$trait %||% "Trait"
+    add_plot("MegaEnvironments", trait, function(cfg = cfg0) {
+      cfg <- modifyList(cfg0, cfg %||% list())
+      df <- adapt_res$mega_env$env_strat
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = MEAN, fill = MEGA_ENV)) +
+        ggplot2::geom_col(alpha = cfg$point_alpha) +
+        ggplot2::labs(title = paste0("Mega-Environments — ", trait), x = "Environment", y = "Winning Mean")
+      apply_common_theme_controls(p, cfg)
+    })
   }
-  
-  if (analysis_type == "Enviromics — Environmental PCA") {
-    pca <- res$pca_res
-    df <- as.data.frame(pca$x)
-    df$label <- res$env_labels
-    p <- ggplot2::ggplot(df, ggplot2::aes(PC1, PC2)) +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "grey60") +
-      ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
-      ggplot2::geom_point(color = cfg$env_color, size = cfg$point_size, alpha = cfg$point_alpha) +
-      ggplot2::coord_equal() +
-      ggplot2::labs(title = "Environmental PCA", x = "PC1", y = "PC2")
-    p <- add_label_layer(p, df, "PC1", "PC2", "label", cfg, cfg$label_color)
-    return(p)
+
+  if (!is.null(adapt_res$env_pca$pca_res)) {
+    add_plot("EnvironmentalPCA", "Global", function(cfg = cfg0) {
+      cfg <- modifyList(cfg0, cfg %||% list())
+      pca <- adapt_res$env_pca$pca_res
+      df <- as.data.frame(pca$x)
+      df$label <- adapt_res$env_pca$env_labels
+      p <- ggplot2::ggplot(df, ggplot2::aes(PC1, PC2)) +
+        ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "grey60") +
+        ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
+        ggplot2::geom_point(color = cfg$env_color, size = cfg$point_size, alpha = cfg$point_alpha) +
+        ggplot2::coord_equal() +
+        ggplot2::labs(title = "Environmental PCA", x = "PC1", y = "PC2")
+      p <- add_label_layer(p, df, "PC1", "PC2", "label", cfg, cfg$label_color)
+      apply_common_theme_controls(p, cfg)
+    })
   }
-  
-  # Stubs for missing builders (return NULL if uncomputed or unsupported)
-  # - Exploratory Analysis — Correlation Matrix
-  # - Exploratory Analysis — Outlier Detection
-  # - ANOVA — Variance Components
-  # - ANOVA — BLUEs/BLUPs
-  # - Stability — Variance Explained (IPCA)
-  # - Stability — Eberhart & Russell
-  # - Stability — Wricke / Shukla
-  # - Enviromics — Env Typology Heatmap
-  # - Enviromics — RDA Triplot
-  # - Enviromics — Sensitivity Ranking
-  # - Adaptation — Winner per Environment
-  return(NULL)
+
+  if (!is.null(db$data) && length(db$traits %||% character(0)) > 0) {
+    trait <- db$traits[1]
+    env_col <- db$env_col
+    add_plot("EDABoxplot", trait, function(cfg = cfg0) {
+      cfg <- modifyList(cfg0, cfg %||% list())
+      p <- ggplot2::ggplot(db$data, ggplot2::aes(x = .data[[env_col]], y = .data[[trait]], fill = .data[[env_col]])) +
+        ggplot2::geom_boxplot(alpha = cfg$point_alpha, outlier.shape = NA) +
+        ggplot2::geom_jitter(width = 0.15, size = cfg$point_size * 0.5, alpha = cfg$point_alpha * 0.6) +
+        ggplot2::labs(title = paste0("EDA Boxplot — ", trait), x = "Environment", y = trait) +
+        ggplot2::theme(legend.position = "none")
+      apply_common_theme_controls(p, cfg)
+    })
+  }
+
+  lib
+}
+
+collect_plot_registry_entries <- function(db, anova_res = NULL, stab_res = NULL, adapt_res = NULL) {
+  lib <- create_plot_library(db, anova_res = anova_res, stab_res = stab_res, adapt_res = adapt_res)
+  out <- list()
+  for (key in names(lib)) {
+    p <- lib[[key]]$builder(default_plot_cfg())
+    if (inherits(p, "gg")) {
+      attr(p, "meridian_key") <- key
+      attr(p, "meridian_module") <- lib[[key]]$module
+      attr(p, "meridian_trait") <- lib[[key]]$trait
+      out[[key]] <- p
+    }
+  }
+  out
 }

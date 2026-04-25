@@ -74,11 +74,6 @@ compose_patchwork_figure <- function(plot_list, selected_ids, cfg) {
                              base_size = cfg$shared_base_size %||% 11)
   }
 
-  bg_color <- cfg$bg_color %||% "white"
-  composed <- composed &
-    ggplot2::theme(plot.background = ggplot2::element_rect(fill = bg_color, color = NA),
-                   panel.background = ggplot2::element_rect(fill = bg_color, color = NA))
-
   composed
 }
 

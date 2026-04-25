@@ -164,7 +164,6 @@ ui <- page_navbar(
 # =============================================================================
 server <- function(input, output, session) {
   plot_registry <- reactiveValues()
-  results_store <- shiny::reactiveValues()
 
   # ---- Auto-theme ggplot2 to match app ----
   thematic::thematic_shiny()
@@ -212,19 +211,19 @@ server <- function(input, output, session) {
   data_result <- mod_data_upload_server("data")
 
   # ---- Initialize Module 2 ----
-  mod_eda_server("eda", data_result, results_store)
+  mod_eda_server("eda", data_result)
 
   # ---- Initialize Module 3 ----
-  anova_result <- mod_anova_server("anova", data_result, results_store)
+  anova_result <- mod_anova_server("anova", data_result)
 
   # ---- Initialize Module 4 ----
-  stab_result <- mod_stability_server("stability", data_result, results_store)
+  stab_result <- mod_stability_server("stability", data_result)
 
   # ---- Initialize Module 5 ----
-  adapt_result <- mod_adaptation_server("adaptation", data_result, results_store)
+  adapt_result <- mod_adaptation_server("adaptation", data_result)
 
   # ---- Initialize Module 6 ----
-  mod_spatial_server("spatial", data_result, results_store)
+  mod_spatial_server("spatial", data_result)
 
   # ---- Initialize Module 7 ----
   mod_reports_server(
@@ -233,8 +232,7 @@ server <- function(input, output, session) {
     anova_result = anova_result,
     stab_result = stab_result,
     adapt_result = adapt_result,
-    plot_registry = plot_registry,
-    results_store = results_store
+    plot_registry = plot_registry
   )
 
   # ---- Handle startup modal buttons ----

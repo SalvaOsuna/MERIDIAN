@@ -175,7 +175,7 @@ mod_anova_ui <- function(id) {
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
-mod_anova_server <- function(id, data_result, results_store) {
+mod_anova_server <- function(id, data_result) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -230,15 +230,13 @@ mod_anova_server <- function(id, data_result, results_store) {
 
         shiny::incProgress(0.2, detail = "Done!")
 
-        res_list <- list(
+        list(
           anova = anova_res,
           mixed = mixed_res,
           blues = blues_res,
           blups = blups_res,
           trait = input$trait
         )
-        results_store[[make_results_key("ANOVA", input$trait)]] <- res_list
-        res_list
       })
     })
 

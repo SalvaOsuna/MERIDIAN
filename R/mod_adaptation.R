@@ -75,7 +75,7 @@ mod_adaptation_ui <- function(id) {
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
-mod_adaptation_server <- function(id, data_result, results_store) {
+mod_adaptation_server <- function(id, data_result) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
@@ -130,20 +130,13 @@ mod_adaptation_server <- function(id, data_result, results_store) {
           }
         }
         
-        res_list <- list(
+        list(
           mega_env = mega_res,
           fw = fw_res,
           env_pca = env_res,
           env_cor = env_cor,
           has_env = !is.null(db()$env_data)
         )
-        
-        results_store[[make_results_key("Mega_Env", input$trait)]] <- mega_res
-        results_store[[make_results_key("Reaction_Norms", input$trait)]] <- fw_res
-        if (!is.null(env_res)) results_store[[make_results_key("Enviromics_PCA", "Global")]] <- env_res
-        if (!is.null(env_cor)) results_store[[make_results_key("Enviromics_Heatmap", "Global")]] <- env_cor
-        
-        res_list
       })
     })
     

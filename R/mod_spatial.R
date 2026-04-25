@@ -107,7 +107,7 @@ mod_spatial_ui <- function(id) {
   )
 }
 
-mod_spatial_server <- function(id, data_result, results_store) {
+mod_spatial_server <- function(id, data_result) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -599,9 +599,7 @@ mod_spatial_server <- function(id, data_result, results_store) {
         ) |>
         dplyr::arrange(dplyr::desc(Across_Env_Mean))
         
-      res_list <- list(combined = combined_df, across = across_df)
-      results_store[[make_results_key("Spatial", input$trait)]] <- res_list
-      res_list
+      list(combined = combined_df, across = across_df)
     })
 
     output$means_all_table <- DT::renderDataTable({
