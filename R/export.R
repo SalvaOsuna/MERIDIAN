@@ -175,15 +175,15 @@ save_ggplot_by_format <- function(plot_obj, file, format, width, height, dpi) {
   fmt <- toupper(format %||% "PNG")
   if (fmt == "PDF") {
     ggplot2::ggsave(file, plot = plot_obj, width = width, height = height,
-      device = grDevices::cairo_pdf)
+      device = grDevices::cairo_pdf, bg = "white")
   } else if (fmt == "SVG") {
     ggplot2::ggsave(file, plot = plot_obj, width = width, height = height,
-      device = svglite::svglite)
+      device = svglite::svglite, bg = "white")
   } else if (fmt == "TIFF") {
     ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi,
-      device = "tiff", compression = "lzw")
+      device = "tiff", compression = "lzw", bg = "white")
   } else {
-    ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi, device = "png")
+    ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi, device = "png", bg = "white")
   }
 }
 

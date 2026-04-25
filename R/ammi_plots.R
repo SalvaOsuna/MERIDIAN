@@ -282,7 +282,7 @@ plot_stability_ranking <- function(ammi, metric = "WAAS", n_top = NULL,
   } else {
     ggplot(df, aes(x = gen_mean, y = .data[[metric]], label = GEN)) +
       geom_point(aes(color = .data[[metric]]), size = 3) +
-      scale_color_gradient(low = "#1B5E20", high = "##B71C1C", name = metric) +
+      scale_color_gradient(low = "#1B5E20", high = "#B71C1C", name = metric) +
       ggrepel::geom_text_repel(size = 3, max.overlaps = 20) +
       geom_hline(yintercept = mean(df[[metric]]),
                  linetype = "dashed", color = "grey50") +

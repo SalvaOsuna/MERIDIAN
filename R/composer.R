@@ -26,32 +26,61 @@ compose_patchwork_figure <- function(plot_list, selected_ids, cfg) {
   selected_ids <- selected_ids[selected_ids %in% names(plot_list)]
   if (length(selected_ids) < 2) stop("Select at least two plots for composition.")
 
-  plots <- lapply(selected_ids, function(id) plot_list[[id]])
+  plots <- lapply(selected_ids, function(id) {
+    p <- plot_list[[id]]
+    if (inherits(p, "patchwork")) {
+      patchwork::wrap_elements(full = p)
+    } else {
+      p
+    }
+  })
   widths <- parse_num_ratio(cfg$width_ratios)
   heights <- parse_num_ratio(cfg$height_ratios)
 
   op <- cfg$operator %||% "+"
   ncol <- max(1, as.integer(cfg$ncol %||% 2))
+  nrow <- cfg$nrow
+  nrow <- if (is.null(nrow) || is.na(nrow) || nrow < 1) NULL else as.integer(nrow)
+  byrow <- isTRUE(cfg$byrow)
 
-  composed <- if (op == "|") {
+  design <- trimws(cfg$design %||% "")
+  if (nzchar(design)) {
+    letters_used <- unique(strsplit(gsub("[^A-Za-z]", "", design), "")[[1]])
+    if (length(letters_used) != length(plots)) {
+      stop("Custom design must use one unique letter for each selected plot.")
+    }
+  }
+
+  composed <- if (nzchar(design)) {
+    patchwork::wrap_plots(plots, design = design)
+  } else if (op == "|") {
     patchwork::wrap_plots(plots, nrow = 1)
   } else if (op == "/") {
     patchwork::wrap_plots(plots, ncol = 1)
   } else {
-    patchwork::wrap_plots(plots, ncol = ncol)
+    patchwork::wrap_plots(plots, ncol = ncol, nrow = nrow, byrow = byrow)
   }
 
   composed <- composed + patchwork::plot_layout(
-    ncol = ncol,
+    ncol = if (nzchar(design)) NULL else ncol,
+    nrow = if (nzchar(design)) NULL else nrow,
+    byrow = byrow,
     widths = widths,
     heights = heights,
-    guides = if (isTRUE(cfg$collect_guides)) "collect" else "keep"
+    guides = if (isTRUE(cfg$collect_guides)) "collect" else "keep",
+    axes = cfg$axes %||% "keep",
+    axis_titles = cfg$axis_titles %||% "keep"
   )
 
   if (isTRUE(cfg$auto_labels)) {
     tag_levels <- map_tag_levels(cfg$label_style)
     tag_pos <- if ((cfg$label_position %||% "top-left") == "top-right") c(1, 1) else c(0, 1)
-    composed <- composed + patchwork::plot_annotation(tag_levels = tag_levels) &
+    composed <- composed + patchwork::plot_annotation(
+      tag_levels = tag_levels,
+      tag_prefix = cfg$tag_prefix %||% "",
+      tag_suffix = cfg$tag_suffix %||% "",
+      tag_sep = cfg$tag_sep %||% ""
+    ) &
       ggplot2::theme(
         plot.tag = ggplot2::element_text(
           size = cfg$label_size %||% 12,
@@ -65,13 +94,43 @@ compose_patchwork_figure <- function(plot_list, selected_ids, cfg) {
   composed <- composed + patchwork::plot_annotation(
     title = cfg$title %||% NULL,
     subtitle = cfg$subtitle %||% NULL,
-    caption = cfg$caption %||% NULL
+    caption = cfg$caption %||% NULL,
+    theme = ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        hjust = cfg$title_hjust %||% 0,
+        size = cfg$title_size %||% NULL,
+        face = cfg$title_face %||% "bold"
+      ),
+      plot.subtitle = ggplot2::element_text(hjust = cfg$title_hjust %||% 0),
+      plot.caption = ggplot2::element_text(hjust = cfg$caption_hjust %||% 1),
+      plot.margin = ggplot2::margin(
+        cfg$outer_margin %||% 8,
+        cfg$outer_margin %||% 8,
+        cfg$outer_margin %||% 8,
+        cfg$outer_margin %||% 8
+      )
+    )
   )
 
   if (isTRUE(cfg$shared_theme)) {
-    composed <- composed &
+    shared_theme <- switch(
+      cfg$shared_theme_name %||% "theme_minimal",
+      "theme_bw" = ggplot2::theme_bw(base_family = cfg$shared_font_family %||% "serif",
+                                     base_size = cfg$shared_base_size %||% 11),
+      "theme_classic" = ggplot2::theme_classic(base_family = cfg$shared_font_family %||% "serif",
+                                               base_size = cfg$shared_base_size %||% 11),
+      "theme_void" = ggplot2::theme_void(base_family = cfg$shared_font_family %||% "serif",
+                                         base_size = cfg$shared_base_size %||% 11),
       ggplot2::theme_minimal(base_family = cfg$shared_font_family %||% "serif",
                              base_size = cfg$shared_base_size %||% 11)
+    )
+    composed <- composed &
+      shared_theme &
+      ggplot2::theme(
+        legend.position = cfg$shared_legend_position %||% "right",
+        panel.grid.major = if (isTRUE(cfg$shared_grid_major)) ggplot2::element_line() else ggplot2::element_blank(),
+        panel.grid.minor = if (isTRUE(cfg$shared_grid_minor)) ggplot2::element_line() else ggplot2::element_blank()
+      )
   }
 
   composed

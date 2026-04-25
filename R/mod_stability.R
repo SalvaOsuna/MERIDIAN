@@ -116,6 +116,10 @@ mod_stability_ui <- function(id) {
         style = "min-height: 500px;",
         bslib::card(
           bslib::card_header("AMMI1 Biplot: Mean vs IPCA"),
+          shiny::div(class = "px-3 pt-2",
+            shiny::actionButton(ns("send_ammi1_report"), "Send this plot to Reports",
+              icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+          ),
           full_screen = TRUE,
           shinycssloaders::withSpinner(
             plotly::plotlyOutput(ns("plot_ammi1"), height = "520px"),
@@ -124,6 +128,10 @@ mod_stability_ui <- function(id) {
         ),
         bslib::card(
           bslib::card_header("AMMI ANOVA"),
+          shiny::div(class = "px-3 pt-2",
+            shiny::actionButton(ns("send_ammi_anova_report"), "Send this table to Reports",
+              icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+          ),
           full_screen = TRUE,
           shinycssloaders::withSpinner(
             DT::dataTableOutput(ns("ammi_anova")),
@@ -138,6 +146,10 @@ mod_stability_ui <- function(id) {
         style = "min-height: 500px;",
         bslib::card(
           bslib::card_header("AMMI2 Biplot: IPCA1 vs IPCA2"),
+          shiny::div(class = "px-3 pt-2",
+            shiny::actionButton(ns("send_ammi2_report"), "Send this plot to Reports",
+              icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+          ),
           full_screen = TRUE,
           shinycssloaders::withSpinner(
             plotly::plotlyOutput(ns("plot_ammi2"), height = "520px"),
@@ -146,6 +158,10 @@ mod_stability_ui <- function(id) {
         ),
         bslib::card(
           bslib::card_header("GxE Variance Explained by IPCA Axis"),
+          shiny::div(class = "px-3 pt-2",
+            shiny::actionButton(ns("send_ammi_variance_report"), "Send this plot to Reports",
+              icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+          ),
           full_screen = TRUE,
           shinycssloaders::withSpinner(
             shiny::plotOutput(ns("plot_variance"), height = "320px"),
@@ -160,6 +176,10 @@ mod_stability_ui <- function(id) {
         style = "min-height: 500px;",
         bslib::card(
           bslib::card_header("GxE Interaction Residuals (from additive model)"),
+          shiny::div(class = "px-3 pt-2",
+            shiny::actionButton(ns("send_gxe_heatmap_report"), "Send this plot to Reports",
+              icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+          ),
           full_screen = TRUE,
           shinycssloaders::withSpinner(
             plotly::plotlyOutput(ns("plot_heatmap"), height = "500px"),
@@ -177,6 +197,10 @@ mod_stability_ui <- function(id) {
           fill  = FALSE,
           bslib::card(
             bslib::card_header("Mean vs Stability Plot"),
+            shiny::div(class = "px-3 pt-2",
+              shiny::actionButton(ns("send_stability_plot_report"), "Send this plot to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               plotly::plotlyOutput(ns("plot_stability"), height = "420px"),
@@ -187,6 +211,9 @@ mod_stability_ui <- function(id) {
             bslib::card_header(
               shiny::tagList(
                 "Stability Table (ASV, WAAS, SIPC)",
+                shiny::actionButton(ns("send_stability_table_report"), "Send to Reports",
+                  icon = shiny::icon("paper-plane"),
+                  class = "btn-success btn-sm float-end ms-1"),
                 shiny::downloadButton(ns("dl_stability_csv"), "CSV",
                   class = "btn-outline-primary btn-sm float-end ms-1"),
                 shiny::downloadButton(ns("dl_stability_xlsx"), "Excel",
@@ -208,6 +235,10 @@ mod_stability_ui <- function(id) {
         style = "min-height: 500px;",
         bslib::card(
           bslib::card_header("GGE Biplot"),
+          shiny::div(class = "px-3 pt-2",
+            shiny::actionButton(ns("send_gge_report"), "Send this plot to Reports",
+              icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+          ),
           full_screen = TRUE,
           shinycssloaders::withSpinner(
             plotly::plotlyOutput(ns("gge_biplot"), height = "550px"),
@@ -225,6 +256,10 @@ mod_stability_ui <- function(id) {
           fill  = FALSE,
           bslib::card(
             bslib::card_header("Regression Parameters"),
+            shiny::div(class = "px-3 pt-2",
+              shiny::actionButton(ns("send_er_table_report"), "Send this table to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               DT::dataTableOutput(ns("er_table")),
@@ -233,6 +268,10 @@ mod_stability_ui <- function(id) {
           ),
           bslib::card(
             bslib::card_header("bi vs Mean"),
+            shiny::div(class = "px-3 pt-2",
+              shiny::actionButton(ns("send_er_plot_report"), "Send this plot to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               plotly::plotlyOutput(ns("er_plot"), height = "400px"),
@@ -251,6 +290,10 @@ mod_stability_ui <- function(id) {
           fill  = FALSE,
           bslib::card(
             bslib::card_header("Wricke Ecovalence"),
+            shiny::div(class = "px-3 pt-2",
+              shiny::actionButton(ns("send_wricke_table_report"), "Send this table to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               DT::dataTableOutput(ns("wricke_table")),
@@ -259,6 +302,10 @@ mod_stability_ui <- function(id) {
           ),
           bslib::card(
             bslib::card_header("Shukla Stability Variance"),
+            shiny::div(class = "px-3 pt-2",
+              shiny::actionButton(ns("send_shukla_table_report"), "Send this table to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               DT::dataTableOutput(ns("shukla_table")),
@@ -276,6 +323,9 @@ mod_stability_ui <- function(id) {
           bslib::card_header(
             shiny::tagList(
               "Combined Stability Indices (native fast kernel)",
+              shiny::actionButton(ns("send_rankings_table_report"), "Send to Reports",
+                icon = shiny::icon("paper-plane"),
+                class = "btn-success btn-sm float-end ms-1"),
               shiny::downloadButton(ns("dl_rankings_csv"), "CSV",
                 class = "btn-outline-primary btn-sm float-end ms-1"),
               shiny::downloadButton(ns("dl_rankings_xlsx"), "Excel",
@@ -297,7 +347,7 @@ mod_stability_ui <- function(id) {
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
-mod_stability_server <- function(id, data_result) {
+mod_stability_server <- function(id, data_result, report_registry = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -651,6 +701,134 @@ mod_stability_server <- function(id, data_result) {
       filename = function() paste0("stability_rankings_", input$trait, ".xlsx"),
       content  = function(file) openxlsx::write.xlsx(rankings_data(), file)
     )
+
+    register_stability_plot <- function(name, label, builder, metadata = list()) {
+      req(report_registry, stab_results())
+      trait <- shiny::isolate(stab_results()$trait)
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("Stability", "plot", trait, name),
+        label = paste(label, "-", trait),
+        module = "Stability Analysis",
+        trait = trait,
+        plot_builder = function() {
+          res <- stab_results()
+          if (is.null(res) || !identical(res$trait, trait)) {
+            stop("Stability results for this trait are no longer active. Please rerun and resend.")
+          }
+          builder(res)
+        },
+        metadata = c(metadata, list(dataset_signature = sig))
+      )
+      shiny::showNotification(paste(label, "sent to Reports."), type = "message")
+    }
+
+    register_stability_table <- function(name, label, builder, metadata = list()) {
+      req(report_registry, stab_results())
+      trait <- shiny::isolate(stab_results()$trait)
+      sig <- make_dataset_signature(db())
+      register_report_table(
+        registry = report_registry,
+        id = make_report_item_id("Stability", "table", trait, name),
+        label = paste(label, "-", trait),
+        module = "Stability Analysis",
+        trait = trait,
+        table_builder = function() {
+          res <- stab_results()
+          if (is.null(res) || !identical(res$trait, trait)) {
+            stop("Stability results for this trait are no longer active. Please rerun and resend.")
+          }
+          as.data.frame(builder(res))
+        },
+        metadata = c(metadata, list(dataset_signature = sig))
+      )
+      shiny::showNotification(paste(label, "sent to Reports."), type = "message")
+    }
+
+    build_er_plot_gg <- function(res) {
+      params <- as.data.frame(res$er$params)
+      gen_col_name <- intersect(c("GEN", "gen", "Genotype"), names(params))[1]
+      mean_col <- intersect(c("Y", "Mean", "mean", "Overall"), names(params))[1]
+      bi_col <- intersect(c("b1", "bi", "b", "slope"), names(params))[1]
+      if (any(is.na(c(gen_col_name, mean_col, bi_col)))) {
+        stop("Could not identify Eberhart-Russell plotting columns.")
+      }
+      ggplot2::ggplot(params, ggplot2::aes(x = .data[[mean_col]], y = .data[[bi_col]], label = .data[[gen_col_name]])) +
+        ggplot2::geom_point(color = "#2c7a51", size = 2.8) +
+        ggrepel::geom_text_repel(size = 3, max.overlaps = 20) +
+        ggplot2::geom_hline(yintercept = 1, linetype = "dashed", color = "#c44e52") +
+        ggplot2::labs(title = paste("Eberhart-Russell:", res$trait), x = "Mean", y = "Regression Coefficient (bi)") +
+        ggplot2::theme_bw()
+    }
+
+    shiny::observeEvent(input$send_ammi1_report, {
+      axis_num <- as.integer(gsub("IPCA", "", shiny::isolate(input$ammi1_axis %||% "IPCA1")))
+      register_stability_plot("ammi1", "AMMI1 biplot",
+        function(res) plot_ammi1(res$ammi, axis = axis_num, interactive = FALSE),
+        list(plot_family = "ammi1", axis = axis_num)
+      )
+    })
+    shiny::observeEvent(input$send_ammi2_report, {
+      axis_x <- as.integer(shiny::isolate(input$ammi2_x %||% 1))
+      axis_y <- as.integer(shiny::isolate(input$ammi2_y %||% 2))
+      register_stability_plot("ammi2", "AMMI2 biplot",
+        function(res) plot_ammi2(res$ammi, axis_x = axis_x, axis_y = axis_y, interactive = FALSE),
+        list(plot_family = "ammi2", axis_x = axis_x, axis_y = axis_y)
+      )
+    })
+    shiny::observeEvent(input$send_ammi_variance_report, {
+      register_stability_plot("ammi_variance", "AMMI variance plot",
+        function(res) plot_ammi_variance(res$ammi),
+        list(plot_family = "ammi_variance")
+      )
+    })
+    shiny::observeEvent(input$send_gxe_heatmap_report, {
+      register_stability_plot("gxe_heatmap", "GxE interaction heatmap",
+        function(res) plot_ge_heatmap_ammi(res$ammi, interactive = FALSE),
+        list(plot_family = "gxe_heatmap")
+      )
+    })
+    shiny::observeEvent(input$send_stability_plot_report, {
+      metric <- shiny::isolate(input$stability_metric %||% "WAAS")
+      register_stability_plot(paste0("stability_", metric), paste("Mean vs stability", metric),
+        function(res) plot_stability_ranking(res$ammi, metric = metric, interactive = FALSE),
+        list(plot_family = "stability_ranking", metric = metric)
+      )
+    })
+    shiny::observeEvent(input$send_gge_report, {
+      register_stability_plot("gge", "GGE biplot",
+        function(res) make_gge_static_plot(res$gge$model, res$trait, default_plot_cfg()),
+        list(plot_family = "gge")
+      )
+    })
+    shiny::observeEvent(input$send_er_plot_report, {
+      register_stability_plot("eberhart_russell", "Eberhart-Russell plot",
+        build_er_plot_gg,
+        list(plot_family = "eberhart_russell")
+      )
+    })
+
+    shiny::observeEvent(input$send_ammi_anova_report, {
+      register_stability_table("ammi_anova", "AMMI ANOVA table", function(res) res$ammi$anova_table)
+    })
+    shiny::observeEvent(input$send_stability_table_report, {
+      register_stability_table("stability_metrics", "Stability metrics table", function(res) res$ammi$stability)
+    })
+    shiny::observeEvent(input$send_er_table_report, {
+      register_stability_table("eberhart_russell", "Eberhart-Russell table", function(res) res$er$params)
+    })
+    shiny::observeEvent(input$send_wricke_table_report, {
+      register_stability_table("wricke", "Wricke ecovalence table", function(res) res$wricke$params)
+    })
+    shiny::observeEvent(input$send_shukla_table_report, {
+      register_stability_table("shukla", "Shukla stability table", function(res) res$shukla$params)
+    })
+    shiny::observeEvent(input$send_rankings_table_report, {
+      register_stability_table("combined_rankings", "Combined stability rankings table",
+        function(res) stability_ranking(res$all$stats_table)
+      )
+    })
 
     # ---- Return ----
     return(list(

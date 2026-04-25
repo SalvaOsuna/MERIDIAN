@@ -365,6 +365,31 @@ safe_analysis <- function(expr, session) {
 #' @param traits Character vector of trait column names
 #' @return Tibble with Mean, SD, Min, Max, CV%, N per group × trait
 descriptive_summary <- function(df, group_col, traits) {
+  if (exists("cpp_group_numeric_summary", mode = "function")) {
+    group_f <- as.factor(df[[group_col]])
+    group_levels <- levels(group_f)
+    results <- lapply(traits, function(trait) {
+      summary_df <- cpp_group_numeric_summary(
+        as.integer(group_f),
+        as.numeric(df[[trait]]),
+        length(group_levels)
+      )
+      data.frame(
+        Group = group_levels[summary_df$GroupId],
+        Trait = trait,
+        N = summary_df$N,
+        Mean = round(summary_df$Mean, 2),
+        SD = round(summary_df$SD, 2),
+        Min = round(summary_df$Min, 2),
+        Max = round(summary_df$Max, 2),
+        CV_pct = round(summary_df$CV_pct, 1),
+        stringsAsFactors = FALSE
+      ) |>
+        stats::setNames(c(group_col, "Trait", "N", "Mean", "SD", "Min", "Max", "CV_pct"))
+    })
+    return(dplyr::bind_rows(results))
+  }
+
   results <- list()
   for (trait in traits) {
     summary_df <- df |>
@@ -399,6 +424,18 @@ descriptive_summary <- function(df, group_col, traits) {
 detect_outliers <- function(df, trait, group_col, method = "iqr", threshold = NULL) {
   if (is.null(threshold)) {
     threshold <- if (method == "iqr") 1.5 else 3
+  }
+
+  if (exists("cpp_detect_outliers", mode = "function")) {
+    group_f <- as.factor(df[[group_col]])
+    df$is_outlier <- as.logical(cpp_detect_outliers(
+      as.integer(group_f),
+      as.numeric(df[[trait]]),
+      nlevels(group_f),
+      method,
+      threshold
+    ))
+    return(df)
   }
 
   df |>

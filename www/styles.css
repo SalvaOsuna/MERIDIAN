@@ -222,6 +222,45 @@ table.dataTable tbody tr:hover {
   min-height: 200px;
 }
 
+/* ---------- Plot Containers ---------- */
+.meridian-plotly-frame {
+  width: 100%;
+  min-height: 540px;
+  overflow: hidden;
+}
+
+.meridian-plotly-frame-tall {
+  min-height: 680px;
+}
+
+.meridian-plotly-frame .shiny-plot-output,
+.meridian-plotly-frame .plotly,
+.meridian-plotly-frame .html-widget {
+  width: 100% !important;
+}
+
+.registered-plots-library {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.report-preview-stage,
+.composer-preview-stage {
+  width: 100%;
+  min-height: 780px;
+  overflow-x: auto;
+  overflow-y: auto;
+  padding-bottom: 1rem;
+}
+
+.report-preview-stage .shiny-plot-output,
+.composer-preview-stage .shiny-plot-output {
+  width: 100% !important;
+  min-height: 760px;
+}
+
 /* ---------- Tooltip Info Icons ---------- */
 .info-tooltip {
   display: inline-flex;

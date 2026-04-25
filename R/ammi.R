@@ -132,8 +132,27 @@ run_ammi <- function(data, gen, env, rep = NULL, trait, n_axis = 2) {
   ipca_cols   <- paste0("IPCA", 1:n_axis)
   ipca_matrix <- as.matrix(stability[, ipca_cols, drop = FALSE])
   
-  # Call C++ kernel for ASV, WAAS, SIPC
-  cpp_metrics <- cpp_ammi_stability(ipca_matrix, axis_ss, axis_pct, n_axis)
+  # Call C++ kernel for ASV, WAAS, SIPC when available.
+  cpp_metrics <- if (exists("cpp_ammi_stability", mode = "function")) {
+    cpp_ammi_stability(ipca_matrix, axis_ss, axis_pct, n_axis)
+  } else {
+    ss_ratio <- if (n_axis >= 2 && axis_ss[2] > 0) axis_ss[1] / axis_ss[2] else NA_real_
+    asv <- rep(NA_real_, nrow(ipca_matrix))
+    if (n_axis >= 2 && !is.na(ss_ratio)) {
+      asv <- sqrt((ss_ratio * ipca_matrix[, 1])^2 + ipca_matrix[, 2]^2)
+    }
+    w_sum <- sum(axis_pct[seq_len(n_axis)])
+    waas <- if (w_sum > 0) {
+      rowSums(abs(ipca_matrix) * matrix(axis_pct[seq_len(n_axis)], nrow = nrow(ipca_matrix), ncol = n_axis, byrow = TRUE)) / w_sum
+    } else {
+      rep(NA_real_, nrow(ipca_matrix))
+    }
+    data.frame(
+      ASV = asv,
+      WAAS = waas,
+      SIPC = rowSums(abs(ipca_matrix))
+    )
+  }
   
   stability$ASV  <- round(cpp_metrics$ASV, 4)
   stability$WAAS <- round(cpp_metrics$WAAS, 4)

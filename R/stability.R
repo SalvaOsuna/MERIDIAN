@@ -37,7 +37,35 @@ prepare_metan_data <- function(df, gen_col, env_col, rep_col, trait = NULL) {
     n_gen_levels <- nlevels(gen_fct)
     n_env_levels <- nlevels(env_fct)
 
-    keep_rows <- cpp_find_balanced_subset(gen_int, env_int, n_gen_levels, n_env_levels)
+    keep_rows <- if (exists("cpp_find_balanced_subset", mode = "function")) {
+      cpp_find_balanced_subset(gen_int, env_int, n_gen_levels, n_env_levels)
+    } else {
+      keep_gen <- rep(TRUE, n_gen_levels)
+      keep_env <- rep(TRUE, n_env_levels)
+      keep <- rep(TRUE, nrow(df_std))
+      changed <- TRUE
+      while (changed) {
+        changed <- FALSE
+        active_envs <- which(keep_env)
+        active_gens <- which(keep_gen)
+        present <- table(
+          factor(gen_int[keep], levels = seq_len(n_gen_levels)),
+          factor(env_int[keep], levels = seq_len(n_env_levels))
+        ) > 0
+        gen_env_counts <- rowSums(present)
+        env_gen_counts <- colSums(present)
+
+        drop_gen <- active_gens[gen_env_counts[active_gens] < length(active_envs)]
+        drop_env <- active_envs[env_gen_counts[active_envs] < length(active_gens)]
+        if (length(drop_gen) > 0 || length(drop_env) > 0) {
+          keep_gen[drop_gen] <- FALSE
+          keep_env[drop_env] <- FALSE
+          keep <- !is.na(gen_int) & !is.na(env_int) & keep_gen[gen_int] & keep_env[env_int]
+          changed <- TRUE
+        }
+      }
+      keep
+    }
     df_std <- df_std[keep_rows, , drop = FALSE]
 
     df_std[[gen_col]] <- droplevels(as.factor(df_std[[gen_col]]))
@@ -82,19 +110,25 @@ prepare_gge_data <- function(df, gen_col, env_col, trait) {
   # Impute missing cells with additive expectation: mu + g + e
   miss_idx <- which(is.na(ge_means), arr.ind = TRUE)
   if (nrow(miss_idx) > 0) {
-    grand_mean <- mean(ge_means, na.rm = TRUE)
-    gen_means <- rowMeans(ge_means, na.rm = TRUE)
-    env_means <- colMeans(ge_means, na.rm = TRUE)
+    if (exists("cpp_impute_additive_gxe", mode = "function")) {
+      imputed <- cpp_impute_additive_gxe(ge_means)
+      ge_means <- as.matrix(imputed$matrix)
+    } else {
+      grand_mean <- mean(ge_means, na.rm = TRUE)
+      gen_means <- rowMeans(ge_means, na.rm = TRUE)
+      env_means <- colMeans(ge_means, na.rm = TRUE)
 
-    # Fallbacks when a full row/column is missing
-    gen_means[is.na(gen_means)] <- grand_mean
-    env_means[is.na(env_means)] <- grand_mean
+      # Fallbacks when a full row/column is missing
+      gen_means[is.na(gen_means)] <- grand_mean
+      env_means[is.na(env_means)] <- grand_mean
 
-    for (k in seq_len(nrow(miss_idx))) {
-      i <- miss_idx[k, 1]
-      j <- miss_idx[k, 2]
-      ge_means[i, j] <- gen_means[i] + env_means[j] - grand_mean
+      for (k in seq_len(nrow(miss_idx))) {
+        i <- miss_idx[k, 1]
+        j <- miss_idx[k, 2]
+        ge_means[i, j] <- gen_means[i] + env_means[j] - grand_mean
+      }
     }
+    dimnames(ge_means) <- list(gen_levels, env_levels)
   }
 
   out <- expand.grid(
@@ -203,13 +237,19 @@ compute_er_table_fast <- function(ge) {
   ei <- ge$env_means - ge$grand_mean
   ss_ei <- sum(ei^2)
 
-  if (exists("cpp_fw_regression", mode = "function")) {
-    mean_vals <- as.numeric(ge$ge_means)
-    ei_vals <- rep(ei, each = ge$n_gen)
-    gen_ids <- rep(seq_len(ge$n_gen), times = ge$n_env)
-    fw <- cpp_fw_regression(mean_vals, ei_vals, gen_ids, ge$n_gen)
-    bi <- as.numeric(fw$slope)
-    intercept <- as.numeric(fw$intercept)
+  if (exists("cpp_er_statistics", mode = "function")) {
+    er <- cpp_er_statistics(ge$ge_means, ei)
+    bi <- as.numeric(er$slope)
+    intercept <- as.numeric(er$intercept)
+    s2di <- as.numeric(er$S2di)
+    r2 <- as.numeric(er$R2)
+  } else if (exists("cpp_fw_regression", mode = "function")) {
+      mean_vals <- as.numeric(ge$ge_means)
+      ei_vals <- rep(ei, each = ge$n_gen)
+      gen_ids <- rep(seq_len(ge$n_gen), times = ge$n_env)
+      fw <- cpp_fw_regression(mean_vals, ei_vals, gen_ids, ge$n_gen)
+      bi <- as.numeric(fw$slope)
+      intercept <- as.numeric(fw$intercept)
   } else if (ss_ei <= .Machine$double.eps) {
     bi <- rep(NA_real_, ge$n_gen)
     intercept <- ge$gen_means
@@ -218,15 +258,17 @@ compute_er_table_fast <- function(ge) {
     intercept <- ge$gen_means
   }
 
-  fitted <- matrix(intercept, nrow = ge$n_gen, ncol = ge$n_env) +
-    tcrossprod(bi, ei)
+  if (!exists("s2di", inherits = FALSE) || !exists("r2", inherits = FALSE)) {
+    fitted <- matrix(intercept, nrow = ge$n_gen, ncol = ge$n_env) +
+      tcrossprod(bi, ei)
 
-  resid <- ge$ge_means - fitted
-  sse <- rowSums(resid^2)
-  sst <- rowSums((ge$ge_means - matrix(intercept, nrow = ge$n_gen, ncol = ge$n_env))^2)
+    resid <- ge$ge_means - fitted
+    sse <- rowSums(resid^2)
+    sst <- rowSums((ge$ge_means - matrix(intercept, nrow = ge$n_gen, ncol = ge$n_env))^2)
 
-  s2di <- if (ge$n_env > 2) sse / (ge$n_env - 2) else rep(NA_real_, ge$n_gen)
-  r2 <- ifelse(sst > .Machine$double.eps, pmax(0, 1 - sse / sst), NA_real_)
+    s2di <- if (ge$n_env > 2) sse / (ge$n_env - 2) else rep(NA_real_, ge$n_gen)
+    r2 <- ifelse(sst > .Machine$double.eps, pmax(0, 1 - sse / sst), NA_real_)
+  }
 
   data.frame(
     GEN = ge$gen_levels,

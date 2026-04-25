@@ -27,12 +27,19 @@ mod_eda_ui <- function(id) {
           ),
           shiny::checkboxInput(ns("box_points"), LABELS$m2_show_points, value = TRUE),
           shiny::tags$hr(),
+          shiny::actionButton(ns("send_boxplot_report"), "Send this plot to Reports",
+            icon = shiny::icon("paper-plane"),
+            class = "btn-success btn-sm w-100 mb-2"
+          ),
           shiny::downloadButton(ns("download_boxplot"), LABELS$download_plot,
                                 class = "btn-outline-primary btn-sm w-100")
         ),
-        shinycssloaders::withSpinner(
-          plotly::plotlyOutput(ns("boxplot"), height = "500px"),
-          type = 6, color = "#2c7a51"
+        shiny::div(
+          class = "meridian-plotly-frame",
+          shinycssloaders::withSpinner(
+            plotly::plotlyOutput(ns("boxplot"), width = "100%", height = "560px"),
+            type = 6, color = "#2c7a51"
+          )
         )
       )
     ),
@@ -52,6 +59,10 @@ mod_eda_ui <- function(id) {
             selected = "RdYlGn"
           ),
           shiny::tags$hr(),
+          shiny::actionButton(ns("send_heatmap_report"), "Send this plot to Reports",
+            icon = shiny::icon("paper-plane"),
+            class = "btn-success btn-sm w-100 mb-2"
+          ),
           shiny::tags$p(
             class = "info-tooltip-text",
             style = "font-size: 0.8rem; color: #777;",
@@ -60,9 +71,12 @@ mod_eda_ui <- function(id) {
             "hierarchical clustering of similar genotypes/environments."
           )
         ),
-        shinycssloaders::withSpinner(
-          plotly::plotlyOutput(ns("heatmap"), height = "600px"),
-          type = 6, color = "#2c7a51"
+        shiny::div(
+          class = "meridian-plotly-frame meridian-plotly-frame-tall",
+          shinycssloaders::withSpinner(
+            plotly::plotlyOutput(ns("heatmap"), width = "100%", height = "680px"),
+            type = 6, color = "#2c7a51"
+          )
         )
       )
     ),
@@ -80,6 +94,10 @@ mod_eda_ui <- function(id) {
             selected = "pearson"
           ),
           shiny::tags$hr(),
+          shiny::actionButton(ns("send_cor_report"), "Send this plot to Reports",
+            icon = shiny::icon("paper-plane"),
+            class = "btn-success btn-sm w-100 mb-2"
+          ),
           shiny::tags$p(
             class = "info-tooltip-text",
             style = "font-size: 0.8rem; color: #777;",
@@ -88,9 +106,12 @@ mod_eda_ui <- function(id) {
             "High correlations indicate similar genotype ranking across environments."
           )
         ),
-        shinycssloaders::withSpinner(
-          plotly::plotlyOutput(ns("cor_plot"), height = "550px"),
-          type = 6, color = "#2c7a51"
+        shiny::div(
+          class = "meridian-plotly-frame",
+          shinycssloaders::withSpinner(
+            plotly::plotlyOutput(ns("cor_plot"), width = "100%", height = "600px"),
+            type = 6, color = "#2c7a51"
+          )
         )
       )
     ),
@@ -111,6 +132,10 @@ mod_eda_ui <- function(id) {
             icon  = shiny::icon("filter"),
             class = "btn-warning btn-sm w-100"
           ),
+          shiny::actionButton(ns("send_outlier_report"), "Send this plot to Reports",
+            icon = shiny::icon("paper-plane"),
+            class = "btn-success btn-sm w-100 mt-2"
+          ),
           shiny::tags$hr(),
           shiny::tags$p(
             class = "info-tooltip-text",
@@ -121,9 +146,12 @@ mod_eda_ui <- function(id) {
             "Z-score method: |z| > 3."
           )
         ),
-        shinycssloaders::withSpinner(
-          plotly::plotlyOutput(ns("outlier_plot"), height = "450px"),
-          type = 6, color = "#2c7a51"
+        shiny::div(
+          class = "meridian-plotly-frame",
+          shinycssloaders::withSpinner(
+            plotly::plotlyOutput(ns("outlier_plot"), width = "100%", height = "540px"),
+            type = 6, color = "#2c7a51"
+          )
         ),
         bslib::card(
           bslib::card_header("Detected Outliers"),
@@ -141,6 +169,9 @@ mod_eda_ui <- function(id) {
           bslib::card_header(
             shiny::tagList(
               "Grand Summary",
+              shiny::actionButton(ns("send_grand_report"), "Send to Reports",
+                icon = shiny::icon("paper-plane"),
+                class = "btn-success btn-sm float-end ms-1"),
               shiny::downloadButton(ns("dl_grand_csv"), "CSV",
                 class = "btn-outline-primary btn-sm float-end ms-1"),
               shiny::downloadButton(ns("dl_grand_xlsx"), "Excel",
@@ -153,6 +184,9 @@ mod_eda_ui <- function(id) {
           bslib::card_header(
             shiny::tagList(
               "Summary by Environment",
+              shiny::actionButton(ns("send_env_report"), "Send to Reports",
+                icon = shiny::icon("paper-plane"),
+                class = "btn-success btn-sm float-end ms-1"),
               shiny::downloadButton(ns("dl_env_csv"), "CSV",
                 class = "btn-outline-primary btn-sm float-end ms-1"),
               shiny::downloadButton(ns("dl_env_xlsx"), "Excel",
@@ -170,7 +204,7 @@ mod_eda_ui <- function(id) {
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
-mod_eda_server <- function(id, data_result) {
+mod_eda_server <- function(id, data_result, report_registry = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -212,17 +246,73 @@ mod_eda_server <- function(id, data_result) {
     output$boxplot <- plotly::renderPlotly({
       req(boxplot_obj())
       plotly::ggplotly(boxplot_obj(), tooltip = c("x", "y")) |>
-        plotly::layout(margin = list(b = 80))
+        plotly::layout(autosize = TRUE, margin = list(l = 70, r = 20, b = 100, t = 60)) |>
+        plotly::config(responsive = TRUE)
     })
 
     output$download_boxplot <- shiny::downloadHandler(
       filename = function() paste0("boxplot_", input$box_trait, ".png"),
       content  = function(file) {
-        ggplot2::ggsave(file, plot = boxplot_obj(), width = 10, height = 6, dpi = 150)
+        ggplot2::ggsave(file, plot = boxplot_obj(), width = 10, height = 6, dpi = 150, bg = "white")
       }
     )
 
+    shiny::observeEvent(input$send_boxplot_report, {
+      req(report_registry, db(), input$box_trait)
+      trait <- shiny::isolate(input$box_trait)
+      group_by <- shiny::isolate(input$box_group)
+      group_col <- shiny::isolate(box_group_col())
+      show_points <- shiny::isolate(input$box_points)
+      sig <- make_dataset_signature(db())
+      id <- make_report_item_id("EDA", "plot", trait, paste0("boxplot_", group_by))
+
+      register_report_plot(
+        registry = report_registry,
+        id = id,
+        label = paste("EDA boxplot -", trait, "by", group_by),
+        module = "Exploratory Analysis",
+        trait = trait,
+        plot_builder = function() {
+          current_db <- data_result$data_bundle()
+          if (is.null(current_db)) stop("No dataset is currently loaded.")
+          plot_boxplots(
+            df = current_db$data,
+            trait = trait,
+            group_col = group_col,
+            color_col = group_col,
+            show_points = show_points
+          )
+        },
+        metadata = list(
+          plot_family = "boxplot",
+          group_by = group_by,
+          show_points = show_points,
+          dataset_signature = sig,
+          input_snapshot = list(trait = trait, group_by = group_by, show_points = show_points)
+        )
+      )
+      shiny::showNotification("EDA boxplot sent to Reports.", type = "message")
+    })
+
     # ---- Tab 2: G×E Heatmap ----
+    build_ge_heatmap_gg <- function(current_db, trait, cluster_rows = TRUE, cluster_cols = TRUE) {
+      mat <- pivot_ge_means(current_db$data, current_db$gen_col, current_db$env_col, trait)
+      if (isTRUE(cluster_rows) && nrow(mat) > 1) {
+        mat <- mat[stats::hclust(stats::dist(mat))$order, , drop = FALSE]
+      }
+      if (isTRUE(cluster_cols) && ncol(mat) > 1) {
+        mat <- mat[, stats::hclust(stats::dist(t(mat)))$order, drop = FALSE]
+      }
+      plot_df <- as.data.frame(as.table(mat), stringsAsFactors = FALSE)
+      names(plot_df) <- c("Genotype", "Environment", "Value")
+      ggplot2::ggplot(plot_df, ggplot2::aes(x = Environment, y = Genotype, fill = Value)) +
+        ggplot2::geom_tile(color = "white", linewidth = 0.2) +
+        ggplot2::scale_fill_viridis_c(option = "D", na.value = "grey90") +
+        ggplot2::labs(title = paste0("GxE Means: ", trait), x = "Environment", y = "Genotype", fill = trait) +
+        ggplot2::theme_bw(base_size = 12) +
+        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+    }
+
     output$heatmap <- plotly::renderPlotly({
       req(db(), input$heat_trait)
       tryCatch({
@@ -236,7 +326,9 @@ mod_eda_server <- function(id, data_result) {
             cluster_cols = input$heat_cluster_cols,
             palette      = input$heat_palette
           )
-        )
+        ) |>
+          plotly::layout(autosize = TRUE, margin = list(l = 120, r = 30, b = 100, t = 80)) |>
+          plotly::config(responsive = TRUE)
       }, error = function(e) {
         shiny::showNotification(
           paste("Heatmap error:", e$message),
@@ -247,7 +339,44 @@ mod_eda_server <- function(id, data_result) {
       })
     })
 
+    shiny::observeEvent(input$send_heatmap_report, {
+      req(report_registry, db(), input$heat_trait)
+      trait <- shiny::isolate(input$heat_trait)
+      cluster_rows <- shiny::isolate(input$heat_cluster_rows)
+      cluster_cols <- shiny::isolate(input$heat_cluster_cols)
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("EDA", "plot", trait, "gxe_heatmap"),
+        label = paste("EDA GxE heatmap -", trait),
+        module = "Exploratory Analysis",
+        trait = trait,
+        plot_builder = function() {
+          current_db <- data_result$data_bundle()
+          if (is.null(current_db)) stop("No dataset is currently loaded.")
+          build_ge_heatmap_gg(current_db, trait, cluster_rows, cluster_cols)
+        },
+        metadata = list(plot_family = "gxe_heatmap", dataset_signature = sig)
+      )
+      shiny::showNotification("EDA GxE heatmap sent to Reports.", type = "message")
+    })
+
     # ---- Tab 3: Correlations ----
+    build_env_correlation_gg <- function(current_db, trait, method = "pearson") {
+      mat <- pivot_ge_means(current_db$data, current_db$gen_col, current_db$env_col, trait)
+      cor_matrix <- round(stats::cor(mat, use = "pairwise.complete.obs", method = method), 2)
+      plot_df <- as.data.frame(as.table(cor_matrix), stringsAsFactors = FALSE)
+      names(plot_df) <- c("Env1", "Env2", "Correlation")
+      ggplot2::ggplot(plot_df, ggplot2::aes(x = Env2, y = Env1, fill = Correlation)) +
+        ggplot2::geom_tile(color = "white", linewidth = 0.2) +
+        ggplot2::geom_text(ggplot2::aes(label = sprintf("%.2f", Correlation)), size = 3) +
+        ggplot2::scale_fill_gradient2(low = "#c44e52", mid = "#f8f9fa", high = "#2c7a51",
+          midpoint = 0, limits = c(-1, 1), name = "r") +
+        ggplot2::labs(title = paste("Environment Correlations:", trait, "(", method, ")"), x = NULL, y = NULL) +
+        ggplot2::theme_bw(base_size = 12) +
+        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+    }
+
     output$cor_plot <- plotly::renderPlotly({
       req(db(), input$cor_trait)
       safe_analysis({
@@ -257,8 +386,30 @@ mod_eda_server <- function(id, data_result) {
           env_col = db()$env_col,
           trait   = input$cor_trait,
           method  = input$cor_method
-        )
+        ) |>
+          plotly::config(responsive = TRUE)
       }, session)
+    })
+
+    shiny::observeEvent(input$send_cor_report, {
+      req(report_registry, db(), input$cor_trait)
+      trait <- shiny::isolate(input$cor_trait)
+      method <- shiny::isolate(input$cor_method)
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("EDA", "plot", trait, paste0("env_correlation_", method)),
+        label = paste("EDA environment correlation -", trait),
+        module = "Exploratory Analysis",
+        trait = trait,
+        plot_builder = function() {
+          current_db <- data_result$data_bundle()
+          if (is.null(current_db)) stop("No dataset is currently loaded.")
+          build_env_correlation_gg(current_db, trait, method)
+        },
+        metadata = list(plot_family = "environment_correlation", method = method, dataset_signature = sig)
+      )
+      shiny::showNotification("EDA environment correlation sent to Reports.", type = "message")
     })
 
     # ---- Tab 4: Outlier Detection ----
@@ -281,7 +432,30 @@ mod_eda_server <- function(id, data_result) {
         gen_col   = db()$gen_col
       )
       plotly::ggplotly(p, tooltip = "text") |>
-        plotly::layout(margin = list(b = 80))
+        plotly::layout(autosize = TRUE, margin = list(l = 70, r = 20, b = 100, t = 60)) |>
+        plotly::config(responsive = TRUE)
+    })
+
+    shiny::observeEvent(input$send_outlier_report, {
+      req(report_registry, outlier_data(), input$out_trait)
+      trait <- shiny::isolate(input$out_trait)
+      method <- shiny::isolate(input$out_method)
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("EDA", "plot", trait, paste0("outliers_", method)),
+        label = paste("EDA outlier scatter -", trait),
+        module = "Exploratory Analysis",
+        trait = trait,
+        plot_builder = function() {
+          current_db <- data_result$data_bundle()
+          if (is.null(current_db)) stop("No dataset is currently loaded.")
+          od <- detect_outliers(current_db$data, trait, current_db$env_col, method)
+          plot_outlier_scatter(od, trait, current_db$env_col, current_db$gen_col)
+        },
+        metadata = list(plot_family = "outlier_scatter", method = method, dataset_signature = sig)
+      )
+      shiny::showNotification("EDA outlier scatter sent to Reports.", type = "message")
     })
 
     output$outlier_table <- DT::renderDataTable({
@@ -356,5 +530,43 @@ mod_eda_server <- function(id, data_result) {
       filename = function() "summary_by_environment.xlsx",
       content  = function(file) openxlsx::write.xlsx(env_summary(), file)
     )
+
+    shiny::observeEvent(input$send_grand_report, {
+      req(report_registry, grand_summary())
+      sig <- make_dataset_signature(db())
+      register_report_table(
+        registry = report_registry,
+        id = make_report_item_id("EDA", "table", "all_traits", "grand_summary"),
+        label = "EDA grand summary table",
+        module = "Exploratory Analysis",
+        trait = "All traits",
+        table_builder = function() {
+          current_db <- data_result$data_bundle()
+          if (is.null(current_db)) stop("No dataset is currently loaded.")
+          compute_grand_summary(current_db$data, current_db$traits)
+        },
+        metadata = list(table_family = "grand_summary", dataset_signature = sig)
+      )
+      shiny::showNotification("Grand summary table sent to Reports.", type = "message")
+    })
+
+    shiny::observeEvent(input$send_env_report, {
+      req(report_registry, env_summary())
+      sig <- make_dataset_signature(db())
+      register_report_table(
+        registry = report_registry,
+        id = make_report_item_id("EDA", "table", "all_traits", "environment_summary"),
+        label = "EDA summary by environment table",
+        module = "Exploratory Analysis",
+        trait = "All traits",
+        table_builder = function() {
+          current_db <- data_result$data_bundle()
+          if (is.null(current_db)) stop("No dataset is currently loaded.")
+          descriptive_summary(current_db$data, current_db$env_col, current_db$traits)
+        },
+        metadata = list(table_family = "environment_summary", dataset_signature = sig)
+      )
+      shiny::showNotification("Environment summary table sent to Reports.", type = "message")
+    })
   })
 }

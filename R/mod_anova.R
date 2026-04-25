@@ -62,6 +62,11 @@ mod_anova_ui <- function(id) {
         title = shiny::tagList(shiny::icon("table"), " ANOVA Table"),
         style = "min-height: 400px;",
         shiny::uiOutput(ns("anova_summary_boxes")),
+        shiny::div(
+          class = "d-flex gap-2 justify-content-end mb-2",
+          shiny::actionButton(ns("send_anova_table_report"), "Send table to Reports",
+            icon = shiny::icon("paper-plane"), class = "btn-success btn-sm")
+        ),
         shinycssloaders::withSpinner(
           DT::dataTableOutput(ns("anova_table")),
           type = 6, color = "#2c7a51"
@@ -70,6 +75,11 @@ mod_anova_ui <- function(id) {
         shinycssloaders::withSpinner(
           plotly::plotlyOutput(ns("ss_barplot"), height = "350px"),
           type = 6, color = "#2c7a51"
+        ),
+        shiny::div(
+          class = "d-flex gap-2 justify-content-end mt-2",
+          shiny::actionButton(ns("send_ss_barplot_report"), "Send this plot to Reports",
+            icon = shiny::icon("paper-plane"), class = "btn-success btn-sm")
         )
       ),
 
@@ -91,6 +101,11 @@ mod_anova_ui <- function(id) {
           ),
           bslib::card(
             bslib::card_header("Variance Partition"),
+            shiny::div(
+              class = "px-3 pt-2",
+              shiny::actionButton(ns("send_var_partition_report"), "Send this plot to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               plotly::plotlyOutput(ns("var_pie"), height = "320px"),
@@ -125,6 +140,11 @@ mod_anova_ui <- function(id) {
           ),
           bslib::card(
             bslib::card_header("BLUEs with 95% CI"),
+            shiny::div(
+              class = "px-3 pt-2",
+              shiny::actionButton(ns("send_blues_plot_report"), "Send this plot to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               plotly::plotlyOutput(ns("blues_plot"), height = "450px"),
@@ -159,6 +179,11 @@ mod_anova_ui <- function(id) {
           ),
           bslib::card(
             bslib::card_header("BLUPs with 95% CI"),
+            shiny::div(
+              class = "px-3 pt-2",
+              shiny::actionButton(ns("send_blups_plot_report"), "Send this plot to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               plotly::plotlyOutput(ns("blups_plot"), height = "450px"),
@@ -175,9 +200,74 @@ mod_anova_ui <- function(id) {
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
-mod_anova_server <- function(id, data_result) {
+mod_anova_server <- function(id, data_result, report_registry = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    build_blues_plot_gg <- function(res) {
+      df <- res$blues
+      df <- df[order(df$BLUE), , drop = FALSE]
+      df$Genotype <- factor(df$Genotype, levels = df$Genotype)
+      ggplot2::ggplot(df, ggplot2::aes(x = BLUE, y = Genotype)) +
+        ggplot2::geom_errorbarh(
+          ggplot2::aes(xmin = CI_lower, xmax = CI_upper),
+          height = 0.15, color = "grey55"
+        ) +
+        ggplot2::geom_point(color = "#2c7a51", size = 2.4) +
+        ggplot2::labs(
+          title = paste("BLUEs:", res$trait),
+          x = res$trait,
+          y = NULL
+        ) +
+        ggplot2::theme_bw()
+    }
+
+    build_blups_plot_gg <- function(res) {
+      df <- res$blups
+      df <- df[order(df$BLUP), , drop = FALSE]
+      df$Genotype <- factor(df$Genotype, levels = df$Genotype)
+      ggplot2::ggplot(df, ggplot2::aes(x = BLUP, y = Genotype)) +
+        ggplot2::geom_errorbarh(
+          ggplot2::aes(xmin = CI_lower, xmax = CI_upper),
+          height = 0.15, color = "grey55"
+        ) +
+        ggplot2::geom_point(color = "#d4a853", size = 2.4) +
+        ggplot2::labs(
+          title = paste("BLUPs:", res$trait),
+          x = res$trait,
+          y = NULL
+        ) +
+        ggplot2::theme_bw()
+    }
+
+    build_var_partition_gg <- function(res) {
+      vt <- res$mixed$var_table
+      vt <- vt[vt$Component != "Total", , drop = FALSE]
+      ggplot2::ggplot(vt, ggplot2::aes(x = Component, y = Variance, fill = Component)) +
+        ggplot2::geom_col(show.legend = FALSE, alpha = 0.85) +
+        ggplot2::labs(
+          title = paste("Variance Partition:", res$trait),
+          x = NULL,
+          y = "Variance"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
+    }
+
+    build_ss_barplot_gg <- function(res) {
+      tbl <- res$anova$anova_table
+      tbl <- tbl[tbl$Source != "Residuals", , drop = FALSE]
+      ggplot2::ggplot(tbl, ggplot2::aes(x = Source, y = Pct_SS, fill = Source)) +
+        ggplot2::geom_col(show.legend = FALSE, alpha = 0.85) +
+        ggplot2::geom_text(ggplot2::aes(label = paste0(Pct_SS, "%")), vjust = -0.3, size = 3) +
+        ggplot2::labs(
+          title = paste("Partitioning of Sum of Squares (%):", res$trait),
+          x = NULL,
+          y = "% of Total SS"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
+    }
 
     # ---- Data bundle helper ----
     db <- shiny::reactive({
@@ -305,7 +395,7 @@ mod_anova_server <- function(id, data_result) {
         hovertemplate = "%{x}<br>%{y:.1f}% of total SS<extra></extra>"
       ) |>
         plotly::layout(
-          title  = "Partitioning of Sum of Squares (%)",
+          title  = paste("Partitioning of Sum of Squares (%):", anova_results()$trait),
           xaxis  = list(title = ""),
           yaxis  = list(title = "% of Total SS"),
           margin = list(b = 80)
@@ -366,7 +456,7 @@ mod_anova_server <- function(id, data_result) {
         hovertemplate = "%{label}<br>Var = %{value:.4f}<br>%{percent}<extra></extra>"
       ) |>
         plotly::layout(
-          title       = "Variance Component Partition",
+          title       = paste("Variance Component Partition:", anova_results()$trait),
           showlegend  = TRUE,
           margin      = list(t = 40)
         )
@@ -463,6 +553,116 @@ mod_anova_server <- function(id, data_result) {
       filename = function() paste0("blups_", input$trait, ".xlsx"),
       content  = function(file) openxlsx::write.xlsx(anova_results()$blups, file)
     )
+
+    shiny::observeEvent(input$send_anova_table_report, {
+      req(report_registry, anova_results(), anova_results()$anova$anova_table)
+      trait <- shiny::isolate(anova_results()$trait)
+      sig <- make_dataset_signature(db())
+      register_report_table(
+        registry = report_registry,
+        id = make_report_item_id("ANOVA", "table", trait, "anova_table"),
+        label = paste("ANOVA table -", trait),
+        module = "ANOVA & Variance Components",
+        trait = trait,
+        table_builder = function() {
+          res <- anova_results()
+          if (is.null(res) || !identical(res$trait, trait)) {
+            stop("ANOVA results for this trait are no longer active. Please rerun and resend.")
+          }
+          as.data.frame(res$anova$anova_table)
+        },
+        metadata = list(table_family = "anova", dataset_signature = sig)
+      )
+      shiny::showNotification("ANOVA table sent to Reports.", type = "message")
+    })
+
+    shiny::observeEvent(input$send_ss_barplot_report, {
+      req(report_registry, anova_results(), anova_results()$anova$anova_table)
+      trait <- shiny::isolate(anova_results()$trait)
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("ANOVA", "plot", trait, "sum_squares"),
+        label = paste("ANOVA sum of squares plot -", trait),
+        module = "ANOVA & Variance Components",
+        trait = trait,
+        plot_builder = function() {
+          res <- anova_results()
+          if (is.null(res) || !identical(res$trait, trait)) {
+            stop("ANOVA sum of squares for this trait is no longer active. Please rerun and resend.")
+          }
+          build_ss_barplot_gg(res)
+        },
+        metadata = list(plot_family = "sum_squares", dataset_signature = sig)
+      )
+      shiny::showNotification("Sum of squares plot sent to Reports.", type = "message")
+    })
+
+    shiny::observeEvent(input$send_blues_plot_report, {
+      req(report_registry, anova_results(), anova_results()$blues)
+      trait <- shiny::isolate(anova_results()$trait)
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("ANOVA", "plot", trait, "blues"),
+        label = paste("ANOVA BLUEs plot -", trait),
+        module = "ANOVA & Variance Components",
+        trait = trait,
+        plot_builder = function() {
+          res <- anova_results()
+          if (is.null(res) || !identical(res$trait, trait)) {
+            stop("ANOVA BLUEs for this trait are no longer active. Please rerun and resend.")
+          }
+          build_blues_plot_gg(res)
+        },
+        metadata = list(plot_family = "blues", dataset_signature = sig)
+      )
+      shiny::showNotification("BLUEs plot sent to Reports.", type = "message")
+    })
+
+    shiny::observeEvent(input$send_var_partition_report, {
+      req(report_registry, anova_results(), anova_results()$mixed$var_table)
+      trait <- shiny::isolate(anova_results()$trait)
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("ANOVA", "plot", trait, "variance_partition"),
+        label = paste("ANOVA variance partition -", trait),
+        module = "ANOVA & Variance Components",
+        trait = trait,
+        plot_builder = function() {
+          res <- anova_results()
+          if (is.null(res) || !identical(res$trait, trait)) {
+            stop("ANOVA variance partition for this trait is no longer active. Please rerun and resend.")
+          }
+          build_var_partition_gg(res)
+        },
+        metadata = list(plot_family = "variance_partition", dataset_signature = sig)
+      )
+      shiny::showNotification("Variance partition plot sent to Reports.", type = "message")
+    })
+
+    shiny::observeEvent(input$send_blups_plot_report, {
+      req(report_registry, anova_results(), anova_results()$blups)
+      trait <- shiny::isolate(anova_results()$trait)
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("ANOVA", "plot", trait, "blups"),
+        label = paste("ANOVA BLUPs plot -", trait),
+        module = "ANOVA & Variance Components",
+        trait = trait,
+        plot_builder = function() {
+          res <- anova_results()
+          if (is.null(res) || !identical(res$trait, trait)) {
+            stop("ANOVA BLUPs for this trait are no longer active. Please rerun and resend.")
+          }
+          build_blups_plot_gg(res)
+        },
+        metadata = list(plot_family = "blups", dataset_signature = sig)
+      )
+      shiny::showNotification("BLUPs plot sent to Reports.", type = "message")
+    })
 
     # ---- Return results for downstream modules ----
     return(list(

@@ -52,6 +52,8 @@ mod_spatial_ui <- function(id) {
         shiny::div(
           style = "min-height: 500px;",
           shiny::uiOutput(ns("spats_message")),
+          shiny::actionButton(ns("send_spats_trend_report"), "Send this plot to Reports",
+            icon = shiny::icon("paper-plane"), class = "btn-success btn-sm mb-3"),
           shinycssloaders::withSpinner(
             shiny::plotOutput(ns("spats_plot"), height = "700px"),
             type = 6, color = "#2c7a51"
@@ -67,6 +69,10 @@ mod_spatial_ui <- function(id) {
           fill  = FALSE,
           bslib::card(
             bslib::card_header("Variance Components (SpATS)"),
+            shiny::div(class = "px-3 pt-2",
+              shiny::actionButton(ns("send_spats_var_table_report"), "Send this table to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               DT::dataTableOutput(ns("var_table")),
@@ -75,6 +81,10 @@ mod_spatial_ui <- function(id) {
           ),
           bslib::card(
             bslib::card_header("Variance Partition"),
+            shiny::div(class = "px-3 pt-2",
+              shiny::actionButton(ns("send_spats_var_plot_report"), "Send this plot to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             shinycssloaders::withSpinner(
               plotly::plotlyOutput(ns("var_pie"), height = "320px"),
@@ -86,6 +96,8 @@ mod_spatial_ui <- function(id) {
       bslib::nav_panel(
         "Within Environment Means",
         shiny::div(
+          shiny::actionButton(ns("send_means_table_report"), "Send this table to Reports",
+            icon = shiny::icon("paper-plane"), class = "btn-success btn-sm mb-3"),
           shiny::downloadButton(ns("download_means"), "Download Adjusted Means", class = "btn-outline-primary mb-3"),
           shinycssloaders::withSpinner(
             DT::dataTableOutput(ns("means_table")),
@@ -96,6 +108,8 @@ mod_spatial_ui <- function(id) {
       bslib::nav_panel(
         "Across Environment Means",
         shiny::div(
+          shiny::actionButton(ns("send_means_all_table_report"), "Send this table to Reports",
+            icon = shiny::icon("paper-plane"), class = "btn-success btn-sm mb-3"),
           shiny::downloadButton(ns("download_means_all"), "Download Across-Env Means", class = "btn-outline-primary mb-3"),
           shinycssloaders::withSpinner(
             DT::dataTableOutput(ns("means_all_table")),
@@ -107,7 +121,7 @@ mod_spatial_ui <- function(id) {
   )
 }
 
-mod_spatial_server <- function(id, data_result) {
+mod_spatial_server <- function(id, data_result, report_registry = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -368,16 +382,6 @@ mod_spatial_server <- function(id, data_result) {
       }
     })
 
-    output$spats_plot <- shiny::renderPlot({
-      mod <- spats_model()
-      req(mod)
-      plot(mod, 
-           main = paste("Spatial Trend for", input$trait, "in", input$env),
-           annotated = input$plot_annotated,
-           depict.missing = input$plot_missing,
-           spaTrend = input$plot_spatrend)
-    })
-
     # ---- Output: Variance Components ----
     output$spats_summary_boxes <- shiny::renderUI({
       mod <- spats_model()
@@ -622,6 +626,304 @@ mod_spatial_server <- function(id, data_result) {
         write.csv(across_env_results()$across, file, row.names = FALSE)
       }
     )
+
+    build_spats_var_plot_gg <- function(df, trait) {
+      ggplot2::ggplot(df, ggplot2::aes(x = Component, y = Pct, fill = Component)) +
+        ggplot2::geom_col(show.legend = FALSE, alpha = 0.85) +
+        ggplot2::geom_text(ggplot2::aes(label = paste0(Pct, "%")), vjust = -0.3, size = 3) +
+        ggplot2::labs(
+          title = paste("SpATS Variance Partition:", trait),
+          x = NULL,
+          y = "% of Total Variance"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
+    }
+
+    build_spats_plot_grid <- function(mod, depict_missing = FALSE) {
+      xlab <- mod$terms$spatial$terms.formula$x.coord
+      ylab <- mod$terms$spatial$terms.formula$y.coord
+      response <- mod$data[, mod$model$response]
+      weights <- mod$data$weights %||% rep(1, length(response))
+
+      get_genotype_prediction <- function() {
+        tryCatch({
+          mm_fun <- getFromNamespace("construct.genotype.prediction.matrix", "SpATS")
+          geno_mm <- mm_fun(mod, mod$data)
+          geno_coeff <- mod$coeff[seq_len(ncol(geno_mm))]
+          as.vector(geno_mm %*% geno_coeff)
+        }, error = function(e) rep(NA_real_, length(response)))
+      }
+
+      obs <- data.frame(
+        Column = as.numeric(mod$data[, xlab]),
+        Row = as.numeric(mod$data[, ylab]),
+        Raw = as.numeric(response),
+        Fitted = as.numeric(mod$fitted),
+        Residual = as.numeric(mod$residuals),
+        Genotype = as.numeric(get_genotype_prediction()),
+        Weight = as.numeric(weights),
+        stringsAsFactors = FALSE
+      )
+      obs$Raw[obs$Weight == 0] <- NA_real_
+      obs$Fitted[obs$Weight == 0] <- NA_real_
+      obs$Residual[obs$Weight == 0] <- NA_real_
+      obs$Genotype[obs$Weight == 0] <- NA_real_
+
+      if (exists("cpp_spatial_cell_summary", mode = "function")) {
+        cell_f <- interaction(obs$Column, obs$Row, drop = TRUE, lex.order = TRUE)
+        obs <- as.data.frame(cpp_spatial_cell_summary(
+          as.integer(cell_f),
+          obs$Column,
+          obs$Row,
+          obs$Raw,
+          obs$Fitted,
+          obs$Residual,
+          obs$Genotype,
+          obs$Weight,
+          nlevels(cell_f)
+        ))
+      } else {
+        obs <- obs |>
+          dplyr::group_by(Column, Row) |>
+          dplyr::summarise(
+            Raw = mean(Raw, na.rm = TRUE),
+            Fitted = mean(Fitted, na.rm = TRUE),
+            Residual = mean(Residual, na.rm = TRUE),
+            Genotype = mean(Genotype, na.rm = TRUE),
+            Weight = mean(Weight, na.rm = TRUE),
+            .groups = "drop"
+          )
+        num_cols <- c("Raw", "Fitted", "Residual", "Genotype")
+        obs[num_cols] <- lapply(obs[num_cols], function(x) {
+          x[is.nan(x)] <- NA_real_
+          x
+        })
+      }
+
+      grid <- expand.grid(
+        Column = sort(unique(obs$Column)),
+        Row = sort(unique(obs$Row)),
+        KEEP.OUT.ATTRS = FALSE
+      )
+      grid <- dplyr::left_join(grid, obs, by = c("Column", "Row"))
+      if (!isTRUE(depict_missing)) {
+        grid <- grid[!is.na(grid$Weight) & grid$Weight != 0, , drop = FALSE]
+      }
+      grid
+    }
+
+    build_spats_trend_surface <- function(mod, spa_trend = "raw", grid_max = 180) {
+      xlab <- mod$terms$spatial$terms.formula$x.coord
+      ylab <- mod$terms$spatial$terms.formula$y.coord
+      n_col <- length(unique(mod$data[, xlab]))
+      n_row <- length(unique(mod$data[, ylab]))
+      trend <- SpATS::obtain.spatialtrend(
+        mod,
+        grid = c(min(grid_max, max(80, n_col * 4)), min(grid_max, max(80, n_row * 4)))
+      )
+      fit <- trend$fit
+      if (identical(spa_trend, "percentage")) {
+        fit <- (fit / mean(mod$data[, mod$model$response], na.rm = TRUE)) * 100
+      }
+      data.frame(
+        Column = rep(trend$col.p, times = length(trend$row.p)),
+        Row = rep(trend$row.p, each = length(trend$col.p)),
+        Value = as.vector(t(fit)),
+        stringsAsFactors = FALSE
+      )
+    }
+
+    build_spats_tile_map <- function(df, value_col, title, fill_label, divergent = FALSE) {
+      vals <- df[[value_col]]
+      limit <- max(abs(vals), na.rm = TRUE)
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = Column, y = Row, fill = .data[[value_col]])) +
+        ggplot2::geom_tile() +
+        ggplot2::coord_equal(expand = FALSE) +
+        ggplot2::labs(title = title, x = "Column", y = "Row", fill = fill_label) +
+        ggplot2::theme_bw(base_size = 10) +
+        ggplot2::theme(
+          plot.title = ggplot2::element_text(face = "bold", size = 11),
+          legend.position = "right",
+          panel.grid = ggplot2::element_blank()
+        )
+      if (isTRUE(divergent) && is.finite(limit) && limit > 0) {
+        p + ggplot2::scale_fill_gradient2(
+          low = "#B71C1C", mid = "#FFF9C4", high = "#1B5E20",
+          midpoint = 0, limits = c(-limit, limit), na.value = "grey90"
+        )
+      } else {
+        p + ggplot2::scale_fill_gradientn(colors = grDevices::topo.colors(100), na.value = "grey90")
+      }
+    }
+
+    build_spats_surface_map <- function(df, title, fill_label, divergent = FALSE) {
+      vals <- df$Value
+      limit <- max(abs(vals), na.rm = TRUE)
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = Column, y = Row, fill = Value)) +
+        ggplot2::geom_raster(interpolate = TRUE) +
+        ggplot2::coord_equal(expand = FALSE) +
+        ggplot2::labs(title = title, x = "Column", y = "Row", fill = fill_label) +
+        ggplot2::theme_bw(base_size = 10) +
+        ggplot2::theme(
+          plot.title = ggplot2::element_text(face = "bold", size = 11),
+          legend.position = "right",
+          panel.grid = ggplot2::element_blank()
+        )
+      if (isTRUE(divergent) && is.finite(limit) && limit > 0) {
+        p + ggplot2::scale_fill_gradient2(
+          low = "#B71C1C", mid = "#FFF9C4", high = "#1B5E20",
+          midpoint = 0, limits = c(-limit, limit), na.value = "grey90"
+        )
+      } else {
+        p + ggplot2::scale_fill_gradientn(colors = grDevices::topo.colors(100), na.value = "grey90")
+      }
+    }
+
+    build_spats_trend_figure_gg <- function(mod, trait, env, spa_trend = "raw",
+                                            depict_missing = FALSE, annotated = FALSE) {
+      field_grid <- build_spats_plot_grid(mod, depict_missing = depict_missing)
+      trend_df <- build_spats_trend_surface(mod, spa_trend = spa_trend)
+      trend_label <- if (identical(spa_trend, "percentage")) "Spatial trend (%)" else "Spatial trend"
+
+      panels <- list(
+        build_spats_tile_map(field_grid, "Raw", "Raw data", "Raw"),
+        build_spats_tile_map(field_grid, "Fitted", "Fitted data", "Fitted"),
+        build_spats_tile_map(field_grid, "Residual", "Residuals", "Residual", divergent = TRUE),
+        build_spats_surface_map(trend_df, "Fitted Spatial Trend", trend_label,
+          divergent = identical(spa_trend, "percentage"))
+      )
+      if (any(!is.na(field_grid$Genotype))) {
+        panels <- c(panels, list(
+          build_spats_tile_map(
+            field_grid,
+            "Genotype",
+            if (isTRUE(mod$model$geno$as.random)) "Genotypic BLUPs" else "Genotypic BLUEs",
+            if (isTRUE(mod$model$geno$as.random)) "BLUP" else "BLUE"
+          )
+        ))
+      }
+
+      subtitle <- if (isTRUE(annotated)) {
+        paste0(
+          "SpATS PSANOVA | n = ", mod$nobs,
+          " | trend scale = ", spa_trend,
+          " | missing cells ", if (isTRUE(depict_missing)) "shown" else "hidden"
+        )
+      } else {
+        NULL
+      }
+
+      patchwork::wrap_plots(panels, ncol = if (length(panels) > 4) 3 else 2) +
+        patchwork::plot_annotation(
+          title = paste("Spatial Trend for", trait, "in", env),
+          subtitle = subtitle
+        ) &
+        ggplot2::theme(plot.margin = ggplot2::margin(6, 6, 6, 6))
+    }
+
+    output$spats_plot <- shiny::renderPlot({
+      mod <- spats_model()
+      req(mod)
+      build_spats_trend_figure_gg(
+        mod = mod,
+        trait = input$trait,
+        env = input$env,
+        spa_trend = input$plot_spatrend,
+        depict_missing = input$plot_missing,
+        annotated = input$plot_annotated
+      )
+    }, res = 96)
+
+    register_spatial_plot <- function(name, label, builder, metadata = list()) {
+      req(report_registry, input$trait)
+      trait <- shiny::isolate(input$trait)
+      sig <- make_dataset_signature(data_result$data_bundle())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("Spatial", "plot", trait, name),
+        label = paste(label, "-", trait),
+        module = "Spatial Trends",
+        trait = trait,
+        plot_builder = builder,
+        metadata = c(metadata, list(dataset_signature = sig))
+      )
+      shiny::showNotification(paste(label, "sent to Reports."), type = "message")
+    }
+
+    register_spatial_table <- function(name, label, builder, metadata = list()) {
+      req(report_registry, input$trait)
+      trait <- shiny::isolate(input$trait)
+      sig <- make_dataset_signature(data_result$data_bundle())
+      register_report_table(
+        registry = report_registry,
+        id = make_report_item_id("Spatial", "table", trait, name),
+        label = paste(label, "-", trait),
+        module = "Spatial Trends",
+        trait = trait,
+        table_builder = function() as.data.frame(builder()),
+        metadata = c(metadata, list(dataset_signature = sig))
+      )
+      shiny::showNotification(paste(label, "sent to Reports."), type = "message")
+    }
+
+    shiny::observeEvent(input$send_spats_var_plot_report, {
+      req(var_components_df())
+      trait <- shiny::isolate(input$trait)
+      register_spatial_plot("variance_partition", "SpATS variance partition plot",
+        function() build_spats_var_plot_gg(var_components_df(), trait),
+        list(plot_family = "variance_partition")
+      )
+    })
+    shiny::observeEvent(input$send_spats_trend_report, {
+      req(spats_model())
+      trait <- shiny::isolate(input$trait)
+      env <- shiny::isolate(input$env)
+      plot_opts <- shiny::isolate(list(
+        spa_trend = input$plot_spatrend,
+        depict_missing = isTRUE(input$plot_missing),
+        annotated = isTRUE(input$plot_annotated)
+      ))
+      register_spatial_plot(paste0("spatial_trend_", env), paste("SpATS spatial trend map -", env),
+        function() {
+          mod <- spats_model()
+          if (is.null(mod)) stop("The SpATS model is no longer active. Please rerun and resend.")
+          build_spats_trend_figure_gg(
+            mod = mod,
+            trait = trait,
+            env = env,
+            spa_trend = plot_opts$spa_trend,
+            depict_missing = plot_opts$depict_missing,
+            annotated = plot_opts$annotated
+          )
+        },
+        list(
+          plot_family = "spats_spatial_trend",
+          environment = env,
+          spa_trend = plot_opts$spa_trend,
+          depict_missing = plot_opts$depict_missing,
+          annotated = plot_opts$annotated
+        )
+      )
+    })
+    shiny::observeEvent(input$send_spats_var_table_report, {
+      req(var_components_df())
+      register_spatial_table("variance_components", "SpATS variance components table",
+        function() var_components_df()
+      )
+    })
+    shiny::observeEvent(input$send_means_table_report, {
+      req(adjusted_means())
+      register_spatial_table("within_environment_means", "SpATS adjusted means table",
+        function() adjusted_means()
+      )
+    })
+    shiny::observeEvent(input$send_means_all_table_report, {
+      req(across_env_results())
+      register_spatial_table("across_environment_means", "SpATS across-environment means table",
+        function() across_env_results()$across
+      )
+    })
 
   })
 }

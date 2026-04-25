@@ -44,6 +44,10 @@ mod_adaptation_ui <- function(id) {
           fill = FALSE,
           bslib::card(
             bslib::card_header("Mega-Environments (Which-won-where clustering)"),
+            shiny::div(class = "px-3 pt-2",
+              shiny::actionButton(ns("send_mega_env_report"), "Send this plot to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             style = "min-height: 400px;",
             shinycssloaders::withSpinner(
@@ -53,6 +57,10 @@ mod_adaptation_ui <- function(id) {
           ),
           bslib::card(
             bslib::card_header("Reaction Norms (Finlay-Wilkinson)"),
+            shiny::div(class = "px-3 pt-2",
+              shiny::actionButton(ns("send_fw_report"), "Send this plot to Reports",
+                icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+            ),
             full_screen = TRUE,
             style = "min-height: 400px;",
             shinycssloaders::withSpinner(
@@ -75,7 +83,7 @@ mod_adaptation_ui <- function(id) {
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
-mod_adaptation_server <- function(id, data_result) {
+mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
@@ -226,6 +234,78 @@ mod_adaptation_server <- function(id, data_result) {
         )
 
       p
+    })
+
+    build_mega_env_gg <- function(res, trait) {
+      df_stat <- res$mega_env$env_strat
+      if (is.null(df_stat)) stop("Mega-environment results are unavailable.")
+      ggplot2::ggplot(df_stat, ggplot2::aes(x = ENV, y = MEAN, fill = MEGA_ENV)) +
+        ggplot2::geom_col(alpha = 0.85) +
+        ggplot2::labs(
+          title = paste0("Environments Grouped by Mega-Environment (", trait, ")"),
+          x = "Environment",
+          y = paste("Max Mean", trait),
+          fill = "Mega-env"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+    }
+
+    build_fw_gg <- function(res, current_db, trait) {
+      fw <- res$fw
+      req(!is.null(fw$fw_data), !is.null(fw$gen_slopes))
+      gen_col <- current_db$gen_col
+      ggplot2::ggplot(fw$fw_data, ggplot2::aes(x = EI, y = mean_val, color = .data[[gen_col]])) +
+        ggplot2::geom_point(alpha = 0.6, size = 1.8) +
+        ggplot2::geom_abline(
+          data = fw$gen_slopes,
+          ggplot2::aes(intercept = intercept, slope = slope, color = .data[[gen_col]]),
+          linewidth = 0.7,
+          alpha = 0.75,
+          show.legend = dplyr::n_distinct(fw$fw_data[[gen_col]]) <= 25
+        ) +
+        ggplot2::labs(
+          title = paste("Reaction Norms (Finlay-Wilkinson) -", trait),
+          x = "Environmental Index",
+          y = paste("Genotype Mean", trait),
+          color = "Genotype"
+        ) +
+        ggplot2::theme_bw()
+    }
+
+    register_adaptation_plot <- function(name, label, builder, metadata = list()) {
+      req(report_registry, adapt_results(), input$trait)
+      trait <- shiny::isolate(input$trait)
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("Adaptation", "plot", trait, name),
+        label = paste(label, "-", trait),
+        module = "Adaptation & Enviromics",
+        trait = trait,
+        plot_builder = function() {
+          res <- adapt_results()
+          current_db <- data_result$data_bundle()
+          if (is.null(res) || is.null(current_db)) stop("Adaptation results are unavailable.")
+          builder(res, current_db, trait)
+        },
+        metadata = c(metadata, list(dataset_signature = sig))
+      )
+      shiny::showNotification(paste(label, "sent to Reports."), type = "message")
+    }
+
+    shiny::observeEvent(input$send_mega_env_report, {
+      register_adaptation_plot("mega_environments", "Mega-environment plot",
+        function(res, current_db, trait) build_mega_env_gg(res, trait),
+        list(plot_family = "mega_environments")
+      )
+    })
+
+    shiny::observeEvent(input$send_fw_report, {
+      register_adaptation_plot("reaction_norms", "Reaction norms plot",
+        function(res, current_db, trait) build_fw_gg(res, current_db, trait),
+        list(plot_family = "reaction_norms")
+      )
     })
     
     # ---- Enviromics UI & Plots ----

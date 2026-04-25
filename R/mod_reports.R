@@ -73,29 +73,46 @@ mod_reports_ui <- function(id) {
     id = ns("reports_tabs"),
     title = shiny::tagList(shiny::icon("file-alt"), " Reports & Export"),
     bslib::nav_panel(
-      "Table Export",
+      "Registered Tables",
       bslib::layout_sidebar(
         sidebar = bslib::sidebar(
           width = 320,
-          shiny::selectInput(ns("table_trait_filter"), "Trait Filter", choices = c("All"), selected = "All"),
-          shiny::selectInput(ns("table_select"), "Select Table", choices = NULL),
+          shiny::selectInput(ns("table_select"), "Registered Table", choices = NULL),
+          shiny::actionButton(ns("remove_table_item"), "Remove Table",
+            icon = shiny::icon("trash"), class = "btn-outline-danger w-100 mb-2"),
+          shiny::actionButton(ns("clear_table_items"), "Clear All Tables",
+            icon = shiny::icon("broom"), class = "btn-outline-danger w-100 mb-2"),
           shiny::downloadButton(ns("dl_table_csv"), "Download CSV", class = "btn-outline-primary w-100 mb-2"),
           shiny::downloadButton(ns("dl_table_xlsx"), "Download Excel", class = "btn-outline-success w-100")
         ),
+        shiny::uiOutput(ns("registered_tables_ui")),
         DT::dataTableOutput(ns("table_export_preview"))
       )
     ),
     bslib::nav_panel(
-      "Plot Export",
+      "Registered Plots",
       bslib::layout_sidebar(
         sidebar = bslib::sidebar(
           width = 360,
-          shiny::selectInput(ns("plot_module"), "Module", choices = NULL),
-          shiny::selectInput(ns("plot_trait"), "Trait", choices = NULL),
+          shiny::selectInput(ns("plot_select"), "Registered Plot", choices = NULL),
+          shiny::actionButton(ns("plot_update_preview"), "Update Preview",
+            icon = shiny::icon("sync"), class = "btn-primary w-100 mb-2"),
+          shiny::actionButton(ns("remove_plot_item"), "Remove Plot",
+            icon = shiny::icon("trash"), class = "btn-outline-danger w-100 mb-2"),
+          shiny::actionButton(ns("clear_plot_items"), "Clear All Plots",
+            icon = shiny::icon("broom"), class = "btn-outline-danger w-100 mb-2"),
           plot_export_controls_ui(ns, "plt"),
           shiny::downloadButton(ns("dl_plot_file"), "Download Plot", class = "btn-success w-100")
         ),
-        shiny::plotOutput(ns("plot_export_preview"), height = "560px")
+        shiny::div(
+          class = "registered-plots-library",
+          shiny::uiOutput(ns("registered_plots_ui"))
+        ),
+        shiny::uiOutput(ns("plot_preview_error_ui")),
+        shiny::div(
+          class = "report-preview-stage",
+          shiny::plotOutput(ns("plot_export_preview"), width = "100%", height = "760px")
+        )
       )
     ),
     bslib::nav_panel(
@@ -112,10 +129,17 @@ mod_reports_ui <- function(id) {
         width = 1/3,
         fill = FALSE,
         shiny::numericInput(ns("comp_ncol"), "Number of Columns", value = 2, min = 1),
+        shiny::numericInput(ns("comp_nrow"), "Number of Rows (0 = Auto)", value = 0, min = 0),
+        shiny::checkboxInput(ns("comp_byrow"), "Fill Layout by Row", value = TRUE),
+        shiny::textAreaInput(ns("comp_design"), "Custom Design", value = "", rows = 3),
         shiny::textInput(ns("comp_width_ratios"), "Column Width Ratios", value = ""),
         shiny::textInput(ns("comp_height_ratios"), "Row Height Ratios", value = ""),
         shiny::selectInput(ns("comp_operator"), "Combination Operator", choices = c("|", "/", "+"), selected = "+"),
-        shiny::checkboxInput(ns("comp_collect_guides"), "Collect Guides", value = TRUE)
+        shiny::checkboxInput(ns("comp_collect_guides"), "Collect Guides", value = TRUE),
+        shiny::selectInput(ns("comp_axes"), "Collect Axes",
+          choices = c("keep", "collect", "collect_x", "collect_y"), selected = "keep"),
+        shiny::selectInput(ns("comp_axis_titles"), "Collect Axis Titles",
+          choices = c("keep", "collect", "collect_x", "collect_y"), selected = "keep")
       ),
       bslib::layout_column_wrap(
         width = 1/3,
@@ -126,7 +150,10 @@ mod_reports_ui <- function(id) {
         shiny::numericInput(ns("comp_label_size"), "Label Font Size", value = 13, min = 6),
         shiny::selectInput(ns("comp_label_face"), "Label Font Face", choices = c("bold", "plain", "italic", "bold.italic"), selected = "bold"),
         shiny::textInput(ns("comp_label_color"), "Label Color", value = "#111111"),
-        shiny::selectInput(ns("comp_label_pos"), "Label Position", choices = c("top-left", "top-right"), selected = "top-left")
+        shiny::selectInput(ns("comp_label_pos"), "Label Position", choices = c("top-left", "top-right"), selected = "top-left"),
+        shiny::textInput(ns("comp_tag_prefix"), "Tag Prefix", value = ""),
+        shiny::textInput(ns("comp_tag_suffix"), "Tag Suffix", value = ""),
+        shiny::textInput(ns("comp_tag_sep"), "Tag Separator", value = "")
       ),
       bslib::layout_column_wrap(
         width = 1/3,
@@ -134,13 +161,30 @@ mod_reports_ui <- function(id) {
         shiny::textInput(ns("comp_title"), "Figure Title", value = ""),
         shiny::textInput(ns("comp_subtitle"), "Figure Subtitle", value = ""),
         shiny::textInput(ns("comp_caption"), "Figure Caption", value = ""),
+        shiny::numericInput(ns("comp_title_size"), "Title Font Size", value = 16, min = 6),
+        shiny::selectInput(ns("comp_title_face"), "Title Font Face",
+          choices = c("bold", "plain", "italic", "bold.italic"), selected = "bold"),
+        shiny::selectInput(ns("comp_title_hjust"), "Title Alignment",
+          choices = c("left" = 0, "center" = 0.5, "right" = 1), selected = 0),
+        shiny::selectInput(ns("comp_caption_hjust"), "Caption Alignment",
+          choices = c("left" = 0, "center" = 0.5, "right" = 1), selected = 1),
         shiny::checkboxInput(ns("comp_shared_theme"), "Apply Shared Theme", value = FALSE),
+        shiny::selectInput(ns("comp_shared_theme_name"), "Shared Theme",
+          choices = c("theme_minimal", "theme_bw", "theme_classic", "theme_void"), selected = "theme_minimal"),
         shiny::selectInput(ns("comp_shared_font"), "Shared Font", choices = c("sans", "serif", "mono"), selected = "serif"),
-        shiny::numericInput(ns("comp_shared_base"), "Shared Base Size", value = 11, min = 6)
+        shiny::numericInput(ns("comp_shared_base"), "Shared Base Size", value = 11, min = 6),
+        shiny::selectInput(ns("comp_shared_legend"), "Shared Legend Position",
+          choices = c("right", "bottom", "top", "left", "none"), selected = "right"),
+        shiny::checkboxInput(ns("comp_shared_grid_major"), "Shared Major Grid", value = TRUE),
+        shiny::checkboxInput(ns("comp_shared_grid_minor"), "Shared Minor Grid", value = FALSE),
+        shiny::numericInput(ns("comp_outer_margin"), "Outer Margin", value = 8, min = 0)
       ),
       shiny::actionButton(ns("comp_refresh"), "Refresh Preview", class = "btn-outline-primary"),
       shiny::uiOutput(ns("comp_warning_ui")),
-      shiny::plotOutput(ns("composer_preview"), height = "600px"),
+      shiny::div(
+        class = "composer-preview-stage",
+        shiny::plotOutput(ns("composer_preview"), width = "100%", height = "780px")
+      ),
       shiny::tags$hr(),
       bslib::layout_column_wrap(
         width = 1/5,
@@ -168,6 +212,9 @@ mod_reports_ui <- function(id) {
             ),
             selected = c("Executive Summary", "Data Description", "ANOVA & Variance Components", "Stability Analysis", "Methods Description")
           ),
+          shiny::checkboxGroupInput(ns("report_plot_ids"), "Include Registered Plots", choices = NULL),
+          shiny::checkboxGroupInput(ns("report_table_ids"), "Include Registered Tables", choices = NULL),
+          shiny::checkboxInput(ns("report_include_composed"), "Include composed figure", value = FALSE),
           shiny::textInput(ns("report_title"), "Report Title", value = "MERIDIAN Analysis Report"),
           shiny::textInput(ns("report_author"), "Author Name", value = ""),
           shiny::textInput(ns("report_institution"), "Institution", value = ""),
@@ -317,7 +364,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       }
     )
 
-    observeEvent(list(db(), anova_res(), stab_res(), adapt_res()), {
+    if (FALSE) observeEvent(list(db(), anova_res(), stab_res(), adapt_res()), {
       new_plots <- collect_plot_registry_entries(
         db(),
         anova_res = anova_res(),
@@ -428,7 +475,8 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       }
     )
 
-    # ---- Figure Composer ----
+    # ---- Legacy Figure Composer (disabled; registry composer below is authoritative) ----
+    if (FALSE) {
     output$composer_library_ui <- shiny::renderUI({
       ids <- registry_keys()
       if (length(ids) == 0) return(shiny::tags$div("No plots available yet. Run analyses first."))
@@ -602,6 +650,333 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
         )
       }
     )
+    }
+
+    # ---- User-driven Report Registry ----
+    registry_items <- shiny::reactive(get_report_registry_items(plot_registry))
+    registry_plot_items <- shiny::reactive(get_report_plot_items(plot_registry))
+    registry_table_items <- shiny::reactive(get_report_table_items(plot_registry))
+    current_dataset_signature <- shiny::reactive(make_dataset_signature(db()))
+
+    plot_choices <- shiny::reactive({
+      items <- registry_plot_items()
+      stats::setNames(names(items), vapply(items, function(x) x$label, character(1)))
+    })
+    table_choices <- shiny::reactive({
+      items <- registry_table_items()
+      stats::setNames(names(items), vapply(items, function(x) x$label, character(1)))
+    })
+
+    observe({
+      choices <- plot_choices()
+      cur <- isolate(input$plot_select)
+      sel <- if (!is.null(cur) && cur %in% unname(choices)) cur else (unname(choices)[1] %||% "")
+      shiny::updateSelectInput(session, "plot_select", choices = choices, selected = sel)
+    })
+    observe({
+      choices <- table_choices()
+      cur <- isolate(input$table_select)
+      sel <- if (!is.null(cur) && cur %in% unname(choices)) cur else (unname(choices)[1] %||% "")
+      shiny::updateSelectInput(session, "table_select", choices = choices, selected = sel)
+    })
+    observe({
+      choices <- plot_choices()
+      current <- isolate(input$report_plot_ids %||% character(0))
+      shiny::updateCheckboxGroupInput(session, "report_plot_ids",
+        choices = choices, selected = intersect(current, unname(choices)))
+    })
+    observe({
+      choices <- table_choices()
+      current <- isolate(input$report_table_ids %||% character(0))
+      shiny::updateCheckboxGroupInput(session, "report_table_ids",
+        choices = choices, selected = intersect(current, unname(choices)))
+    })
+
+    build_registry_plot <- function(id, customize = TRUE) {
+      item <- registry_plot_items()[[id]]
+      if (is.null(item)) stop("Select a registered plot.")
+      validate_report_item(item)
+      assert_report_item_dataset(item, current_dataset_signature())
+      p <- item$builder()
+      if (!inherits(p, "gg")) stop("Registered plot did not return a ggplot object.")
+      if (isTRUE(customize)) p <- apply_common_theme_controls(p, plot_cfg())
+      p
+    }
+    build_registry_table <- function(id) {
+      item <- registry_table_items()[[id]]
+      if (is.null(item)) stop("Select a registered table.")
+      validate_report_item(item)
+      assert_report_item_dataset(item, current_dataset_signature())
+      tbl <- item$builder()
+      if (!is.data.frame(tbl)) stop("Registered table did not return a data.frame or tibble.")
+      as.data.frame(tbl)
+    }
+
+    output$registered_plots_ui <- shiny::renderUI({
+      items <- registry_plot_items()
+      if (length(items) == 0) {
+        return(shiny::tags$div(class = "alert alert-info", "No registered plots yet. Use 'Send this plot to Reports' from an analysis module."))
+      }
+      rows <- lapply(items, function(item) {
+        shiny::tags$tr(
+          shiny::tags$td(item$label),
+          shiny::tags$td(item$module),
+          shiny::tags$td(item$trait),
+          shiny::tags$td(format(item$created_at, "%Y-%m-%d %H:%M"))
+        )
+      })
+      shiny::tags$table(
+        class = "table table-sm table-striped",
+        shiny::tags$thead(shiny::tags$tr(
+          shiny::tags$th("Label"), shiny::tags$th("Module"),
+          shiny::tags$th("Trait"), shiny::tags$th("Created")
+        )),
+        shiny::tags$tbody(rows)
+      )
+    })
+    output$registered_tables_ui <- shiny::renderUI({
+      items <- registry_table_items()
+      if (length(items) == 0) {
+        return(shiny::tags$div(class = "alert alert-info", "No registered tables yet. Use 'Send table to Reports' from an analysis module."))
+      }
+      rows <- lapply(items, function(item) {
+        shiny::tags$tr(
+          shiny::tags$td(item$label),
+          shiny::tags$td(item$module),
+          shiny::tags$td(item$trait),
+          shiny::tags$td(format(item$created_at, "%Y-%m-%d %H:%M"))
+        )
+      })
+      shiny::tags$table(
+        class = "table table-sm table-striped",
+        shiny::tags$thead(shiny::tags$tr(
+          shiny::tags$th("Label"), shiny::tags$th("Module"),
+          shiny::tags$th("Trait"), shiny::tags$th("Created")
+        )),
+        shiny::tags$tbody(rows)
+      )
+    })
+
+    preview_plot <- shiny::reactiveVal(NULL)
+    preview_error <- shiny::reactiveVal(NULL)
+    composed_preview <- shiny::reactiveVal(NULL)
+    composed_error <- shiny::reactiveVal(NULL)
+
+    observeEvent(input$remove_plot_item, {
+      req(input$plot_select)
+      unregister_report_item(plot_registry, input$plot_select)
+      preview_plot(NULL)
+      composed_preview(NULL)
+    })
+    observeEvent(input$remove_table_item, {
+      req(input$table_select)
+      unregister_report_item(plot_registry, input$table_select)
+    })
+    observeEvent(input$clear_plot_items, {
+      clear_report_registry(plot_registry, "plot")
+      preview_plot(NULL)
+      composed_preview(NULL)
+    })
+    observeEvent(input$clear_table_items, clear_report_registry(plot_registry, "table"))
+
+    output$table_export_preview <- DT::renderDataTable({
+      req(input$table_select)
+      DT::datatable(build_registry_table(input$table_select),
+        options = list(pageLength = 20, scrollX = TRUE), rownames = FALSE)
+    })
+    output$dl_table_csv <- shiny::downloadHandler(
+      filename = function() paste0(gsub("[^A-Za-z0-9_\\-]+", "_", input$table_select), ".csv"),
+      content = function(file) utils::write.csv(build_registry_table(input$table_select), file, row.names = FALSE)
+    )
+    output$dl_table_xlsx <- shiny::downloadHandler(
+      filename = function() paste0(gsub("[^A-Za-z0-9_\\-]+", "_", input$table_select), ".xlsx"),
+      content = function(file) {
+        item <- registry_table_items()[[input$table_select]]
+        metadata <- list(
+          analysis_date = as.character(Sys.time()),
+          selected_table = item$label %||% input$table_select,
+          module = item$module %||% "",
+          trait = item$trait %||% ""
+        )
+        write_table_excel_with_metadata(build_registry_table(input$table_select), file, item$label, metadata)
+      }
+    )
+
+    observeEvent(input$plot_update_preview, {
+      preview_error(NULL)
+      tryCatch({
+        req(input$plot_select)
+        preview_plot(build_registry_plot(input$plot_select, customize = TRUE))
+      }, error = function(e) {
+        preview_plot(NULL)
+        preview_error(conditionMessage(e))
+      })
+    })
+    output$plot_preview_error_ui <- shiny::renderUI({
+      if (is.null(preview_error())) return(NULL)
+      shiny::tags$div(class = "alert alert-warning", preview_error())
+    })
+    output$plot_export_preview <- shiny::renderPlot({
+      req(preview_plot())
+      print(preview_plot() + ggplot2::theme(plot.margin = ggplot2::margin(8, 8, 8, 8)))
+    }, width = function() {
+      w <- session$clientData[[paste0("output_", ns("plot_export_preview"), "_width")]] %||% 1000
+      max(800, as.numeric(w))
+    }, height = 760, res = 96)
+    output$dl_plot_file <- shiny::downloadHandler(
+      filename = function() {
+        ext <- tolower(input$plt_format %||% "png")
+        paste0(gsub("[^A-Za-z0-9_\\-]+", "_", input$plot_select), ".", ext)
+      },
+      content = function(file) {
+        p <- preview_plot()
+        if (is.null(p)) p <- build_registry_plot(input$plot_select, customize = TRUE)
+        save_ggplot_by_format(
+          plot_obj = p,
+          file = file,
+          format = input$plt_format,
+          width = input$plt_width,
+          height = input$plt_height,
+          dpi = input$plt_dpi
+        )
+      }
+    )
+
+    output$composer_library_ui <- shiny::renderUI({
+      items <- registry_plot_items()
+      ids <- names(items)
+      if (length(ids) == 0) return(shiny::tags$div(class = "alert alert-info", "No registered plots yet."))
+      shiny::checkboxGroupInput(
+        ns("comp_selected_ids"),
+        "Selected Plots",
+        choices = stats::setNames(ids, vapply(items, function(x) x$label, character(1))),
+        selected = isolate(input$comp_selected_ids %||% character(0))
+      )
+    })
+    selected_comp_ids <- shiny::reactive(input$comp_selected_ids %||% character(0))
+    comp_cfg <- shiny::reactive({
+      list(
+        ncol = input$comp_ncol,
+        nrow = input$comp_nrow,
+        byrow = isTRUE(input$comp_byrow),
+        design = input$comp_design,
+        width_ratios = input$comp_width_ratios,
+        height_ratios = input$comp_height_ratios,
+        operator = input$comp_operator,
+        collect_guides = isTRUE(input$comp_collect_guides),
+        axes = input$comp_axes,
+        axis_titles = input$comp_axis_titles,
+        auto_labels = isTRUE(input$comp_auto_labels),
+        label_style = input$comp_label_style,
+        label_size = input$comp_label_size,
+        label_face = input$comp_label_face,
+        label_color = input$comp_label_color,
+        label_position = input$comp_label_pos,
+        tag_prefix = input$comp_tag_prefix,
+        tag_suffix = input$comp_tag_suffix,
+        tag_sep = input$comp_tag_sep,
+        title = input$comp_title,
+        subtitle = input$comp_subtitle,
+        caption = input$comp_caption,
+        title_size = input$comp_title_size,
+        title_face = input$comp_title_face,
+        title_hjust = as.numeric(input$comp_title_hjust),
+        caption_hjust = as.numeric(input$comp_caption_hjust),
+        shared_theme = isTRUE(input$comp_shared_theme),
+        shared_theme_name = input$comp_shared_theme_name,
+        shared_font_family = input$comp_shared_font,
+        shared_base_size = input$comp_shared_base,
+        shared_legend_position = input$comp_shared_legend,
+        shared_grid_major = isTRUE(input$comp_shared_grid_major),
+        shared_grid_minor = isTRUE(input$comp_shared_grid_minor),
+        outer_margin = input$comp_outer_margin
+      )
+    })
+
+    observeEvent(input$comp_refresh, {
+      composed_error(NULL)
+      tryCatch({
+        ids <- selected_comp_ids()
+        req(length(ids) >= 2)
+        built <- lapply(ids, function(id) build_registry_plot(id, customize = TRUE))
+        names(built) <- ids
+        composed_preview(compose_patchwork_figure(built, ids, comp_cfg()))
+      }, error = function(e) {
+        composed_preview(NULL)
+        composed_error(conditionMessage(e))
+      })
+    })
+    output$composer_preview <- shiny::renderPlot({
+      req(composed_preview())
+      tryCatch({
+        print(composed_preview() & ggplot2::theme(plot.margin = ggplot2::margin(8, 8, 8, 8)))
+      }, error = function(e) {
+        graphics::par(mar = c(1, 1, 1, 1))
+        graphics::plot.new()
+        graphics::text(0.5, 0.5, paste("Preview error:", conditionMessage(e)), cex = 1)
+      })
+    }, width = function() {
+      w <- session$clientData[[paste0("output_", ns("composer_preview"), "_width")]] %||% 1100
+      max(900, as.numeric(w))
+    }, height = 780, res = 96)
+    output$comp_warning_ui <- shiny::renderUI({
+      ids <- selected_comp_ids()
+      warns <- character(0)
+      if (length(ids) < 2) warns <- c(warns, "Select at least two plots to compose.")
+      if (!is.null(composed_error())) warns <- c(warns, composed_error())
+      if (length(warns) == 0 && length(ids) >= 2) {
+        built <- lapply(ids, function(id) tryCatch(build_registry_plot(id, customize = FALSE), error = function(e) NULL))
+        built <- Filter(Negate(is.null), built)
+        warns <- check_composer_warnings(built)
+      }
+      if (length(warns) == 0) return(NULL)
+      shiny::tagList(lapply(warns, function(w) shiny::tags$div(class = "alert alert-warning", w)))
+    })
+    output$dl_comp_figure <- shiny::downloadHandler(
+      filename = function() {
+        ext <- tolower(input$comp_format %||% "png")
+        paste0("composed_figure.", ext)
+      },
+      content = function(file) {
+        p <- composed_preview()
+        if (is.null(p)) {
+          ids <- selected_comp_ids()
+          built <- lapply(ids, function(id) build_registry_plot(id, customize = TRUE))
+          names(built) <- ids
+          p <- compose_patchwork_figure(built, ids, comp_cfg())
+        }
+        save_ggplot_by_format(
+          plot_obj = p,
+          file = file,
+          format = input$comp_format,
+          width = input$comp_width,
+          height = input$comp_height,
+          dpi = input$comp_dpi
+        )
+      }
+    )
+    output$dl_comp_panels_zip <- shiny::downloadHandler(
+      filename = function() "figure_panels.zip",
+      content = function(file) {
+        ids <- selected_comp_ids()
+        req(length(ids) >= 1)
+        built <- lapply(ids, function(id) build_registry_plot(id, customize = TRUE))
+        names(built) <- ids
+        export_panels_zip(
+          plot_list = built,
+          selected_ids = ids,
+          cfg = list(format = input$comp_format, width = input$comp_width, height = input$comp_height, dpi = input$comp_dpi),
+          zip_file = file
+        )
+      }
+    )
+
+    tables_avail <- shiny::reactive({
+      ids <- names(registry_table_items())
+      out <- lapply(ids, build_registry_table)
+      names(out) <- vapply(registry_table_items(), function(x) x$label, character(1))
+      out
+    })
 
     # ---- Report generation ----
     report_file <- shiny::reactiveVal(NULL)
@@ -648,11 +1023,18 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
 
       tryCatch({
         report_status("Rendering plots...")
-        plot_objs <- shiny::reactiveValuesToList(plot_registry)
-        plot_objs <- plot_objs[vapply(plot_objs, function(x) inherits(x, "gg"), logical(1))]
+        plot_ids <- input$report_plot_ids %||% character(0)
+        plot_items <- registry_plot_items()[plot_ids]
+        plot_objs <- lapply(plot_ids, function(id) build_registry_plot(id, customize = TRUE))
+        names(plot_objs) <- vapply(plot_items, function(x) x$label, character(1))
 
         report_status("Compiling tables...")
-        tbls <- tables_avail()
+        table_ids <- input$report_table_ids %||% character(0)
+        tbls <- lapply(table_ids, build_registry_table)
+        names(tbls) <- vapply(registry_table_items()[table_ids], function(x) x$label, character(1))
+        if (isTRUE(input$report_include_composed) && !is.null(composed_preview())) {
+          plot_objs[["Composed figure"]] <- composed_preview()
+        }
         methods_text <- build_methods_text(db(), anova_res = anova_res(), stab_res = stab_res(), adapt_res = adapt_res())
 
         report_status("Building document...")
@@ -696,7 +1078,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
 
     invisible(list(
       tables = tables_avail,
-      plots = registry_keys
+      plots = function() names(registry_plot_items())
     ))
   })
 }

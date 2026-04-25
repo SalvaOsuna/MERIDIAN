@@ -29,7 +29,16 @@ library(pagedown)
 
 # ---- Compile C++ Functions ----
 if (file.exists("src/fast_pruning.cpp")) {
-  Rcpp::sourceCpp("src/fast_pruning.cpp")
+  tryCatch(
+    Rcpp::sourceCpp("src/fast_pruning.cpp"),
+    error = function(e) {
+      warning(
+        "C++ acceleration could not be compiled; MERIDIAN will use R fallbacks. ",
+        conditionMessage(e),
+        call. = FALSE
+      )
+    }
+  )
 }
 
 # ---- Static assets ----
@@ -39,6 +48,7 @@ if (dir.exists("www")) {
 
 # ---- Source R files ----
 source("R/utils.R")
+source("R/report_registry.R")
 source("R/data_processing.R")
 source("R/plots.R")
 source("R/models.R")
@@ -163,7 +173,7 @@ ui <- page_navbar(
 # Server
 # =============================================================================
 server <- function(input, output, session) {
-  plot_registry <- reactiveValues()
+  report_registry <- reactiveValues()
 
   # ---- Auto-theme ggplot2 to match app ----
   thematic::thematic_shiny()
@@ -211,19 +221,19 @@ server <- function(input, output, session) {
   data_result <- mod_data_upload_server("data")
 
   # ---- Initialize Module 2 ----
-  mod_eda_server("eda", data_result)
+  mod_eda_server("eda", data_result, report_registry = report_registry)
 
   # ---- Initialize Module 3 ----
-  anova_result <- mod_anova_server("anova", data_result)
+  anova_result <- mod_anova_server("anova", data_result, report_registry = report_registry)
 
   # ---- Initialize Module 4 ----
-  stab_result <- mod_stability_server("stability", data_result)
+  stab_result <- mod_stability_server("stability", data_result, report_registry = report_registry)
 
   # ---- Initialize Module 5 ----
-  adapt_result <- mod_adaptation_server("adaptation", data_result)
+  adapt_result <- mod_adaptation_server("adaptation", data_result, report_registry = report_registry)
 
   # ---- Initialize Module 6 ----
-  mod_spatial_server("spatial", data_result)
+  mod_spatial_server("spatial", data_result, report_registry = report_registry)
 
   # ---- Initialize Module 7 ----
   mod_reports_server(
@@ -232,8 +242,22 @@ server <- function(input, output, session) {
     anova_result = anova_result,
     stab_result = stab_result,
     adapt_result = adapt_result,
-    plot_registry = plot_registry
+    plot_registry = report_registry
   )
+
+  previous_dataset_signature <- reactiveVal(NULL)
+  observeEvent(data_result$data_bundle(), {
+    sig <- make_dataset_signature(data_result$data_bundle())
+    old <- previous_dataset_signature()
+    if (!is.null(old) && !identical(old, sig)) {
+      clear_report_registry(report_registry, "all")
+      showNotification(
+        "Report Registry cleared because a new dataset was loaded.",
+        type = "message", duration = 5
+      )
+    }
+    previous_dataset_signature(sig)
+  }, ignoreInit = TRUE)
 
   # ---- Handle startup modal buttons ----
   observeEvent(input$btn_load_example, {
