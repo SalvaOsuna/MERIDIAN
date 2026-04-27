@@ -44,7 +44,77 @@ mod_eda_ui <- function(id) {
       )
     ),
 
-    # ---- Tab 2: G×E Heatmap ----
+    # ---- Tab 2: Distributions ----
+    bslib::nav_panel(
+      title = shiny::tagList(shiny::icon("chart-area"), " ", "Distributions"),
+      bslib::layout_sidebar(
+        sidebar = bslib::sidebar(
+          width = 300,
+          shiny::selectInput(ns("dist_trait"), "Trait", choices = NULL),
+          shiny::actionButton(ns("dist_toggle_envs"), "Select All / Deselect All",
+            icon = shiny::icon("check-square"),
+            class = "btn-outline-secondary btn-sm w-100 mb-2"
+          ),
+          shiny::checkboxGroupInput(ns("dist_envs"), "Environments", choices = NULL),
+          shiny::sliderInput(ns("dist_bins"), "Number of bins",
+            min = 5, max = 100, value = 30, step = 1
+          ),
+          colourpicker::colourInput(ns("dist_fill"), "Fill color", value = "#4CAF50"),
+          shiny::sliderInput(ns("dist_alpha"), "Transparency (alpha)",
+            min = 0.1, max = 1.0, value = 0.8, step = 0.05
+          ),
+          shiny::checkboxInput(ns("dist_normal"), "Show normal curve overlay", value = FALSE),
+          shiny::conditionalPanel(
+            condition = "input.dist_normal",
+            ns = ns,
+            shiny::sliderInput(ns("dist_normal_linewidth"), "Normal curve linewidth",
+              min = 0.3, max = 2.0, value = 1.0, step = 0.1
+            )
+          ),
+          shiny::checkboxInput(ns("dist_mean"), "Show mean line", value = TRUE),
+          shiny::radioButtons(ns("dist_layout"), "Facet layout",
+            choices = c("Wrap", "Grid"), selected = "Wrap", inline = TRUE
+          ),
+          shiny::conditionalPanel(
+            condition = "input.dist_layout == 'Wrap'",
+            ns = ns,
+            shiny::numericInput(ns("dist_ncol"), "Number of columns in facet wrap",
+              value = 2, min = 1, max = 6, step = 1
+            )
+          ),
+          shiny::radioButtons(ns("dist_scales"), "Free or fixed scales",
+            choices = c("Fixed", "Free X", "Free Y", "Free XY"),
+            selected = "Fixed"
+          ),
+          shiny::selectInput(ns("dist_strip"), "Strip label style",
+            choices = c(
+              "Environment name only",
+              "Environment name + N obs",
+              "Environment name + Mean +/- SD"
+            ),
+            selected = "Environment name only"
+          ),
+          shiny::tags$hr(),
+          shiny::actionButton(ns("run_distributions"), "Generate",
+            icon = shiny::icon("play"),
+            class = "btn-primary btn-sm w-100 mb-2"
+          ),
+          shiny::actionButton(ns("send_distribution_report"), "Save to Figure Composer",
+            icon = shiny::icon("paper-plane"),
+            class = "btn-success btn-sm w-100"
+          )
+        ),
+        shiny::div(
+          class = "meridian-plotly-frame",
+          shinycssloaders::withSpinner(
+            shiny::plotOutput(ns("distribution_plot"), width = "100%", height = "680px"),
+            type = 6, color = "#2c7a51"
+          )
+        )
+      )
+    ),
+
+    # ---- Tab 3: G×E Heatmap ----
     bslib::nav_panel(
       title = shiny::tagList(shiny::icon("th"), " ", LABELS$m2_heatmap),
       bslib::layout_sidebar(
@@ -81,7 +151,7 @@ mod_eda_ui <- function(id) {
       )
     ),
 
-    # ---- Tab 3: Environment Correlations ----
+    # ---- Tab 4: Environment Correlations ----
     bslib::nav_panel(
       title = shiny::tagList(shiny::icon("project-diagram"), " ", LABELS$m2_correlation),
       bslib::layout_sidebar(
@@ -116,7 +186,7 @@ mod_eda_ui <- function(id) {
       )
     ),
 
-    # ---- Tab 4: Outlier Detection ----
+    # ---- Tab 5: Outlier Detection ----
     bslib::nav_panel(
       title = shiny::tagList(shiny::icon("search"), " ", LABELS$m2_outliers),
       bslib::layout_sidebar(
@@ -160,7 +230,7 @@ mod_eda_ui <- function(id) {
       )
     ),
 
-    # ---- Tab 5: Summary Tables ----
+    # ---- Tab 6: Summary Tables ----
     bslib::nav_panel(
       title = shiny::tagList(shiny::icon("table"), " ", LABELS$m2_summary),
       bslib::layout_column_wrap(
@@ -223,6 +293,21 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         shiny::updateSelectInput(session, sel_id,
           choices = traits, selected = traits[1])
       }
+
+      numeric_cols <- names(db()$data)[vapply(db()$data, is.numeric, logical(1))]
+      numeric_traits <- intersect(traits, numeric_cols)
+      if (length(numeric_traits) == 0) numeric_traits <- numeric_cols
+      shiny::updateSelectInput(session, "dist_trait",
+        choices = numeric_traits,
+        selected = if (length(numeric_traits) > 0) numeric_traits[1] else character(0)
+      )
+
+      envs <- sort(unique(as.character(db()$data[[db()$env_col]])))
+      envs <- envs[!is.na(envs) & nzchar(envs)]
+      shiny::updateCheckboxGroupInput(session, "dist_envs",
+        choices = envs,
+        selected = envs
+      )
     })
 
     # ---- Reactive: Resolve grouping column name ----
@@ -294,7 +379,258 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       shiny::showNotification("EDA boxplot sent to Reports.", type = "message")
     })
 
-    # ---- Tab 2: G×E Heatmap ----
+    # ---- Tab 2: Distributions ----
+    shiny::observeEvent(input$dist_toggle_envs, {
+      req(db())
+      envs <- sort(unique(as.character(db()$data[[db()$env_col]])))
+      envs <- envs[!is.na(envs) & nzchar(envs)]
+      selected <- input$dist_envs %||% character(0)
+      next_selection <- if (length(envs) > 0 && setequal(selected, envs)) character(0) else envs
+      shiny::updateCheckboxGroupInput(session, "dist_envs", selected = next_selection)
+    })
+
+    scale_choice <- function(label) {
+      switch(label,
+        "Fixed" = "fixed",
+        "Free X" = "free_x",
+        "Free Y" = "free_y",
+        "Free XY" = "free",
+        "fixed"
+      )
+    }
+
+    build_distribution_plot <- function(current_db, trait, envs, bins, fill, alpha,
+                                        show_normal, normal_linewidth, show_mean,
+                                        layout, ncol, scales_label, strip_label,
+                                        notify = FALSE) {
+      env_col <- current_db$env_col
+      gen_col <- current_db$gen_col
+      needed <- c(trait, env_col, gen_col)
+      missing_cols <- setdiff(needed, names(current_db$data))
+      if (length(missing_cols) > 0) {
+        stop("Missing required column(s): ", paste(missing_cols, collapse = ", "), call. = FALSE)
+      }
+
+      if (is.null(envs) || length(envs) == 0) {
+        stop("Select at least one environment before generating distributions.", call. = FALSE)
+      }
+
+      plot_df <- current_db$data[, needed, drop = FALSE]
+      names(plot_df) <- c("trait_value", "environment", "genotype")
+      if (!is.numeric(plot_df$trait_value)) {
+        stop("Selected trait must be numeric to draw a distribution histogram.", call. = FALSE)
+      }
+      plot_df$environment <- as.character(plot_df$environment)
+      plot_df <- plot_df[plot_df$environment %in% envs & !is.na(plot_df$trait_value), , drop = FALSE]
+
+      env_counts <- stats::aggregate(
+        trait_value ~ environment,
+        data = plot_df,
+        FUN = function(x) sum(!is.na(x))
+      )
+      names(env_counts)[2] <- "n"
+      excluded <- env_counts$environment[env_counts$n < 3]
+
+      missing_selected <- setdiff(envs, env_counts$environment)
+      excluded <- unique(c(excluded, missing_selected))
+      if (length(excluded) > 0 && isTRUE(notify)) {
+        shiny::showNotification(
+          paste(
+            "Excluded environments with fewer than 3 non-NA observations:",
+            paste(excluded, collapse = ", ")
+          ),
+          type = "warning",
+          duration = 8
+        )
+      }
+
+      plot_df <- plot_df[!plot_df$environment %in% excluded, , drop = FALSE]
+      if (nrow(plot_df) == 0) {
+        stop("No selected environments have at least 3 non-NA observations.", call. = FALSE)
+      }
+
+      env_stats <- stats::aggregate(
+        trait_value ~ environment,
+        data = plot_df,
+        FUN = function(x) c(n = length(x), mean = mean(x), sd = stats::sd(x))
+      )
+      env_stats <- data.frame(
+        environment = env_stats$environment,
+        n = env_stats$trait_value[, "n"],
+        env_mean = env_stats$trait_value[, "mean"],
+        env_sd = env_stats$trait_value[, "sd"],
+        stringsAsFactors = FALSE
+      )
+
+      env_stats$facet_label <- switch(strip_label,
+        "Environment name + N obs" = paste0(env_stats$environment, " (n=", env_stats$n, ")"),
+        "Environment name + Mean +/- SD" = paste0(
+          env_stats$environment,
+          " (mu=", sprintf("%.2f", env_stats$env_mean),
+          ", sigma=", sprintf("%.2f", env_stats$env_sd), ")"
+        ),
+        env_stats$environment
+      )
+      env_stats$facet_label <- factor(env_stats$facet_label, levels = env_stats$facet_label)
+
+      plot_df <- merge(plot_df, env_stats[, c("environment", "facet_label")],
+        by = "environment", all.x = TRUE, sort = FALSE
+      )
+      plot_df$facet_label <- factor(plot_df$facet_label, levels = levels(env_stats$facet_label))
+
+      p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = trait_value)) +
+        ggplot2::geom_histogram(
+          bins = bins,
+          fill = fill,
+          alpha = alpha,
+          color = "white",
+          linewidth = 0.2
+        ) +
+        ggplot2::labs(
+          title = paste0("Distribution of ", trait, " by Environment"),
+          x = trait,
+          y = "Count"
+        ) +
+        ggplot2::theme_bw(base_size = 12)
+
+      if (isTRUE(show_mean)) {
+        p <- p +
+          ggplot2::geom_vline(
+            data = env_stats,
+            ggplot2::aes(xintercept = env_mean),
+            stat = "identity",
+            linetype = "dashed",
+            color = "#1565C0",
+            linewidth = 0.8
+          )
+      }
+
+      if (isTRUE(show_normal)) {
+        density_data <- lapply(seq_len(nrow(env_stats)), function(i) {
+          env <- env_stats$environment[i]
+          env_values <- plot_df$trait_value[plot_df$environment == env]
+          rng <- range(env_values, na.rm = TRUE)
+          env_sd <- env_stats$env_sd[i]
+          if (!is.finite(env_sd) || env_sd <= 0 || diff(rng) <= 0) return(NULL)
+          x_vals <- seq(rng[1], rng[2], length.out = 200)
+          bin_width <- diff(rng) / bins
+          data.frame(
+            environment = env,
+            facet_label = env_stats$facet_label[i],
+            trait_value = x_vals,
+            count = stats::dnorm(x_vals, mean = env_stats$env_mean[i], sd = env_sd) *
+              env_stats$n[i] * bin_width,
+            stringsAsFactors = FALSE
+          )
+        })
+        density_data <- dplyr::bind_rows(density_data)
+        if (nrow(density_data) > 0) {
+          density_data$facet_label <- factor(density_data$facet_label, levels = levels(env_stats$facet_label))
+          p <- p +
+            ggplot2::geom_line(
+              data = density_data,
+              ggplot2::aes(x = trait_value, y = count),
+              inherit.aes = FALSE,
+              color = "#B71C1C",
+              linewidth = normal_linewidth
+            )
+        }
+      }
+
+      facet_scales <- scale_choice(scales_label)
+      if (identical(layout, "Grid")) {
+        p <- p + ggplot2::facet_grid(stats::as.formula("facet_label ~ ."), scales = facet_scales)
+      } else {
+        p <- p + ggplot2::facet_wrap(
+          stats::as.formula("~ facet_label"),
+          ncol = max(1, min(6, as.integer(ncol %||% 2))),
+          scales = facet_scales
+        )
+      }
+
+      p
+    }
+
+    distribution_plot_obj <- shiny::eventReactive(input$run_distributions, {
+      req(db(), input$dist_trait)
+      safe_analysis({
+        build_distribution_plot(
+          current_db = db(),
+          trait = input$dist_trait,
+          envs = input$dist_envs,
+          bins = input$dist_bins,
+          fill = input$dist_fill,
+          alpha = input$dist_alpha,
+          show_normal = input$dist_normal,
+          normal_linewidth = input$dist_normal_linewidth,
+          show_mean = input$dist_mean,
+          layout = input$dist_layout,
+          ncol = input$dist_ncol,
+          scales_label = input$dist_scales,
+          strip_label = input$dist_strip,
+          notify = TRUE
+        )
+      }, session)
+    }, ignoreInit = TRUE)
+
+    output$distribution_plot <- shiny::renderPlot({
+      req(distribution_plot_obj())
+      distribution_plot_obj()
+    }, res = 96)
+
+    shiny::observeEvent(input$send_distribution_report, {
+      req(report_registry, distribution_plot_obj(), input$dist_trait)
+      trait <- shiny::isolate(input$dist_trait)
+      settings <- shiny::isolate(list(
+        envs = input$dist_envs,
+        bins = input$dist_bins,
+        fill = input$dist_fill,
+        alpha = input$dist_alpha,
+        show_normal = input$dist_normal,
+        normal_linewidth = input$dist_normal_linewidth,
+        show_mean = input$dist_mean,
+        layout = input$dist_layout,
+        ncol = input$dist_ncol,
+        scales_label = input$dist_scales,
+        strip_label = input$dist_strip
+      ))
+      sig <- make_dataset_signature(db())
+      register_report_plot(
+        registry = report_registry,
+        id = make_report_item_id("EDA", "plot", trait, "distributions"),
+        label = paste("EDA distributions -", trait),
+        module = "Exploratory Analysis",
+        trait = trait,
+        plot_builder = function() {
+          current_db <- data_result$data_bundle()
+          if (is.null(current_db)) stop("No dataset is currently loaded.")
+          build_distribution_plot(
+            current_db = current_db,
+            trait = trait,
+            envs = settings$envs,
+            bins = settings$bins,
+            fill = settings$fill,
+            alpha = settings$alpha,
+            show_normal = settings$show_normal,
+            normal_linewidth = settings$normal_linewidth,
+            show_mean = settings$show_mean,
+            layout = settings$layout,
+            ncol = settings$ncol,
+            scales_label = settings$scales_label,
+            strip_label = settings$strip_label,
+            notify = FALSE
+          )
+        },
+        metadata = list(
+          plot_family = "distribution_histograms",
+          dataset_signature = sig,
+          input_snapshot = settings
+        )
+      )
+      shiny::showNotification("EDA distribution plot sent to Figure Composer.", type = "message")
+    })
+
+    # ---- Tab 3: G×E Heatmap ----
     build_ge_heatmap_gg <- function(current_db, trait, cluster_rows = TRUE, cluster_cols = TRUE) {
       mat <- pivot_ge_means(current_db$data, current_db$gen_col, current_db$env_col, trait)
       if (isTRUE(cluster_rows) && nrow(mat) > 1) {

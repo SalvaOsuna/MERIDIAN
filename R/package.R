@@ -30,5 +30,6 @@ utils::globalVariables(c(
   "Source", "TRAIT", "Value", "Variance", "WAAS", "Weight", "avg_rep",
   "env_effect", "env_mean", "fitted_additive", "gen_effect", "gen_mean",
   "hover_text", "intercept", "ipca", "is_outlier", "label", "mean_val",
-  "n_rep", "point_size", "slope", "type", "value", "x", "x0", "x1", "y"
+  "n_rep", "point_size", "slope", "type", "value", "x", "x0", "x1", "y",
+  "trait_value", "count"
 ))
