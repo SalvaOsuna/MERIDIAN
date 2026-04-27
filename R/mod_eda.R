@@ -50,7 +50,11 @@ mod_eda_ui <- function(id) {
       bslib::layout_sidebar(
         sidebar = bslib::sidebar(
           width = 300,
-          shiny::selectInput(ns("dist_trait"), "Trait", choices = NULL),
+          shiny::selectizeInput(ns("dist_trait"), "Traits",
+            choices = NULL,
+            multiple = TRUE,
+            options = list(plugins = c("remove_button"))
+          ),
           shiny::actionButton(ns("dist_toggle_envs"), "Select All / Deselect All",
             icon = shiny::icon("check-square"),
             class = "btn-outline-secondary btn-sm w-100 mb-2"
@@ -297,7 +301,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       numeric_cols <- names(db()$data)[vapply(db()$data, is.numeric, logical(1))]
       numeric_traits <- intersect(traits, numeric_cols)
       if (length(numeric_traits) == 0) numeric_traits <- numeric_cols
-      shiny::updateSelectInput(session, "dist_trait",
+      shiny::updateSelectizeInput(session, "dist_trait",
         choices = numeric_traits,
         selected = if (length(numeric_traits) > 0) numeric_traits[1] else character(0)
       )
@@ -399,16 +403,29 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       )
     }
 
-    build_distribution_plot <- function(current_db, trait, envs, bins, fill, alpha,
+    build_distribution_plot <- function(current_db, traits, envs, bins, fill, alpha,
                                         show_normal, normal_linewidth, show_mean,
                                         layout, ncol, scales_label, strip_label,
                                         notify = FALSE) {
       env_col <- current_db$env_col
       gen_col <- current_db$gen_col
-      needed <- c(trait, env_col, gen_col)
+      traits <- unique(traits %||% character(0))
+      if (length(traits) == 0) {
+        stop("Select at least one trait before generating distributions.", call. = FALSE)
+      }
+      needed <- c(traits, env_col, gen_col)
       missing_cols <- setdiff(needed, names(current_db$data))
       if (length(missing_cols) > 0) {
         stop("Missing required column(s): ", paste(missing_cols, collapse = ", "), call. = FALSE)
+      }
+
+      non_numeric_traits <- traits[!vapply(current_db$data[traits], is.numeric, logical(1))]
+      if (length(non_numeric_traits) > 0) {
+        stop(
+          "Selected trait(s) must be numeric to draw distribution histograms: ",
+          paste(non_numeric_traits, collapse = ", "),
+          call. = FALSE
+        )
       }
 
       if (is.null(envs) || length(envs) == 0) {
@@ -416,45 +433,66 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       }
 
       plot_df <- current_db$data[, needed, drop = FALSE]
-      names(plot_df) <- c("trait_value", "environment", "genotype")
-      if (!is.numeric(plot_df$trait_value)) {
-        stop("Selected trait must be numeric to draw a distribution histogram.", call. = FALSE)
-      }
+      plot_df <- tidyr::pivot_longer(
+        plot_df,
+        cols = dplyr::all_of(traits),
+        names_to = "trait_name",
+        values_to = "trait_value"
+      )
+      names(plot_df)[names(plot_df) == env_col] <- "environment"
+      names(plot_df)[names(plot_df) == gen_col] <- "genotype"
       plot_df$environment <- as.character(plot_df$environment)
       plot_df <- plot_df[plot_df$environment %in% envs & !is.na(plot_df$trait_value), , drop = FALSE]
+      if (nrow(plot_df) == 0) {
+        stop("No non-NA observations are available for the selected traits and environments.", call. = FALSE)
+      }
 
       env_counts <- stats::aggregate(
-        trait_value ~ environment,
+        trait_value ~ trait_name + environment,
         data = plot_df,
         FUN = function(x) sum(!is.na(x))
       )
-      names(env_counts)[2] <- "n"
-      excluded <- env_counts$environment[env_counts$n < 3]
+      names(env_counts)[3] <- "n"
+      excluded_counts <- env_counts[env_counts$n < 3, c("trait_name", "environment"), drop = FALSE]
 
-      missing_selected <- setdiff(envs, env_counts$environment)
-      excluded <- unique(c(excluded, missing_selected))
-      if (length(excluded) > 0 && isTRUE(notify)) {
+      selected_pairs <- expand.grid(
+        trait_name = traits,
+        environment = envs,
+        stringsAsFactors = FALSE
+      )
+      observed_pairs <- unique(env_counts[, c("trait_name", "environment"), drop = FALSE])
+      missing_pairs <- selected_pairs[!paste(selected_pairs$trait_name, selected_pairs$environment, sep = "\r") %in%
+        paste(observed_pairs$trait_name, observed_pairs$environment, sep = "\r"), , drop = FALSE]
+      excluded_pairs <- unique(rbind(excluded_counts, missing_pairs))
+
+      if (nrow(excluded_pairs) > 0 && isTRUE(notify)) {
+        excluded_labels <- paste(excluded_pairs$trait_name, excluded_pairs$environment, sep = " @ ")
         shiny::showNotification(
           paste(
-            "Excluded environments with fewer than 3 non-NA observations:",
-            paste(excluded, collapse = ", ")
+            "Excluded trait-environment panels with fewer than 3 non-NA observations:",
+            paste(excluded_labels, collapse = ", ")
           ),
           type = "warning",
           duration = 8
         )
       }
 
-      plot_df <- plot_df[!plot_df$environment %in% excluded, , drop = FALSE]
+      if (nrow(excluded_pairs) > 0) {
+        excluded_keys <- paste(excluded_pairs$trait_name, excluded_pairs$environment, sep = "\r")
+        plot_keys <- paste(plot_df$trait_name, plot_df$environment, sep = "\r")
+        plot_df <- plot_df[!plot_keys %in% excluded_keys, , drop = FALSE]
+      }
       if (nrow(plot_df) == 0) {
-        stop("No selected environments have at least 3 non-NA observations.", call. = FALSE)
+        stop("No selected trait-environment panels have at least 3 non-NA observations.", call. = FALSE)
       }
 
       env_stats <- stats::aggregate(
-        trait_value ~ environment,
+        trait_value ~ trait_name + environment,
         data = plot_df,
         FUN = function(x) c(n = length(x), mean = mean(x), sd = stats::sd(x))
       )
       env_stats <- data.frame(
+        trait_name = env_stats$trait_name,
         environment = env_stats$environment,
         n = env_stats$trait_value[, "n"],
         env_mean = env_stats$trait_value[, "mean"],
@@ -462,7 +500,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         stringsAsFactors = FALSE
       )
 
-      env_stats$facet_label <- switch(strip_label,
+      env_stats$env_facet_label <- switch(strip_label,
         "Environment name + N obs" = paste0(env_stats$environment, " (n=", env_stats$n, ")"),
         "Environment name + Mean +/- SD" = paste0(
           env_stats$environment,
@@ -471,12 +509,24 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         ),
         env_stats$environment
       )
-      env_stats$facet_label <- factor(env_stats$facet_label, levels = env_stats$facet_label)
-
-      plot_df <- merge(plot_df, env_stats[, c("environment", "facet_label")],
-        by = "environment", all.x = TRUE, sort = FALSE
+      env_levels <- unique(env_stats$env_facet_label[order(match(env_stats$environment, envs))])
+      trait_levels <- traits[traits %in% env_stats$trait_name]
+      env_stats$env_facet_label <- factor(env_stats$env_facet_label, levels = env_levels)
+      env_stats$trait_facet_label <- factor(env_stats$trait_name, levels = trait_levels)
+      env_stats$panel_facet_label <- factor(
+        paste(env_stats$trait_name, env_stats$env_facet_label, sep = " | "),
+        levels = unique(paste(env_stats$trait_name, env_stats$env_facet_label, sep = " | "))
       )
-      plot_df$facet_label <- factor(plot_df$facet_label, levels = levels(env_stats$facet_label))
+
+      plot_df <- merge(plot_df, env_stats[, c(
+        "trait_name", "environment", "env_facet_label",
+        "trait_facet_label", "panel_facet_label"
+      )],
+        by = c("trait_name", "environment"), all.x = TRUE, sort = FALSE
+      )
+      plot_df$env_facet_label <- factor(plot_df$env_facet_label, levels = levels(env_stats$env_facet_label))
+      plot_df$trait_facet_label <- factor(plot_df$trait_facet_label, levels = levels(env_stats$trait_facet_label))
+      plot_df$panel_facet_label <- factor(plot_df$panel_facet_label, levels = levels(env_stats$panel_facet_label))
 
       p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = trait_value)) +
         ggplot2::geom_histogram(
@@ -487,8 +537,12 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
           linewidth = 0.2
         ) +
         ggplot2::labs(
-          title = paste0("Distribution of ", trait, " by Environment"),
-          x = trait,
+          title = if (length(traits) == 1) {
+            paste0("Distribution of ", traits, " by Environment")
+          } else {
+            "Trait Distributions by Environment"
+          },
+          x = if (length(traits) == 1) traits else "Trait value",
           y = "Count"
         ) +
         ggplot2::theme_bw(base_size = 12)
@@ -507,16 +561,20 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
       if (isTRUE(show_normal)) {
         density_data <- lapply(seq_len(nrow(env_stats)), function(i) {
+          trait_i <- env_stats$trait_name[i]
           env <- env_stats$environment[i]
-          env_values <- plot_df$trait_value[plot_df$environment == env]
+          env_values <- plot_df$trait_value[plot_df$trait_name == trait_i & plot_df$environment == env]
           rng <- range(env_values, na.rm = TRUE)
           env_sd <- env_stats$env_sd[i]
           if (!is.finite(env_sd) || env_sd <= 0 || diff(rng) <= 0) return(NULL)
           x_vals <- seq(rng[1], rng[2], length.out = 200)
           bin_width <- diff(rng) / bins
           data.frame(
+            trait_name = trait_i,
             environment = env,
-            facet_label = env_stats$facet_label[i],
+            env_facet_label = env_stats$env_facet_label[i],
+            trait_facet_label = env_stats$trait_facet_label[i],
+            panel_facet_label = env_stats$panel_facet_label[i],
             trait_value = x_vals,
             count = stats::dnorm(x_vals, mean = env_stats$env_mean[i], sd = env_sd) *
               env_stats$n[i] * bin_width,
@@ -525,7 +583,9 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         })
         density_data <- dplyr::bind_rows(density_data)
         if (nrow(density_data) > 0) {
-          density_data$facet_label <- factor(density_data$facet_label, levels = levels(env_stats$facet_label))
+          density_data$env_facet_label <- factor(density_data$env_facet_label, levels = levels(env_stats$env_facet_label))
+          density_data$trait_facet_label <- factor(density_data$trait_facet_label, levels = levels(env_stats$trait_facet_label))
+          density_data$panel_facet_label <- factor(density_data$panel_facet_label, levels = levels(env_stats$panel_facet_label))
           p <- p +
             ggplot2::geom_line(
               data = density_data,
@@ -539,10 +599,13 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
       facet_scales <- scale_choice(scales_label)
       if (identical(layout, "Grid")) {
-        p <- p + ggplot2::facet_grid(stats::as.formula("facet_label ~ ."), scales = facet_scales)
+        p <- p + ggplot2::facet_grid(
+          stats::as.formula(if (length(trait_levels) > 1) "env_facet_label ~ trait_facet_label" else "env_facet_label ~ ."),
+          scales = facet_scales
+        )
       } else {
         p <- p + ggplot2::facet_wrap(
-          stats::as.formula("~ facet_label"),
+          stats::as.formula(if (length(trait_levels) > 1) "~ panel_facet_label" else "~ env_facet_label"),
           ncol = max(1, min(6, as.integer(ncol %||% 2))),
           scales = facet_scales
         )
@@ -556,7 +619,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       safe_analysis({
         build_distribution_plot(
           current_db = db(),
-          trait = input$dist_trait,
+          traits = input$dist_trait,
           envs = input$dist_envs,
           bins = input$dist_bins,
           fill = input$dist_fill,
@@ -580,8 +643,9 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_distribution_report, {
       req(report_registry, distribution_plot_obj(), input$dist_trait)
-      trait <- shiny::isolate(input$dist_trait)
+      traits <- shiny::isolate(input$dist_trait)
       settings <- shiny::isolate(list(
+        traits = traits,
         envs = input$dist_envs,
         bins = input$dist_bins,
         fill = input$dist_fill,
@@ -595,18 +659,19 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         strip_label = input$dist_strip
       ))
       sig <- make_dataset_signature(db())
+      trait_label <- paste(traits, collapse = ", ")
       register_report_plot(
         registry = report_registry,
-        id = make_report_item_id("EDA", "plot", trait, "distributions"),
-        label = paste("EDA distributions -", trait),
+        id = make_report_item_id("EDA", "plot", paste(traits, collapse = "_"), "distributions"),
+        label = paste("EDA distributions -", trait_label),
         module = "Exploratory Analysis",
-        trait = trait,
+        trait = trait_label,
         plot_builder = function() {
           current_db <- data_result$data_bundle()
           if (is.null(current_db)) stop("No dataset is currently loaded.")
           build_distribution_plot(
             current_db = current_db,
-            trait = trait,
+            traits = settings$traits,
             envs = settings$envs,
             bins = settings$bins,
             fill = settings$fill,

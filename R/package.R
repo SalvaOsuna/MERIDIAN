@@ -8,6 +8,7 @@
 #' @importFrom ggplot2 aes element_text geom_col geom_hline geom_line geom_point geom_segment geom_text geom_tile geom_vline ggplot labs scale_color_gradient scale_color_manual scale_fill_gradient2 scale_shape_manual scale_y_continuous theme theme_bw
 #' @importFrom Rcpp sourceCpp
 #' @importFrom rlang .data
+#' @importFrom SpATS PSANOVA
 #' @importFrom stats anova complete.cases cor lm median prcomp predict quantile reorder sd
 #' @importFrom shiny isolate need observe observeEvent removeModal req showModal validate
 #' @importFrom tibble column_to_rownames
@@ -31,5 +32,6 @@ utils::globalVariables(c(
   "env_effect", "env_mean", "fitted_additive", "gen_effect", "gen_mean",
   "hover_text", "intercept", "ipca", "is_outlier", "label", "mean_val",
   "n_rep", "point_size", "slope", "type", "value", "x", "x0", "x1", "y",
-  "trait_value", "count"
+  "trait_value", "count", "trait_name", "env_facet_label",
+  "trait_facet_label", "panel_facet_label"
 ))

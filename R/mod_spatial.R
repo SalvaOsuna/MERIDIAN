@@ -236,6 +236,7 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       }
 
       # Spatial formula
+      PSANOVA <- SpATS::PSANOVA
       spatial_form <- stats::as.formula(
         paste0("~ PSANOVA(", qn(col_col), ", ", qn(row_col),
                ", nseg = c(", nseg_col, ", ", nseg_row, "))")
