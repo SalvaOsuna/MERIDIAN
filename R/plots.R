@@ -62,21 +62,28 @@ plot_boxplots <- function(df, trait, group_col, color_col = NULL, show_points = 
 plot_ge_heatmap <- function(df, gen_col, env_col, trait,
                             cluster_rows = TRUE, cluster_cols = TRUE,
                             palette = "RdYlGn") {
+  if (!requireNamespace("heatmaply", quietly = TRUE)) {
+    stop("Interactive GxE heatmaps require the optional package 'heatmaply'.", call. = FALSE)
+  }
+
   ge_matrix <- pivot_ge_means(df, gen_col, env_col, trait)
 
   plot_title <- paste0("GxE Means: ", trait)
 
   # Resolve palette: convert all names to actual color vectors
   viridis_palettes <- c("viridis", "inferno", "plasma", "magma", "cividis")
-  if (tolower(palette) %in% viridis_palettes) {
+  if (tolower(palette) %in% viridis_palettes &&
+      requireNamespace("viridisLite", quietly = TRUE)) {
     color_vec <- viridisLite::viridis(256, option = substr(tolower(palette), 1, 1))
-  } else {
-    # RColorBrewer palettes — get max colors and interpolate to 256
+  } else if (requireNamespace("RColorBrewer", quietly = TRUE)) {
+    # RColorBrewer palettes: get max colors and interpolate to 256
     n_colors <- tryCatch(
       RColorBrewer::brewer.pal.info[palette, "maxcolors"],
       error = function(e) 11
     )
     color_vec <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(n_colors, palette))(256)
+  } else {
+    color_vec <- grDevices::colorRampPalette(c("#c44e52", "#f8f9fa", "#2c7a51"))(256)
   }
 
   heatmaply::heatmaply(

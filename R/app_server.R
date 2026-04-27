@@ -5,7 +5,9 @@
 app_server <- function(input, output, session) {
   report_registry <- shiny::reactiveValues()
 
-  thematic::thematic_shiny()
+  if (requireNamespace("thematic", quietly = TRUE)) {
+    thematic::thematic_shiny()
+  }
 
   shiny::showModal(shiny::modalDialog(
     title = shiny::tags$div(

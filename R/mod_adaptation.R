@@ -374,6 +374,10 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
     
     output$plot_env_cor <- plotly::renderPlotly({
       req(adapt_results()$env_cor)
+      if (!requireNamespace("heatmaply", quietly = TRUE)) {
+        return(plotly::plotly_empty() |>
+          plotly::layout(title = "Covariate heatmaps require the optional package 'heatmaply'."))
+      }
       cor_mat <- adapt_results()$env_cor$cor_mat
       
       heatmaply::heatmaply_cor(

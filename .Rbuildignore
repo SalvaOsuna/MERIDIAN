@@ -6,3 +6,7 @@
 ^docs$
 ^shiny_run.*\.log$
 ^Shiny_MET\.code-workspace$
+^LICENSE\.md$
+^Repository_structure\.txt$
+^cran-comments\.md$
+^CRAN-SUBMISSION$

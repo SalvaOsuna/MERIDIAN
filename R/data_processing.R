@@ -12,6 +12,9 @@ read_met_file <- function(path, sep = ",", header = TRUE) {
   ext <- tolower(tools::file_ext(path))
 
   if (ext %in% c("xlsx", "xls")) {
+    if (!requireNamespace("readxl", quietly = TRUE)) {
+      stop("Reading Excel files requires the optional package 'readxl'.", call. = FALSE)
+    }
     df <- readxl::read_excel(path, col_names = header)
   } else {
     df <- readr::read_delim(

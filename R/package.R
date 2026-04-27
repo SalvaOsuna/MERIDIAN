@@ -6,8 +6,6 @@
 #' @importFrom grid arrow unit
 #' @importFrom dplyr %>% all_of arrange bind_rows everything filter group_by left_join mutate n rename select slice_min starts_with summarise
 #' @importFrom ggplot2 aes element_text geom_col geom_hline geom_line geom_point geom_segment geom_text geom_tile geom_vline ggplot labs scale_color_gradient scale_color_manual scale_fill_gradient2 scale_shape_manual scale_y_continuous theme theme_bw
-#' @importFrom kableExtra kable_styling
-#' @importFrom knitr is_html_output kable opts_chunk
 #' @importFrom Rcpp sourceCpp
 #' @importFrom rlang .data
 #' @importFrom stats anova complete.cases cor lm median prcomp predict quantile reorder sd
