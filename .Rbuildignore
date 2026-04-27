@@ -1,2 +1,8 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^\.Rhistory$
+^.*\.Rhistory$
+^data-raw$
+^docs$
+^shiny_run.*\.log$
+^Shiny_MET\.code-workspace$

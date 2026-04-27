@@ -1,0 +1,10 @@
+default:
+  golem_name: MERIDIAN
+  golem_version: 0.1.0
+  app_prod: no
+
+production:
+  app_prod: yes
+
+dev:
+  golem_wd: !expr getwd()

@@ -117,7 +117,9 @@ run_anova_met <- function(df, gen_col, env_col, rep_col, block_col = NULL, trait
 #' Fit mixed model with lme4 and extract variance components
 #' Model: trait ~ env + (1|gen) + (1|gen:env) + (1|env:rep)
 #' @param df Data frame
-#' @param gen_col, env_col, rep_col Column names
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
 #' @param trait Trait column name
 #' @return List with var_components, model, heritability
 run_mixed_model <- function(df, gen_col, env_col, rep_col, trait) {
@@ -201,7 +203,9 @@ run_mixed_model <- function(df, gen_col, env_col, rep_col, trait) {
 
 #' Compute BLUEs (genotype as fixed, environment as random)
 #' @param df Data frame
-#' @param gen_col, env_col, rep_col Column names
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
 #' @param trait Trait column name
 #' @return Data frame with Genotype, BLUE, SE, CI_lower, CI_upper
 compute_blues <- function(df, gen_col, env_col, rep_col, trait) {
@@ -251,7 +255,9 @@ compute_blues <- function(df, gen_col, env_col, rep_col, trait) {
 
 #' Compute BLUPs (genotype as random, environment as fixed)
 #' @param df Data frame
-#' @param gen_col, env_col, rep_col Column names
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
 #' @param trait Trait column name
 #' @return Data frame with Genotype, BLUP, SE, CI_lower, CI_upper
 compute_blups <- function(df, gen_col, env_col, rep_col, trait) {

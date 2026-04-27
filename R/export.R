@@ -1,5 +1,5 @@
 # =============================================================================
-# MERIDIAN — Export Helpers (Tables + Plots)
+# MERIDIAN - Export Helpers (Tables + Plots)
 # =============================================================================
 
 default_plot_cfg <- function() {
@@ -117,22 +117,22 @@ collect_available_tables <- function(db, anova_res = NULL, stab_res = NULL, adap
   trait_stab <- stab_res$trait %||% "Trait"
   trait_adapt <- adapt_res$trait %||% "Trait"
 
-  if (!is.null(stab_res$ammi$stability)) out[[paste0("Stability Metrics — ", trait_stab)]] <- as.data.frame(stab_res$ammi$stability)
-  if (!is.null(stab_res$all$stats_table)) out[[paste0("Combined Stability Indices — ", trait_stab)]] <- as.data.frame(stab_res$all$stats_table)
-  if (!is.null(anova_res$anova$anova_table)) out[[paste0("ANOVA Table — ", trait_anova)]] <- as.data.frame(anova_res$anova$anova_table)
-  if (!is.null(anova_res$blues)) out[[paste0("BLUEs — ", trait_anova)]] <- as.data.frame(anova_res$blues)
-  if (!is.null(anova_res$blups)) out[[paste0("BLUPs — ", trait_anova)]] <- as.data.frame(anova_res$blups)
-  if (!is.null(stab_res$ammi$gen_means)) out[[paste0("AMMI Genotype Means — ", trait_stab)]] <- as.data.frame(stab_res$ammi$gen_means)
-  if (!is.null(stab_res$ammi$env_means)) out[[paste0("AMMI Environment Means — ", trait_stab)]] <- as.data.frame(stab_res$ammi$env_means)
-  if (!is.null(stab_res$ammi$variance_explained)) out[[paste0("AMMI Variance Explained — ", trait_stab)]] <- as.data.frame(stab_res$ammi$variance_explained)
+  if (!is.null(stab_res$ammi$stability)) out[[paste0("Stability Metrics - ", trait_stab)]] <- as.data.frame(stab_res$ammi$stability)
+  if (!is.null(stab_res$all$stats_table)) out[[paste0("Combined Stability Indices - ", trait_stab)]] <- as.data.frame(stab_res$all$stats_table)
+  if (!is.null(anova_res$anova$anova_table)) out[[paste0("ANOVA Table - ", trait_anova)]] <- as.data.frame(anova_res$anova$anova_table)
+  if (!is.null(anova_res$blues)) out[[paste0("BLUEs - ", trait_anova)]] <- as.data.frame(anova_res$blues)
+  if (!is.null(anova_res$blups)) out[[paste0("BLUPs - ", trait_anova)]] <- as.data.frame(anova_res$blups)
+  if (!is.null(stab_res$ammi$gen_means)) out[[paste0("AMMI Genotype Means - ", trait_stab)]] <- as.data.frame(stab_res$ammi$gen_means)
+  if (!is.null(stab_res$ammi$env_means)) out[[paste0("AMMI Environment Means - ", trait_stab)]] <- as.data.frame(stab_res$ammi$env_means)
+  if (!is.null(stab_res$ammi$variance_explained)) out[[paste0("AMMI Variance Explained - ", trait_stab)]] <- as.data.frame(stab_res$ammi$variance_explained)
   if (!is.null(stab_res$ammi$interaction_matrix)) {
     m <- as.data.frame(stab_res$ammi$interaction_matrix)
     m$Genotype <- rownames(m)
     m <- m[, c("Genotype", setdiff(names(m), "Genotype")), drop = FALSE]
-    out[[paste0("GxE Interaction Matrix — ", trait_stab)]] <- m
+    out[[paste0("GxE Interaction Matrix - ", trait_stab)]] <- m
   }
-  if (!is.null(adapt_res$fw$env_means)) out[[paste0("Finlay-Wilkinson Env Means — ", trait_adapt)]] <- as.data.frame(adapt_res$fw$env_means)
-  if (!is.null(adapt_res$mega_env$env_strat)) out[[paste0("Mega-Environment Table — ", trait_adapt)]] <- as.data.frame(adapt_res$mega_env$env_strat)
+  if (!is.null(adapt_res$fw$env_means)) out[[paste0("Finlay-Wilkinson Env Means - ", trait_adapt)]] <- as.data.frame(adapt_res$fw$env_means)
+  if (!is.null(adapt_res$mega_env$env_strat)) out[[paste0("Mega-Environment Table - ", trait_adapt)]] <- as.data.frame(adapt_res$mega_env$env_strat)
   out
 }
 
@@ -209,7 +209,7 @@ make_gge_static_plot <- function(gge_model, trait, cfg) {
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
     ggplot2::coord_equal() +
     ggplot2::labs(
-      title = paste0("GGE Biplot — ", trait),
+      title = paste0("GGE Biplot - ", trait),
       x = paste0("PC1 (", round(g$varexpl[1], 1), "%)"),
       y = paste0("PC2 (", round(g$varexpl[2], 1), "%)")
     )
@@ -228,7 +228,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
       key = key,
       module = module,
       trait = trait,
-      label = label %||% paste0(module, " — ", trait),
+      label = label %||% paste0(module, " - ", trait),
       builder = builder
     )
   }
@@ -246,7 +246,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
         ggplot2::geom_point(data = env_df, ggplot2::aes(mean_val, ipca), color = cfg$env_color, size = cfg$point_size + 0.5, alpha = cfg$point_alpha) +
         ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "grey60", linewidth = cfg$line_width) +
         ggplot2::geom_vline(xintercept = ammi$grand_mean, linetype = "dashed", color = "grey60", linewidth = cfg$line_width) +
-        ggplot2::labs(title = paste0("AMMI1 — ", trait), x = paste0("Mean (", trait, ")"), y = "IPCA1")
+        ggplot2::labs(title = paste0("AMMI1 - ", trait), x = paste0("Mean (", trait, ")"), y = "IPCA1")
       p <- add_label_layer(p, dplyr::transmute(gen_df, x = mean_val, y = ipca, label = GEN), "x", "y", "label", cfg, cfg$geno_color)
       p <- add_label_layer(p, dplyr::transmute(env_df, x = mean_val, y = ipca, label = ENV), "x", "y", "label", cfg, cfg$env_color)
       apply_common_theme_controls(p, cfg)
@@ -265,7 +265,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
         ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "grey60") +
         ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
         ggplot2::coord_equal() +
-        ggplot2::labs(title = paste0("AMMI2 — ", trait), x = "IPCA1", y = "IPCA2")
+        ggplot2::labs(title = paste0("AMMI2 - ", trait), x = "IPCA1", y = "IPCA2")
       p <- add_label_layer(p, gen_df, "x", "y", "label", cfg, cfg$geno_color)
       p <- add_label_layer(p, env_df, "x", "y", "label", cfg, cfg$env_color)
       apply_common_theme_controls(p, cfg)
@@ -278,7 +278,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
         ggplot2::geom_point(color = cfg$geno_color, size = cfg$point_size, alpha = cfg$point_alpha) +
         ggplot2::geom_hline(yintercept = mean(df$WAAS, na.rm = TRUE), linetype = "dashed", color = "grey60") +
         ggplot2::geom_vline(xintercept = mean(df$gen_mean, na.rm = TRUE), linetype = "dashed", color = "grey60") +
-        ggplot2::labs(title = paste0("Stability Ranking — ", trait), x = paste0("Mean (", trait, ")"), y = "WAAS")
+        ggplot2::labs(title = paste0("Stability Ranking - ", trait), x = paste0("Mean (", trait, ")"), y = "WAAS")
       p <- add_label_layer(p, dplyr::transmute(df, x = gen_mean, y = WAAS, label = GEN), "x", "y", "label", cfg, cfg$geno_color)
       apply_common_theme_controls(p, cfg)
     })
@@ -289,7 +289,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
       p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = GEN, fill = interaction)) +
         ggplot2::geom_tile(color = "white", linewidth = 0.2) +
         ggplot2::scale_fill_gradient2(low = cfg$neg_fill, mid = "white", high = cfg$pos_fill, midpoint = 0) +
-        ggplot2::labs(title = paste0("GxE Interaction Heatmap — ", trait), x = "Environment", y = "Genotype")
+        ggplot2::labs(title = paste0("GxE Interaction Heatmap - ", trait), x = "Environment", y = "Genotype")
       apply_common_theme_controls(p, cfg)
     })
   }
@@ -313,7 +313,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
         ggplot2::geom_point(size = cfg$point_size, alpha = cfg$point_alpha) +
         ggplot2::geom_abline(data = slopes, ggplot2::aes(intercept = intercept, slope = slope, color = .data[[gen_col]]),
           linewidth = cfg$line_width, alpha = 0.8, show.legend = FALSE) +
-        ggplot2::labs(title = paste0("Reaction Norms — ", trait), x = "Environmental Index", y = paste0("Mean ", trait))
+        ggplot2::labs(title = paste0("Reaction Norms - ", trait), x = "Environmental Index", y = paste0("Mean ", trait))
       apply_common_theme_controls(p, cfg)
     })
   }
@@ -325,7 +325,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
       df <- adapt_res$mega_env$env_strat
       p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = MEAN, fill = MEGA_ENV)) +
         ggplot2::geom_col(alpha = cfg$point_alpha) +
-        ggplot2::labs(title = paste0("Mega-Environments — ", trait), x = "Environment", y = "Winning Mean")
+        ggplot2::labs(title = paste0("Mega-Environments - ", trait), x = "Environment", y = "Winning Mean")
       apply_common_theme_controls(p, cfg)
     })
   }
@@ -355,7 +355,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
       p <- ggplot2::ggplot(db$data, ggplot2::aes(x = .data[[env_col]], y = .data[[trait]], fill = .data[[env_col]])) +
         ggplot2::geom_boxplot(alpha = cfg$point_alpha, outlier.shape = NA) +
         ggplot2::geom_jitter(width = 0.15, size = cfg$point_size * 0.5, alpha = cfg$point_alpha * 0.6) +
-        ggplot2::labs(title = paste0("EDA Boxplot — ", trait), x = "Environment", y = trait) +
+        ggplot2::labs(title = paste0("EDA Boxplot - ", trait), x = "Environment", y = trait) +
         ggplot2::theme(legend.position = "none")
       apply_common_theme_controls(p, cfg)
     })

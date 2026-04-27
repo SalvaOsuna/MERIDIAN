@@ -6,7 +6,10 @@
 
 #' Prepare data for stability functions
 #' @param df Data frame
-#' @param gen_col, env_col, rep_col Column names
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
+#' @param trait Trait column name
 #' @return Data frame with cleaned factor columns
 prepare_metan_data <- function(df, gen_col, env_col, rep_col, trait = NULL) {
   df_std <- df
@@ -81,6 +84,11 @@ prepare_metan_data <- function(df, gen_col, env_col, rep_col, trait = NULL) {
 
 #' Prepare data for GGE while preserving all observed genotypes/environments
 #' Missing GxE cells are imputed with additive expectations to avoid dropping levels.
+#' @param df Data frame
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param trait Trait column name
+#' @return List with imputed GGE input data and imputed-cell count
 prepare_gge_data <- function(df, gen_col, env_col, trait) {
   df_std <- df[!is.na(df[[trait]]), , drop = FALSE]
   df_std[[gen_col]] <- as.factor(df_std[[gen_col]])
@@ -150,6 +158,10 @@ prepare_gge_data <- function(df, gen_col, env_col, trait) {
 
 
 #' Build fast GxE mean matrix and additive interaction matrix
+#' @param df_std Cleaned data frame
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param trait Trait column name
 #' @return List with ge_means, interaction, means, dims and labels
 build_ge_matrices <- function(df_std, gen_col, env_col, trait) {
   gen_f <- as.factor(df_std[[gen_col]])
@@ -196,6 +208,12 @@ build_ge_matrices <- function(df_std, gen_col, env_col, trait) {
 
 
 #' AMMI analysis using metan::performs_ammi()
+#' @param df Data frame
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
+#' @param trait Trait column name
+#' @return List with AMMI model, ANOVA table, and IPCA scores
 run_ammi_metan <- function(df, gen_col, env_col, rep_col, trait) {
   df_std <- prepare_metan_data(df, gen_col, env_col, rep_col, trait)
 
@@ -217,6 +235,12 @@ run_ammi_metan <- function(df, gen_col, env_col, rep_col, trait) {
 
 
 #' GGE Biplot analysis using metan::gge()
+#' @param df Data frame
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
+#' @param trait Trait column name
+#' @return List with GGE model and imputed-cell count
 run_gge <- function(df, gen_col, env_col, rep_col, trait) {
   gge_input <- prepare_gge_data(df, gen_col, env_col, trait)
   df_std <- gge_input$data
@@ -233,6 +257,8 @@ run_gge <- function(df, gen_col, env_col, rep_col, trait) {
 
 
 #' Fast Eberhart & Russell parameters from GxE means
+#' @param ge GxE matrix object from build_ge_matrices()
+#' @return Data frame of Eberhart-Russell parameters
 compute_er_table_fast <- function(ge) {
   ei <- ge$env_means - ge$grand_mean
   ss_ei <- sum(ei^2)
@@ -283,6 +309,8 @@ compute_er_table_fast <- function(ge) {
 
 
 #' Fast Wricke ecovalence from additive interaction matrix
+#' @param ge GxE matrix object from build_ge_matrices()
+#' @return Data frame of Wricke ecovalence values
 compute_wricke_table_fast <- function(ge) {
   wi <- rowSums(ge$interaction^2)
   data.frame(
@@ -295,6 +323,9 @@ compute_wricke_table_fast <- function(ge) {
 
 
 #' Fast Shukla variance from Wricke and interaction SS
+#' @param ge GxE matrix object from build_ge_matrices()
+#' @param wi Optional precomputed Wricke ecovalence vector
+#' @return Data frame of Shukla variance values
 compute_shukla_table_fast <- function(ge, wi = NULL) {
   if (is.null(wi)) wi <- rowSums(ge$interaction^2)
 
@@ -319,6 +350,8 @@ compute_shukla_table_fast <- function(ge, wi = NULL) {
 
 
 #' Fast AMMI metrics (ASV, WAAS, SIPC) from interaction matrix
+#' @param ge GxE matrix object from build_ge_matrices()
+#' @return Data frame of AMMI stability metrics
 compute_ammi_metrics_fast <- function(ge) {
   n_axis <- min(ge$n_gen, ge$n_env) - 1
   if (n_axis < 1) {
@@ -376,6 +409,12 @@ compute_ammi_metrics_fast <- function(ge) {
 
 
 #' Eberhart & Russell stability regression
+#' @param df Data frame
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
+#' @param trait Trait column name
+#' @return List with fitted model metadata and parameters
 run_eberhart_russell <- function(df, gen_col, env_col, rep_col, trait) {
   df_std <- prepare_metan_data(df, gen_col, env_col, rep_col, trait)
   run_eberhart_russell_fast(df_std, gen_col, env_col, rep_col, trait)
@@ -383,6 +422,12 @@ run_eberhart_russell <- function(df, gen_col, env_col, rep_col, trait) {
 
 
 #' Wricke ecovalence
+#' @param df Data frame
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
+#' @param trait Trait column name
+#' @return List with fitted model metadata and parameters
 compute_wricke <- function(df, gen_col, env_col, rep_col, trait) {
   df_std <- prepare_metan_data(df, gen_col, env_col, rep_col, trait)
   compute_wricke_fast(df_std, gen_col, env_col, rep_col, trait)
@@ -390,6 +435,12 @@ compute_wricke <- function(df, gen_col, env_col, rep_col, trait) {
 
 
 #' Shukla stability variance
+#' @param df Data frame
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
+#' @param trait Trait column name
+#' @return List with fitted model metadata and parameters
 compute_shukla <- function(df, gen_col, env_col, rep_col, trait) {
   df_std <- prepare_metan_data(df, gen_col, env_col, rep_col, trait)
   compute_shukla_fast(df_std, gen_col, env_col, rep_col, trait)
@@ -397,6 +448,12 @@ compute_shukla <- function(df, gen_col, env_col, rep_col, trait) {
 
 
 #' Run all stability indices
+#' @param df Data frame
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
+#' @param trait Trait column name
+#' @return List with fitted model metadata and combined stability table
 run_all_stability <- function(df, gen_col, env_col, rep_col, trait) {
   df_std <- prepare_metan_data(df, gen_col, env_col, rep_col, trait)
   run_all_stability_fast(df_std, gen_col, env_col, rep_col, trait)
@@ -404,6 +461,8 @@ run_all_stability <- function(df, gen_col, env_col, rep_col, trait) {
 
 
 #' Combine stability rankings into one table
+#' @param stats_table Stability statistics data frame
+#' @return Rounded stability ranking data frame
 stability_ranking <- function(stats_table) {
   if (is.null(stats_table)) return(NULL)
 

@@ -1,5 +1,5 @@
 # =============================================================================
-# MERIDIAN — Module 7: Reports & Export
+# MERIDIAN - Module 7: Reports & Export
 # =============================================================================
 
 plot_export_controls_ui <- function(ns, prefix = "plt") {
@@ -322,7 +322,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       t_all <- tables_avail()
       tf <- input$table_trait_filter %||% "All"
       if (identical(tf, "All")) return(t_all)
-      keep <- vapply(names(t_all), function(nm) grepl(paste0("—\\s*", tf, "$"), nm), logical(1))
+      keep <- vapply(names(t_all), function(nm) grepl(paste0("-\\s*", tf, "$"), nm), logical(1))
       t_all[keep]
     })
 

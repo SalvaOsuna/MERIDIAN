@@ -1,7 +1,8 @@
 Package: MERIDIAN
-Title: MERIDIAN - Multi-Environment Research Integration: Data Intelligence & Agronomic Networks
+Title: Multi-Environment Research Integration: Data Intelligence and Agronomic Networks
 Version: 0.1.0
-Authors@R: person("Salva", "Osuna", role = c("aut", "cre"))
+Authors@R: person("Salva", "Osuna", email = "salvadorosunacaballero@gmail.com",
+    role = c("aut", "cre"))
 Description: An interactive Shiny application for comprehensive analysis of
     Multi-Environment Trial (MET) phenotypic data. Provides exploratory data
     analysis, ANOVA with variance components, stability analysis (AMMI, GGE,
@@ -9,9 +10,14 @@ Description: An interactive Shiny application for comprehensive analysis of
     mega-environment identification, and automated report generation.
 License: MIT + file LICENSE
 Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Depends:
+    R (>= 4.3.0)
 Imports:
     shiny (>= 1.8.0),
     bslib (>= 0.6.0),
+    golem,
     shinyWidgets,
     DT,
     shinycssloaders,
@@ -20,15 +26,14 @@ Imports:
     readxl,
     dplyr,
     tidyr,
+    tibble,
     ggplot2,
     plotly,
     ggrepel,
     heatmaply,
-    corrplot,
     metan,
     lme4,
     emmeans,
-    sommer,
     openxlsx,
     rmarkdown,
     knitr,
@@ -37,12 +42,19 @@ Imports:
     ggpubr,
     pagedown,
     digest,
-    Cairo,
     svglite,
     zip,
-    scales,
     SpATS,
+    RColorBrewer,
+    viridisLite,
+    rlang,
+    Rcpp
+LinkingTo:
     Rcpp
 Suggests:
     shinytest2,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    usethis,
+    devtools
+Config/testthat/edition: 3
+NeedsCompilation: yes

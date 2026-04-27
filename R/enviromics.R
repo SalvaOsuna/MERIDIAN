@@ -10,7 +10,8 @@
 #' Run Mega-Environment Analysis (Which-won-where)
 #' Natively computes winning genotypes per environment and groups them.
 #' @param df Data frame
-#' @param gen_col, env_col Column names
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
 #' @param trait Trait column name
 #' @return List with env_strat dataframe
 run_mega_envs <- function(df, gen_col, env_col, trait) {
@@ -58,7 +59,8 @@ run_mega_envs <- function(df, gen_col, env_col, trait) {
 #' Run Finlay-Wilkinson Reaction Norms
 #' Computes the environmental index and fits regressions for each genotype.
 #' @param df Data frame
-#' @param gen_col, env_col Column names
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
 #' @param trait Trait column name
 #' @return Data frame with fitted lines and scatter data
 run_finlay_wilkinson <- function(df, gen_col, env_col, trait) {

@@ -274,7 +274,7 @@ mod_data_upload_server <- function(id) {
         )
       } else if (isTRUE(example_loaded())) {
         read_met_file(
-          path   = file.path("data", "example_phenotypic.csv"),
+          path   = app_sys("extdata", "example_phenotypic.csv"),
           sep    = ",",
           header = TRUE
         )
@@ -293,7 +293,7 @@ mod_data_upload_server <- function(id) {
         )
       } else if (isTRUE(example_loaded())) {
         read_met_file(
-          path   = file.path("data", "example_envdata.csv"),
+          path   = app_sys("extdata", "example_envdata.csv"),
           sep    = ",",
           header = TRUE
         )
@@ -691,7 +691,7 @@ mod_data_upload_server <- function(id) {
     output$download_example <- shiny::downloadHandler(
       filename = function() "example_phenotypic.csv",
       content  = function(file) {
-        file.copy(file.path("data", "example_phenotypic.csv"), file)
+        file.copy(app_sys("extdata", "example_phenotypic.csv"), file)
       }
     )
 

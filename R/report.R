@@ -32,7 +32,7 @@ build_methods_text <- function(db, anova_res = NULL, stab_res = NULL, adapt_res 
 }
 
 render_meridian_report <- function(output_file, output_format, params, session = NULL) {
-  template_path <- file.path("inst", "report_template.Rmd")
+  template_path <- app_sys("report_template.Rmd")
   if (!file.exists(template_path)) stop("Report template not found: inst/report_template.Rmd")
 
   quiet <- FALSE

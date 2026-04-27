@@ -1,5 +1,5 @@
 # =============================================================================
-# MERIDIAN — Module 3: ANOVA & Variance Components
+# MERIDIAN - Module 3: ANOVA & Variance Components
 # Two-way ANOVA, variance components, heritability, BLUEs, BLUPs
 # =============================================================================
 
@@ -354,7 +354,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
           title = "G x E",
           value = {
             ge_row <- res$anova_table[grep("G.*x.*E|Genotype.*x.*Env", res$anova_table$Source), ]
-            if (nrow(ge_row) > 0) ge_row$Signif[1] else "—"
+            if (nrow(ge_row) > 0) ge_row$Signif[1] else "-"
           },
           showcase = shiny::icon("asterisk"), theme = "warning"
         )

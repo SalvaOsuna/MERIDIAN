@@ -1,21 +1,36 @@
-MET-Analyzer/
-├── app.R	# o ui.R + server.R separados
-├── R/
-│   ├── data_processing.R
-│   ├── models.R
-│   ├── plots.R
-│   ├── stability.R
-│   ├── enviromics.R          
-│   └── utils.R
-├── www/
-│   ├── styles.css
-│   └── logo.png
-├── data/
-│   ├── example_phenotypic.csv
-│   └── example_envdata.csv   
-├── tests/
-│   └── testthat/
-├── DESCRIPTION
-├── README.md
-├── .gitignore
-└── renv.lock	#reproducibility
+MERIDIAN/
+|-- DESCRIPTION
+|-- NAMESPACE
+|-- R/
+|   |-- app_ui.R
+|   |-- app_server.R
+|   |-- run_app.R
+|   |-- package.R
+|   |-- RcppExports.R
+|   |-- data_processing.R
+|   |-- models.R
+|   |-- plots.R
+|   |-- stability.R
+|   |-- enviromics.R
+|   `-- utils.R
+|-- src/
+|   |-- fast_pruning.cpp
+|   `-- RcppExports.cpp
+|-- inst/
+|   |-- app/www/
+|   |   |-- logo.png
+|   |   `-- styles.css
+|   |-- extdata/
+|   |   |-- example_phenotypic.csv
+|   |   `-- example_envdata.csv
+|   |-- golem-config.yml
+|   |-- report_template.Rmd
+|   `-- report_styles.css
+|-- data-raw/
+|   `-- generate_example_data.R
+|-- tests/testthat/
+|   `-- test-app.R
+|-- man/
+|-- README.md
+|-- LICENSE
+`-- LICENSE.md

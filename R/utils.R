@@ -1,5 +1,5 @@
 # =============================================================================
-# MERIDIAN — Utility Functions
+# MERIDIAN - Utility Functions
 # Shared helpers used across all modules
 # =============================================================================
 
@@ -19,7 +19,7 @@ LABELS <- list(
   app_subtitle     = "Multi-Environment Research Integration: Data Intelligence & Agronomic Networks",
 
 
-  # Module 1 — Data Upload
+  # Module 1 - Data Upload
   m1_title         = "Data Upload & Validation",
   m1_upload        = "Upload Data File",
   m1_upload_hint   = "Accepted formats: .csv, .xlsx, .xls",
@@ -40,7 +40,7 @@ LABELS <- list(
   m1_summary_gen   = "Summary by Genotype",
   m1_no_data       = "No data loaded. Upload a file or load the example dataset.",
 
-  # Module 2 — EDA
+  # Module 2 - EDA
   m2_title         = "Exploratory Data Analysis",
   m2_boxplots      = "Boxplots",
   m2_heatmap       = "G\u00D7E Heatmap",
@@ -58,19 +58,19 @@ LABELS <- list(
   m2_remove_outliers = "Remove Outliers",
   m2_color_palette = "Color Palette",
 
-  # Module 3 — ANOVA (placeholder)
+  # Module 3 - ANOVA (placeholder)
   m3_title         = "ANOVA & Variance Components",
 
-  # Module 4 — Stability (placeholder)
+  # Module 4 - Stability (placeholder)
   m4_title         = "Stability Analysis",
 
-  # Module 5 — Adaptation (placeholder)
+  # Module 5 - Adaptation (placeholder)
   m5_title         = "Adaptation Analysis",
 
-  # Module 6 — Reports (placeholder)
+  # Module 6 - Reports (placeholder)
   m6_title         = "Reports & Export",
 
-  # Module 7 — Spatial
+  # Module 7 - Spatial
   m7_title         = "Spatial Trends",
   m7_select_trait  = "Select Trait",
   m7_select_env    = "Select Environment",
@@ -80,7 +80,7 @@ LABELS <- list(
   m7_nseg_col      = "Number of Column Segments",
 
   # Common
-  coming_soon      = "Coming soon — this module will be available in a future update.",
+  coming_soon      = "Coming soon - this module will be available in a future update.",
   no_data_warning  = "Please load data in the Data Upload tab first.",
   run_analysis     = "Run Analysis",
   download_csv     = "Download CSV",
@@ -190,7 +190,7 @@ detect_design <- function(df, gen_col, env_col, rep_col, block_col = NULL) {
         }
       }
 
-      # Incomplete blocks → Alpha-Lattice
+      # Incomplete blocks -> Alpha-Lattice
       if (avg_gen_per_block < total_gen * 0.9) {
         return(list(
           design = "Alpha-Lattice",
@@ -243,6 +243,11 @@ detect_design <- function(df, gen_col, env_col, rep_col, block_col = NULL) {
 # Validate MET data
 # ---------------------------------------------------------------------------
 #' Validate MET dataset structure and content
+#' @param df Data frame
+#' @param gen_col Genotype column name
+#' @param env_col Environment column name
+#' @param rep_col Replicate column name
+#' @param resp_vars Character vector of response variable names
 #' @return List of validation messages: errors (fatal), warnings (informational)
 validate_met_data <- function(df, gen_col, env_col, rep_col, resp_vars) {
   errors   <- character(0)
@@ -363,7 +368,7 @@ safe_analysis <- function(expr, session) {
 #' @param df Data frame
 #' @param group_col Column name to group by
 #' @param traits Character vector of trait column names
-#' @return Tibble with Mean, SD, Min, Max, CV%, N per group × trait
+#' @return Tibble with Mean, SD, Min, Max, CV%, N per group x trait
 descriptive_summary <- function(df, group_col, traits) {
   if (exists("cpp_group_numeric_summary", mode = "function")) {
     group_f <- as.factor(df[[group_col]])

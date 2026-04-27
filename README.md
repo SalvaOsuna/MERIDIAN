@@ -1,6 +1,6 @@
-# MERIDIAN <img src="www/logo.png" align="right" height="140"/>
+# MERIDIAN <img src="inst/app/www/logo.png" align="right" height="140"/>
 
-`MERIDIAN` (**M**ulti-**E**nvironment **R**esearch **I**ntegration: **D**ata **I**ntelligence & **A**gronomic **N**etworks) is a comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenotypic data analysis. It is built for plant breeders, geneticists, and agronomists who need to move from raw field data to publication-ready results.
+`MERIDIAN` (**M**ulti-**E**nvironment **R**esearch **I**ntegration: **D**ata **I**ntelligence & **A**gronomic **N**etworks) is a comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenotypic data analysis. It is packaged with the `golem` framework so it can be installed, documented, tested, and launched like a regular R package.
 
 ## Features
 
@@ -93,32 +93,28 @@ The registry stores lightweight report items with module, trait, item type, meta
 - RStudio recommended
 - Rtools recommended on Windows for C++ acceleration
 
-### Setup
+### Setup From GitHub
 
 ```r
-# Clone the repository
-# git clone https://github.com/SalvaOsuna/MERIDIAN.git
+install.packages("pak")
+pak::pak("SalvaOsuna/MERIDIAN")
 
-# Install required packages
-install.packages(c(
-  "shiny", "bslib", "shinyWidgets", "DT", "shinycssloaders",
-  "thematic", "readr", "readxl", "dplyr", "tidyr",
-  "ggplot2", "plotly", "heatmaply", "scales", "openxlsx",
-  "metan", "lme4", "emmeans", "SpATS", "Rcpp",
-  "patchwork", "ggrepel", "ggpubr", "digest", "svglite",
-  "Cairo", "zip", "rmarkdown", "knitr", "kableExtra", "pagedown"
-))
-
-# Run the app
-shiny::runApp()
+MERIDIAN::run_app()
 ```
 
-### Using renv
+### Setup For Local Development
 
 ```r
-renv::restore()
-shiny::runApp()
+# From the cloned repository
+install.packages(c("devtools", "usethis"))
+devtools::install_deps(dependencies = TRUE)
+devtools::document()
+devtools::load_all()
+
+run_app()
 ```
+
+Dependencies are declared in `DESCRIPTION`. When adding a runtime dependency, use `usethis::use_package("package_name")`; for development-only tooling, use `usethis::use_package("package_name", type = "Suggests")`.
 
 ## Input Data Format
 
@@ -142,11 +138,11 @@ The app expects data in **long format** with at minimum:
 | G01 | ENV1 | 2 | 2 | 3 | 3.71 | 80.1 |
 | G02 | ENV1 | 1 | 1 | 2 | 4.10 | 65.4 |
 
-An example dataset is included and can be loaded directly from the app.
+An example dataset is included in `inst/extdata` and can be loaded directly from the app.
 
 ## Performance
 
-MERIDIAN includes optional C++ acceleration through `Rcpp` for large MET datasets. Current kernels support balanced subset pruning, GxE means, additive GxE imputation, grouped summaries, grouped outlier detection, spatial cell aggregation, AMMI metrics, Finlay-Wilkinson regression, and Eberhart-Russell diagnostics.
+MERIDIAN includes optional C++ acceleration through `Rcpp` for large MET datasets. The C++ kernels live in `src/` and are linked through `Rcpp` attributes during package documentation/build. Current kernels support balanced subset pruning, GxE means, additive GxE imputation, grouped summaries, grouped outlier detection, spatial cell aggregation, AMMI metrics, Finlay-Wilkinson regression, and Eberhart-Russell diagnostics.
 
 If C++ compilation is unavailable, the app warns the user and falls back to R implementations so the workflow remains usable.
 
@@ -155,19 +151,20 @@ If C++ compilation is unavailable, the app warns the user and falls back to R im
 ### Local
 
 ```r
-shiny::runApp()
+MERIDIAN::run_app()
 ```
 
 ### shinyapps.io
 
 ```r
-rsconnect::deployApp()
+rsconnect::deployApp(appDir = system.file("app", package = "MERIDIAN"))
 ```
 
 ## Notes
 
 - If the app logo does not appear, hard refresh the browser (`Ctrl+F5`) to clear cached static assets.
-- The app serves static assets via `/assets/`, mapped from `www/`.
+- The app logo and stylesheet are bundled under `inst/app/www` and served via `/assets/`.
+- To test locally, use `devtools::load_all(); run_app()` or install the package and run `MERIDIAN::run_app()`. You no longer launch the app by clicking **Run App** on a root-level `app.R`.
 - Downloaded figures use a white background for PNG, PDF, SVG, and TIFF output.
 - The Report Registry is cleared when a new dataset is loaded, preventing stale report items from being exported with mismatched data.
 
@@ -177,7 +174,7 @@ rsconnect::deployApp()
 - **Visualization:** ggplot2, plotly, heatmaply, patchwork
 - **Data handling:** dplyr, tidyr, readr, readxl
 - **Statistical analysis:** metan, lme4, emmeans, SpATS
-- **Reports and export:** rmarkdown, knitr, kableExtra, openxlsx, svglite, Cairo
+- **Reports and export:** rmarkdown, knitr, kableExtra, openxlsx, svglite
 - **Performance integrations:** Rcpp
 
 ## Author
@@ -186,4 +183,4 @@ rsconnect::deployApp()
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE.md](LICENSE.md) for details.
