@@ -31,9 +31,33 @@ mod_spatial_ui <- function(id) {
       
       shiny::tags$hr(),
       shiny::tags$h6("Plot Options"),
+      shiny::selectInput(ns("plot_panel"), "Display",
+        choices = c(
+          "Raw data" = "raw",
+          "Fitted data" = "fitted",
+          "Residuals" = "residual",
+          "Fitted Spatial Trend" = "trend",
+          "Genotypic BLUEs / BLUPs" = "genotype"
+        ),
+        selected = "trend"
+      ),
       shiny::checkboxInput(ns("plot_annotated"), "Annotated Plot", value = FALSE),
       shiny::checkboxInput(ns("plot_missing"), "Depict Missing Data", value = FALSE),
       shiny::selectInput(ns("plot_spatrend"), "Spatial Trend Scale", choices = c("raw", "percentage"), selected = "raw"),
+      shiny::selectInput(ns("plot_col_direction"), "Column direction",
+        choices = c(
+          "Increasing left to right" = "left_to_right",
+          "Increasing right to left" = "right_to_left"
+        ),
+        selected = "left_to_right"
+      ),
+      shiny::selectInput(ns("plot_row_direction"), "Row direction",
+        choices = c(
+          "Increasing bottom to top" = "bottom_to_top",
+          "Increasing top to bottom" = "top_to_bottom"
+        ),
+        selected = "bottom_to_top"
+      ),
 
       shiny::actionButton(ns("run_spats"), "Fit SpATS (Single Env)", class = "btn-primary w-100 mb-2", icon = shiny::icon("play")),
       
@@ -136,7 +160,9 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       shiny::updateSelectInput(session, "env", choices = envs)
 
       candidates <- c(db$rep_col, db$block_col)
-      candidates <- candidates[!is.null(candidates) & candidates != ""]
+      excluded_terms <- c(db$gen_col, db$env_col, db$row_col, db$col_col, db$traits)
+      candidates <- unique(candidates[!is.na(candidates) & nzchar(candidates)])
+      candidates <- setdiff(candidates[candidates %in% names(db$data)], excluded_terms)
       
       shiny::updateSelectInput(session, "fixed_terms", choices = candidates)
       shiny::updateSelectInput(session, "random_terms", choices = candidates)
@@ -160,9 +186,24 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
 
     # ---- Helper: Fit SpATS model for a single dataset ----
     fit_spats <- function(env_data, trait, row_col, col_col, gen_col, fixed_terms, random_terms, nseg_row, nseg_col, gen_random) {
+      required_cols <- c(trait, row_col, col_col, gen_col)
+      missing_required <- setdiff(required_cols, names(env_data))
+      if (length(missing_required) > 0) {
+        stop("Missing required spatial analysis column(s): ", paste(missing_required, collapse = ", "), call. = FALSE)
+      }
+
       env_data[[row_col]] <- as.numeric(as.character(env_data[[row_col]]))
       env_data[[col_col]] <- as.numeric(as.character(env_data[[col_col]]))
       env_data[[gen_col]] <- as.factor(env_data[[gen_col]])
+      env_data <- env_data[!is.na(env_data[[row_col]]) & !is.na(env_data[[col_col]]) &
+        !is.na(env_data[[gen_col]]) & !is.na(env_data[[trait]]), , drop = FALSE]
+
+      if (nrow(env_data) == 0) {
+        stop("No complete observations remain for the selected trait, genotype, row, and column fields.", call. = FALSE)
+      }
+      if (nlevels(droplevels(env_data[[gen_col]])) < 2) {
+        stop("At least two genotype levels are required for SpATS spatial analysis.", call. = FALSE)
+      }
 
       qn <- function(x) paste0("`", x, "`")
       clean_terms <- function(x) unique(x[!is.na(x) & nzchar(x)])
@@ -172,6 +213,9 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
 
       fixed_terms <- fixed_terms_req[fixed_terms_req %in% names(env_data)]
       random_terms <- random_terms_req[random_terms_req %in% names(env_data)]
+      model_cols <- c(trait, row_col, col_col, gen_col)
+      fixed_terms <- setdiff(fixed_terms, model_cols)
+      random_terms <- setdiff(random_terms, model_cols)
 
       # Keep terms explicit for users: if duplicated across fixed/random, preserve in fixed.
       dropped_random_overlap <- intersect(random_terms, fixed_terms)
@@ -212,21 +256,14 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         }
       }
 
-      # Build fixed formulas (primary with intercept, retry without intercept if needed)
-      make_fixed_form <- function(use_intercept = TRUE) {
-        if (length(fixed_labels) == 0) {
-          return(stats::reformulate(termlabels = "1", response = qn(trait)))
-        }
-        rhs <- paste(unique(unname(fixed_labels)), collapse = " + ")
-        if (use_intercept) {
-          stats::as.formula(paste0(qn(trait), " ~ ", rhs))
-        } else {
-          stats::as.formula(paste0(qn(trait), " ~ 0 + ", rhs))
-        }
+      # SpATS receives the response separately; fixed terms must be one-sided.
+      make_fixed_form <- function(labels = fixed_labels) {
+        if (length(labels) == 0) return(NULL)
+        rhs <- paste(unique(unname(labels)), collapse = " + ")
+        stats::as.formula(paste0("~ ", rhs))
       }
 
-      fixed_form <- make_fixed_form(use_intercept = TRUE)
-      used_no_intercept <- FALSE
+      fixed_form <- make_fixed_form()
       dropped_fixed <- character(0)
 
       # Random terms
@@ -254,36 +291,33 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         )
       }
 
+      retry_without_confounded_fixed <- function(original_error) {
+        if (length(fixed_labels) == 0) stop(original_error)
+
+        for (term in names(fixed_labels)) {
+          trial_labels <- fixed_labels[setdiff(names(fixed_labels), term)]
+          trial <- tryCatch(run_spats_core(make_fixed_form(trial_labels)), error = identity)
+          if (!inherits(trial, "error")) {
+            dropped_fixed <<- unique(c(dropped_fixed, term))
+            return(trial)
+          }
+        }
+
+        trial <- tryCatch(run_spats_core(NULL), error = identity)
+        if (!inherits(trial, "error")) {
+          dropped_fixed <<- unique(c(dropped_fixed, names(fixed_labels)))
+          return(trial)
+        }
+
+        stop(original_error)
+      }
+
       mod <- tryCatch(
         run_spats_core(fixed_form),
         error = function(e1) {
           msg1 <- conditionMessage(e1)
           if (grepl("not of full rank", msg1, ignore.case = TRUE) && length(fixed_terms) > 0) {
-            used_no_intercept <<- TRUE
-            fixed_form_0 <- make_fixed_form(use_intercept = FALSE)
-
-            return(
-              tryCatch(
-                run_spats_core(fixed_form_0),
-                error = function(e2) {
-                  msg2 <- conditionMessage(e2)
-                  # Last-resort fallback only when structure is still singular
-                  if (grepl("not of full rank", msg2, ignore.case = TRUE) && length(fixed_terms) > 0) {
-                    mm <- tryCatch(stats::model.matrix(fixed_form_0, data = env_data), error = function(e) NULL)
-                    if (!is.null(mm)) {
-                      qr_mm <- qr(mm)
-                      keep_cols <- qr_mm$pivot[seq_len(qr_mm$rank)]
-                      col_names <- colnames(mm)[keep_cols]
-                      drop_names <- setdiff(colnames(mm), col_names)
-                      dropped_fixed <<- unique(c(dropped_fixed, drop_names))
-                    }
-                    fixed_final <- stats::reformulate(termlabels = "1", response = qn(trait))
-                    return(run_spats_core(fixed_final))
-                  }
-                  stop(e2)
-                }
-              )
-            )
+            return(retry_without_confounded_fixed(e1))
           }
           stop(e1)
         }
@@ -295,7 +329,6 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         used_fixed = unique(unname(fixed_labels)),
         used_random = random_terms,
         nested_rewrites = unique(nested_rewrites),
-        used_no_intercept = used_no_intercept,
         dropped_fixed = unique(dropped_fixed),
         dropped_random_overlap = unique(dropped_random_overlap)
       )
@@ -337,17 +370,10 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
               duration = 8
             )
           }
-          if (isTRUE(meta$used_no_intercept)) {
-            shiny::showNotification(
-              "Fixed-effect coding was switched to no-intercept parameterization to resolve linear dependencies while retaining selected terms.",
-              type = "message",
-              duration = 8
-            )
-          }
           if (!is.null(meta$dropped_fixed) && length(meta$dropped_fixed) > 0) {
             shiny::showNotification(
               paste0(
-                "Last-resort simplification applied (severe confounding in fixed effects). Dropped: ",
+                "Fixed-effect term(s) were removed because they were rank-confounded with the genotype/spatial model: ",
                 paste(meta$dropped_fixed, collapse = ", "),
                 "."
               ),
@@ -469,8 +495,29 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
           title       = "Variance Component Partition",
           showlegend  = FALSE,
           margin      = list(t = 40)
-        )
+      )
     })
+
+    get_genotype_predictions <- function(mod, gen_col) {
+      preds <- stats::predict(mod, which = gen_col)
+      stat_cols <- c("predicted.values", "standard.errors")
+      geno_col <- if (gen_col %in% names(preds)) {
+        gen_col
+      } else {
+        candidates <- setdiff(names(preds), stat_cols)
+        if (length(candidates) == 0) {
+          stop("SpATS predictions did not include a genotype identifier column.", call. = FALSE)
+        }
+        candidates[1]
+      }
+
+      data.frame(
+        Genotype = preds[[geno_col]],
+        Adjusted_Mean = preds$predicted.values,
+        SE = preds$standard.errors,
+        stringsAsFactors = FALSE
+      )
+    }
 
     # ---- Output: Single Env Adjusted Means ----
     adjusted_means <- shiny::reactive({
@@ -478,13 +525,13 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       req(mod)
       
       db <- data_result$data_bundle()
-      preds <- predict(mod, which = db$gen_col)
+      preds <- get_genotype_predictions(mod, db$gen_col)
       
       df <- data.frame(
-        Genotype = preds[[db$gen_col]],
+        Genotype = preds$Genotype,
         Environment = input$env,
-        Adjusted_Mean = round(preds$predicted.values, 4),
-        SE = round(preds$standard.errors, 4)
+        Adjusted_Mean = round(preds$Adjusted_Mean, 4),
+        SE = round(preds$SE, 4)
       )
       df
     })
@@ -561,12 +608,12 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
               )
             }
 
-            preds <- predict(mod, which = db$gen_col)
+            preds <- get_genotype_predictions(mod, db$gen_col)
             all_preds[[env_name]] <- data.frame(
-              Genotype = preds[[db$gen_col]],
+              Genotype = preds$Genotype,
               Environment = env_name,
-              Adjusted_Mean = preds$predicted.values,
-              SE = preds$standard.errors
+              Adjusted_Mean = preds$Adjusted_Mean,
+              SE = preds$SE
             )
           }
         }
@@ -735,7 +782,25 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       )
     }
 
-    build_spats_tile_map <- function(df, value_col, title, fill_label, divergent = FALSE) {
+    apply_field_direction <- function(p, col_direction = "left_to_right", row_direction = "bottom_to_top") {
+      if (identical(col_direction, "right_to_left")) {
+        p <- p + ggplot2::scale_x_reverse()
+      }
+      if (identical(row_direction, "top_to_bottom")) {
+        p <- p + ggplot2::scale_y_reverse()
+      }
+      p
+    }
+
+    build_empty_spats_map <- function(message) {
+      ggplot2::ggplot() +
+        ggplot2::annotate("text", x = 0, y = 0, label = message, size = 4) +
+        ggplot2::theme_void()
+    }
+
+    build_spats_tile_map <- function(df, value_col, title, fill_label, divergent = FALSE,
+                                     col_direction = "left_to_right",
+                                     row_direction = "bottom_to_top") {
       vals <- df[[value_col]]
       limit <- max(abs(vals), na.rm = TRUE)
       p <- ggplot2::ggplot(df, ggplot2::aes(x = Column, y = Row, fill = .data[[value_col]])) +
@@ -749,16 +814,19 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
           panel.grid = ggplot2::element_blank()
         )
       if (isTRUE(divergent) && is.finite(limit) && limit > 0) {
-        p + ggplot2::scale_fill_gradient2(
+        p <- p + ggplot2::scale_fill_gradient2(
           low = "#B71C1C", mid = "#FFF9C4", high = "#1B5E20",
           midpoint = 0, limits = c(-limit, limit), na.value = "grey90"
         )
       } else {
-        p + ggplot2::scale_fill_gradientn(colors = grDevices::topo.colors(100), na.value = "grey90")
+        p <- p + ggplot2::scale_fill_gradientn(colors = grDevices::topo.colors(100), na.value = "grey90")
       }
+      apply_field_direction(p, col_direction = col_direction, row_direction = row_direction)
     }
 
-    build_spats_surface_map <- function(df, title, fill_label, divergent = FALSE) {
+    build_spats_surface_map <- function(df, title, fill_label, divergent = FALSE,
+                                        col_direction = "left_to_right",
+                                        row_direction = "bottom_to_top") {
       vals <- df$Value
       limit <- max(abs(vals), na.rm = TRUE)
       p <- ggplot2::ggplot(df, ggplot2::aes(x = Column, y = Row, fill = Value)) +
@@ -772,54 +840,87 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
           panel.grid = ggplot2::element_blank()
         )
       if (isTRUE(divergent) && is.finite(limit) && limit > 0) {
-        p + ggplot2::scale_fill_gradient2(
+        p <- p + ggplot2::scale_fill_gradient2(
           low = "#B71C1C", mid = "#FFF9C4", high = "#1B5E20",
           midpoint = 0, limits = c(-limit, limit), na.value = "grey90"
         )
       } else {
-        p + ggplot2::scale_fill_gradientn(colors = grDevices::topo.colors(100), na.value = "grey90")
+        p <- p + ggplot2::scale_fill_gradientn(colors = grDevices::topo.colors(100), na.value = "grey90")
       }
+      apply_field_direction(p, col_direction = col_direction, row_direction = row_direction)
     }
 
     build_spats_trend_figure_gg <- function(mod, trait, env, spa_trend = "raw",
-                                            depict_missing = FALSE, annotated = FALSE) {
+                                            depict_missing = FALSE, annotated = FALSE,
+                                            panel = "trend",
+                                            col_direction = "left_to_right",
+                                            row_direction = "bottom_to_top") {
       field_grid <- build_spats_plot_grid(mod, depict_missing = depict_missing)
-      trend_df <- build_spats_trend_surface(mod, spa_trend = spa_trend)
       trend_label <- if (identical(spa_trend, "percentage")) "Spatial trend (%)" else "Spatial trend"
+      panel <- panel %||% "trend"
 
-      panels <- list(
-        build_spats_tile_map(field_grid, "Raw", "Raw data", "Raw"),
-        build_spats_tile_map(field_grid, "Fitted", "Fitted data", "Fitted"),
-        build_spats_tile_map(field_grid, "Residual", "Residuals", "Residual", divergent = TRUE),
-        build_spats_surface_map(trend_df, "Fitted Spatial Trend", trend_label,
-          divergent = identical(spa_trend, "percentage"))
-      )
-      if (any(!is.na(field_grid$Genotype))) {
-        panels <- c(panels, list(
-          build_spats_tile_map(
-            field_grid,
-            "Genotype",
-            if (isTRUE(mod$model$geno$as.random)) "Genotypic BLUPs" else "Genotypic BLUEs",
-            if (isTRUE(mod$model$geno$as.random)) "BLUP" else "BLUE"
+      p <- switch(panel,
+        raw = build_spats_tile_map(field_grid, "Raw", "Raw data", "Raw",
+          col_direction = col_direction, row_direction = row_direction),
+        fitted = build_spats_tile_map(field_grid, "Fitted", "Fitted data", "Fitted",
+          col_direction = col_direction, row_direction = row_direction),
+        residual = build_spats_tile_map(field_grid, "Residual", "Residuals", "Residual",
+          divergent = TRUE, col_direction = col_direction, row_direction = row_direction),
+        genotype = {
+          if (!any(!is.na(field_grid$Genotype))) {
+            build_empty_spats_map("Genotypic BLUEs / BLUPs are not available for this model.")
+          } else {
+            build_spats_tile_map(
+              field_grid,
+              "Genotype",
+              if (isTRUE(mod$model$geno$as.random)) "Genotypic BLUPs" else "Genotypic BLUEs",
+              if (isTRUE(mod$model$geno$as.random)) "BLUP" else "BLUE",
+              col_direction = col_direction,
+              row_direction = row_direction
+            )
+          }
+        },
+        trend = {
+          trend_df <- build_spats_trend_surface(mod, spa_trend = spa_trend)
+          build_spats_surface_map(
+            trend_df,
+            "Fitted Spatial Trend",
+            trend_label,
+            divergent = identical(spa_trend, "percentage"),
+            col_direction = col_direction,
+            row_direction = row_direction
           )
-        ))
-      }
+        },
+        {
+          trend_df <- build_spats_trend_surface(mod, spa_trend = spa_trend)
+          build_spats_surface_map(
+            trend_df,
+            "Fitted Spatial Trend",
+            trend_label,
+            divergent = identical(spa_trend, "percentage"),
+            col_direction = col_direction,
+            row_direction = row_direction
+          )
+        }
+      )
 
       subtitle <- if (isTRUE(annotated)) {
         paste0(
           "SpATS PSANOVA | n = ", mod$nobs,
           " | trend scale = ", spa_trend,
-          " | missing cells ", if (isTRUE(depict_missing)) "shown" else "hidden"
+          " | missing cells ", if (isTRUE(depict_missing)) "shown" else "hidden",
+          " | columns ", if (identical(col_direction, "right_to_left")) "right-to-left" else "left-to-right",
+          " | rows ", if (identical(row_direction, "top_to_bottom")) "top-to-bottom" else "bottom-to-top"
         )
       } else {
         NULL
       }
 
-      patchwork::wrap_plots(panels, ncol = if (length(panels) > 4) 3 else 2) +
-        patchwork::plot_annotation(
+      p +
+        ggplot2::labs(
           title = paste("Spatial Trend for", trait, "in", env),
           subtitle = subtitle
-        ) &
+        ) +
         ggplot2::theme(plot.margin = ggplot2::margin(6, 6, 6, 6))
     }
 
@@ -832,7 +933,10 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         env = input$env,
         spa_trend = input$plot_spatrend,
         depict_missing = input$plot_missing,
-        annotated = input$plot_annotated
+        annotated = input$plot_annotated,
+        panel = input$plot_panel,
+        col_direction = input$plot_col_direction,
+        row_direction = input$plot_row_direction
       )
     }, res = 96)
 
@@ -881,9 +985,12 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       trait <- shiny::isolate(input$trait)
       env <- shiny::isolate(input$env)
       plot_opts <- shiny::isolate(list(
+        panel = input$plot_panel,
         spa_trend = input$plot_spatrend,
         depict_missing = isTRUE(input$plot_missing),
-        annotated = isTRUE(input$plot_annotated)
+        annotated = isTRUE(input$plot_annotated),
+        col_direction = input$plot_col_direction,
+        row_direction = input$plot_row_direction
       ))
       register_spatial_plot(paste0("spatial_trend_", env), paste("SpATS spatial trend map -", env),
         function() {
@@ -895,15 +1002,21 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
             env = env,
             spa_trend = plot_opts$spa_trend,
             depict_missing = plot_opts$depict_missing,
-            annotated = plot_opts$annotated
+            annotated = plot_opts$annotated,
+            panel = plot_opts$panel,
+            col_direction = plot_opts$col_direction,
+            row_direction = plot_opts$row_direction
           )
         },
         list(
           plot_family = "spats_spatial_trend",
           environment = env,
+          panel = plot_opts$panel,
           spa_trend = plot_opts$spa_trend,
           depict_missing = plot_opts$depict_missing,
-          annotated = plot_opts$annotated
+          annotated = plot_opts$annotated,
+          col_direction = plot_opts$col_direction,
+          row_direction = plot_opts$row_direction
         )
       )
     })
