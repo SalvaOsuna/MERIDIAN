@@ -183,4 +183,4 @@ rsconnect::deployApp(appDir = system.file("app", package = "MERIDIAN"))
 
 ## License
 
-MIT License - see [LICENSE.md](LICENSE.md) for details.
+MIT License.

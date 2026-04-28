@@ -10,3 +10,4 @@
 ^Repository_structure\.txt$
 ^cran-comments\.md$
 ^CRAN-SUBMISSION$
+^run_app_dev\.R$

@@ -23,6 +23,7 @@ desktop.ini
 
 # Private data
 data/*.private.*
+run_app_dev.R
 
 # Session files
 .httr-oauth
