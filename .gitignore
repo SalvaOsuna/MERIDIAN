@@ -25,6 +25,7 @@ desktop.ini
 data/*.private.*
 run_app_dev.R
 Shiny_MET.Rproj
+CRAN-SUBMISSION
 
 # Session files
 .httr-oauth
