@@ -138,6 +138,25 @@ mod_data_upload_ui <- function(id) {
     ),
 
     # ---- Main Panel: Outputs ----
+    shiny::tags$section(
+      class = "meridian-dashboard-intro",
+      shiny::tags$div(
+        class = "meridian-intro-copy",
+        shiny::tags$span(class = "meridian-eyebrow", "Trial Overview"),
+        shiny::tags$h1("Plant phenotype workspace"),
+        shiny::tags$p(
+          "Load a MET dataset, map the experimental design, and move from raw trial records ",
+          "to trait summaries, field maps, stability models, and report-ready outputs."
+        ),
+        shiny::tags$div(
+          class = "meridian-chip-row",
+          shiny::tags$span(shiny::icon("seedling"), " Phenotype traits"),
+          shiny::tags$span(shiny::icon("map"), " Field layout"),
+          shiny::tags$span(shiny::icon("chart-line"), " Model outputs")
+        )
+      )
+    ),
+
     # Row 1: Value boxes
     bslib::layout_column_wrap(
       width = 1 / 4,

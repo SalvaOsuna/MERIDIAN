@@ -11,17 +11,15 @@ app_server <- function(input, output, session) {
 
   shiny::showModal(shiny::modalDialog(
     title = shiny::tags$div(
-      style = "display: flex; align-items: center; gap: 10px;",
+      class = "meridian-modal-title",
       shiny::tags$img(src = "assets/logo.png", height = "40px"),
-      shiny::tags$span("Welcome to MERIDIAN", style = "font-weight: 600;")
+      shiny::tags$span("Welcome to MERIDIAN")
     ),
     shiny::tags$div(
-      style = "text-align: center; padding: 1rem 0;",
+      class = "meridian-welcome",
       shiny::tags$p(
-        style = "font-size: 1rem; color: #555; margin-bottom: 1.5rem;",
-        "A comprehensive tool for analyzing Multi-Environment Trial data.",
-        shiny::tags$br(),
-        "Get started by uploading your own data or exploring with our example dataset."
+        "Analyze multi-environment trial data from upload to exploratory summaries, ",
+        "variance components, spatial trends, stability models, and reports."
       ),
       bslib::layout_column_wrap(
         width = 1 / 2,
@@ -29,18 +27,16 @@ app_server <- function(input, output, session) {
         shiny::actionButton(
           "btn_load_example",
           shiny::tags$span(shiny::icon("seedling"), " Load Example Data"),
-          class = "btn btn-success btn-lg w-100",
-          style = "padding: 1rem;"
+          class = "btn btn-success btn-lg w-100"
         ),
         shiny::actionButton(
           "btn_upload_own",
           shiny::tags$span(shiny::icon("upload"), " Upload My Data"),
-          class = "btn btn-outline-primary btn-lg w-100",
-          style = "padding: 1rem;"
+          class = "btn btn-outline-primary btn-lg w-100"
         )
       ),
       shiny::tags$p(
-        style = "font-size: 0.8rem; color: #999; margin-top: 1.5rem;",
+        class = "meridian-welcome-note",
         "Example: 20 genotypes x 5 environments x 3 reps (RCBD) with 4 traits"
       )
     ),
