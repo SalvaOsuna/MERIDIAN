@@ -30,20 +30,19 @@ plot_boxplots <- function(df, trait, group_col, color_col = NULL, show_points = 
       title = paste(trait, "by", group_col),
       fill  = color_col
     ) +
-    ggplot2::theme_minimal(base_size = 13) +
+    scale_fill_meridian_discrete() +
+    theme_meridian_nature() +
     ggplot2::theme(
       axis.text.x     = ggplot2::element_text(angle = 45, hjust = 1),
-      legend.position = "none",
-      plot.title       = ggplot2::element_text(face = "bold", size = 14)
-    ) +
-    ggplot2::scale_fill_viridis_d(option = "D", alpha = 0.8)
+      legend.position = "none"
+    )
 
   if (show_points) {
     p <- p + ggplot2::geom_jitter(
-      width = 0.2, alpha = 0.4, size = 1.5,
+      width = 0.2, alpha = 0.35, size = 0.9,
       ggplot2::aes(color = .data[[color_col]])
     ) +
-      ggplot2::scale_color_viridis_d(option = "D", alpha = 0.6)
+      scale_color_meridian_discrete()
   }
 
   p
@@ -61,7 +60,7 @@ plot_boxplots <- function(df, trait, group_col, color_col = NULL, show_points = 
 #' @return heatmaply object (htmlwidget)
 plot_ge_heatmap <- function(df, gen_col, env_col, trait,
                             cluster_rows = TRUE, cluster_cols = TRUE,
-                            palette = "RdYlGn") {
+                            palette = "meridian") {
   if (!requireNamespace("heatmaply", quietly = TRUE)) {
     stop("Interactive GxE heatmaps require the optional package 'heatmaply'.", call. = FALSE)
   }
@@ -72,7 +71,10 @@ plot_ge_heatmap <- function(df, gen_col, env_col, trait,
 
   # Resolve palette: convert all names to actual color vectors
   viridis_palettes <- c("viridis", "inferno", "plasma", "magma", "cividis")
-  if (tolower(palette) %in% viridis_palettes &&
+  if (tolower(palette) %in% c("meridian", "nature", "default")) {
+    pal <- meridian_nature_palette()
+    color_vec <- grDevices::colorRampPalette(c("#EEF3F7", "#A9CFE2", pal[["signal_blue"]], "#264653"))(256)
+  } else if (tolower(palette) %in% viridis_palettes &&
       requireNamespace("viridisLite", quietly = TRUE)) {
     color_vec <- viridisLite::viridis(256, option = substr(tolower(palette), 1, 1))
   } else if (requireNamespace("RColorBrewer", quietly = TRUE)) {
@@ -83,7 +85,8 @@ plot_ge_heatmap <- function(df, gen_col, env_col, trait,
     )
     color_vec <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(n_colors, palette))(256)
   } else {
-    color_vec <- grDevices::colorRampPalette(c("#c44e52", "#f8f9fa", "#2c7a51"))(256)
+    pal <- meridian_nature_palette()
+    color_vec <- grDevices::colorRampPalette(c(pal[["heat_low"]], pal[["heat_mid"]], pal[["heat_high"]]))(256)
   }
 
   heatmaply::heatmaply(
@@ -96,8 +99,8 @@ plot_ge_heatmap <- function(df, gen_col, env_col, trait,
     main         = plot_title,
     margins      = c(80, 120, 60, 20),
     label_names  = c("Genotype", "Environment", "Value"),
-    fontsize_row = 9,
-    fontsize_col = 10
+    fontsize_row = 8,
+    fontsize_col = 8
   )
 }
 
@@ -121,19 +124,19 @@ plot_env_correlation <- function(df, gen_col, env_col, trait, method = "pearson"
     z = cor_matrix,
     type   = "heatmap",
     colorscale = list(
-      list(0, "#c44e52"),
-      list(0.5, "#f8f9fa"),
-      list(1, "#2c7a51")
+      list(0, meridian_nature_color("heat_low")),
+      list(0.5, meridian_nature_color("heat_mid")),
+      list(1, meridian_nature_color("heat_high"))
     ),
     zmin = -1, zmax = 1,
     text = cor_matrix,
     hovertemplate = "Env1: %{y}<br>Env2: %{x}<br>r = %{z:.2f}<extra></extra>"
   ) |>
-    plotly::layout(
-      title  = paste("Environment Correlations:", trait, "(", method, ")"),
-      xaxis  = list(title = "", tickangle = -45),
-      yaxis  = list(title = "", autorange = "reversed"),
-      margin = list(l = 80, b = 80)
+    meridian_plotly_layout(
+      title = paste("Environment Correlations:", trait, "(", method, ")"),
+      xaxis = list(title = "", tickangle = -45),
+      yaxis = list(title = "", autorange = "reversed"),
+      margin = list(l = 80, r = 20, b = 80, t = 55)
     )
 }
 
@@ -167,7 +170,7 @@ plot_outlier_scatter <- function(df, trait, group_col, gen_col) {
     ) +
     ggplot2::scale_size_identity() +
     ggplot2::scale_color_manual(
-      values = c("FALSE" = "#2c7a51", "TRUE" = "#c44e52"),
+      values = c("FALSE" = meridian_nature_color("neutral_mid"), "TRUE" = meridian_nature_color("accent_red")),
       labels = c("Normal", "Outlier"),
       name   = "Status"
     ) +
@@ -176,10 +179,9 @@ plot_outlier_scatter <- function(df, trait, group_col, gen_col) {
       y     = trait,
       title = paste("Outlier Detection:", trait)
     ) +
-    ggplot2::theme_minimal(base_size = 13) +
+    theme_meridian_nature() +
     ggplot2::theme(
-      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
-      plot.title  = ggplot2::element_text(face = "bold", size = 14)
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)
     )
 
   p

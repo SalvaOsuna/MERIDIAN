@@ -213,13 +213,13 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
           ggplot2::aes(xmin = CI_lower, xmax = CI_upper),
           height = 0.15, color = "grey55"
         ) +
-        ggplot2::geom_point(color = "#2c7a51", size = 2.4) +
+        ggplot2::geom_point(color = meridian_nature_color("signal_blue"), size = 1.8) +
         ggplot2::labs(
           title = paste("BLUEs:", res$trait),
           x = res$trait,
           y = NULL
         ) +
-        ggplot2::theme_bw()
+        theme_meridian_nature()
     }
 
     build_blups_plot_gg <- function(res) {
@@ -231,13 +231,13 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
           ggplot2::aes(xmin = CI_lower, xmax = CI_upper),
           height = 0.15, color = "grey55"
         ) +
-        ggplot2::geom_point(color = "#d4a853", size = 2.4) +
+        ggplot2::geom_point(color = meridian_nature_color("accent_orange"), size = 1.8) +
         ggplot2::labs(
           title = paste("BLUPs:", res$trait),
           x = res$trait,
           y = NULL
         ) +
-        ggplot2::theme_bw()
+        theme_meridian_nature()
     }
 
     build_var_partition_gg <- function(res) {
@@ -245,12 +245,13 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
       vt <- vt[vt$Component != "Total", , drop = FALSE]
       ggplot2::ggplot(vt, ggplot2::aes(x = Component, y = Variance, fill = Component)) +
         ggplot2::geom_col(show.legend = FALSE, alpha = 0.85) +
+        scale_fill_meridian_discrete() +
         ggplot2::labs(
           title = paste("Variance Partition:", res$trait),
           x = NULL,
           y = "Variance"
         ) +
-        ggplot2::theme_bw() +
+        theme_meridian_nature() +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
     }
 
@@ -259,13 +260,14 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
       tbl <- tbl[tbl$Source != "Residuals", , drop = FALSE]
       ggplot2::ggplot(tbl, ggplot2::aes(x = Source, y = Pct_SS, fill = Source)) +
         ggplot2::geom_col(show.legend = FALSE, alpha = 0.85) +
-        ggplot2::geom_text(ggplot2::aes(label = paste0(Pct_SS, "%")), vjust = -0.3, size = 3) +
+        ggplot2::geom_text(ggplot2::aes(label = paste0(Pct_SS, "%")), vjust = -0.3, size = 2.1) +
+        scale_fill_meridian_discrete() +
         ggplot2::labs(
           title = paste("Partitioning of Sum of Squares (%):", res$trait),
           x = NULL,
           y = "% of Total SS"
         ) +
-        ggplot2::theme_bw() +
+        theme_meridian_nature() +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
     }
 
@@ -389,16 +391,16 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
       plotly::plot_ly(
         data = tbl, x = ~Source, y = ~Pct_SS,
         type = "bar",
-        marker = list(color = c("#2c7a51", "#5b9279", "#d4a853", "#8fbc8f")),
+        marker = list(color = meridian_nature_discrete(nrow(tbl))),
         text = ~paste0(Pct_SS, "%"),
         textposition = "auto",
         hovertemplate = "%{x}<br>%{y:.1f}% of total SS<extra></extra>"
       ) |>
-        plotly::layout(
-          title  = paste("Partitioning of Sum of Squares (%):", anova_results()$trait),
-          xaxis  = list(title = ""),
-          yaxis  = list(title = "% of Total SS"),
-          margin = list(b = 80)
+        meridian_plotly_layout(
+          title = paste("Partitioning of Sum of Squares (%):", anova_results()$trait),
+          xaxis = list(title = ""),
+          yaxis = list(title = "% of Total SS"),
+          margin = list(l = 70, r = 20, b = 80, t = 55)
         )
     })
 
@@ -451,14 +453,14 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
         labels = ~Component,
         values = ~Variance,
         type   = "pie",
-        marker = list(colors = c("#2c7a51", "#d4a853", "#8fbc8f", "#c44e52")),
+        marker = list(colors = meridian_nature_discrete(nrow(vt))),
         textinfo = "label+percent",
         hovertemplate = "%{label}<br>Var = %{value:.4f}<br>%{percent}<extra></extra>"
       ) |>
-        plotly::layout(
-          title       = paste("Variance Component Partition:", anova_results()$trait),
+        meridian_plotly_layout(
+          title = paste("Variance Component Partition:", anova_results()$trait),
           showlegend  = TRUE,
-          margin      = list(t = 40)
+          margin = list(l = 20, r = 20, b = 20, t = 55)
         )
     })
 
@@ -482,7 +484,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
 
       plotly::plot_ly(data = df, x = ~BLUE, y = ~Genotype, type = "scatter",
                       mode = "markers",
-                      marker = list(color = "#2c7a51", size = 8),
+                      marker = list(color = meridian_nature_color("signal_blue"), size = 7),
                       error_x = list(
                         type    = "data",
                         symmetric = FALSE,
@@ -491,10 +493,10 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
                         color = "#999"
                       ),
                       hovertemplate = "%{y}<br>BLUE = %{x:.3f}<extra></extra>") |>
-        plotly::layout(
-          title  = paste("BLUEs:", anova_results()$trait),
-          xaxis  = list(title = anova_results()$trait),
-          yaxis  = list(title = "", categoryorder = "trace"),
+        meridian_plotly_layout(
+          title = paste("BLUEs:", anova_results()$trait),
+          xaxis = list(title = anova_results()$trait),
+          yaxis = list(title = "", categoryorder = "trace"),
           margin = list(l = 100)
         )
     })
@@ -519,7 +521,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
 
       plotly::plot_ly(data = df, x = ~BLUP, y = ~Genotype, type = "scatter",
                       mode = "markers",
-                      marker = list(color = "#d4a853", size = 8),
+                      marker = list(color = meridian_nature_color("accent_orange"), size = 7),
                       error_x = list(
                         type    = "data",
                         symmetric = FALSE,
@@ -528,10 +530,10 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
                         color = "#999"
                       ),
                       hovertemplate = "%{y}<br>BLUP = %{x:.3f}<extra></extra>") |>
-        plotly::layout(
-          title  = paste("BLUPs:", anova_results()$trait),
-          xaxis  = list(title = anova_results()$trait),
-          yaxis  = list(title = "", categoryorder = "trace"),
+        meridian_plotly_layout(
+          title = paste("BLUPs:", anova_results()$trait),
+          xaxis = list(title = anova_results()$trait),
+          yaxis = list(title = "", categoryorder = "trace"),
           margin = list(l = 100)
         )
     })

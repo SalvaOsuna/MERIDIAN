@@ -497,7 +497,7 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
         error = function(e) {
           plot.new()
           text(0.5, 0.5, paste("Variance plot error:", e$message),
-               cex = 1.2, col = "#c44e52")
+               cex = 1.2, col = meridian_nature_color("accent_red"))
         }
       )
     }, res = 96)
@@ -623,20 +623,20 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
         y    = ~get(bi_col[1]),
         text = ~get(gen_col_name[1]),
         type = "scatter", mode = "markers+text",
-        marker   = list(color = "#2c7a51", size = 10),
+        marker   = list(color = meridian_nature_color("signal_blue"), size = 8),
         textposition = "top center",
         textfont = list(size = 9),
         hovertemplate = paste0(
           "%{text}<br>Mean = %{x:.2f}<br>bi = %{y:.3f}<extra></extra>"
         )
       ) |>
-        plotly::layout(
-          title  = paste("Eberhart-Russell:", stab_results()$trait),
-          xaxis  = list(title = "Mean"),
-          yaxis  = list(title = "Regression Coefficient (bi)"),
+        meridian_plotly_layout(
+          title = paste("Eberhart-Russell:", stab_results()$trait),
+          xaxis = list(title = "Mean"),
+          yaxis = list(title = "Regression Coefficient (bi)"),
           shapes = list(
             list(type = "line", y0 = 1, y1 = 1, x0 = 0, x1 = 1,
-                 xref = "paper", line = list(dash = "dash", color = "#c44e52"))
+                 xref = "paper", line = list(dash = "dash", color = meridian_nature_color("accent_red")))
           )
         )
     })
@@ -755,11 +755,11 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
         stop("Could not identify Eberhart-Russell plotting columns.")
       }
       ggplot2::ggplot(params, ggplot2::aes(x = .data[[mean_col]], y = .data[[bi_col]], label = .data[[gen_col_name]])) +
-        ggplot2::geom_point(color = "#2c7a51", size = 2.8) +
-        ggrepel::geom_text_repel(size = 3, max.overlaps = 20) +
-        ggplot2::geom_hline(yintercept = 1, linetype = "dashed", color = "#c44e52") +
+        ggplot2::geom_point(color = meridian_nature_color("signal_blue"), size = 1.8) +
+        ggrepel::geom_text_repel(size = 2.1, max.overlaps = 20) +
+        ggplot2::geom_hline(yintercept = 1, linetype = "dashed", color = meridian_nature_color("accent_red"), linewidth = 0.35) +
         ggplot2::labs(title = paste("Eberhart-Russell:", res$trait), x = "Mean", y = "Regression Coefficient (bi)") +
-        ggplot2::theme_bw()
+        theme_meridian_nature()
     }
 
     shiny::observeEvent(input$send_ammi1_report, {

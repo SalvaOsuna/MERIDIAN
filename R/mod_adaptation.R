@@ -166,10 +166,11 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
         text = ~paste("Winner:", Winning_Genotype, "<br>Mean:", round(MEAN, 3)),
         hovertemplate = "%{text}<extra></extra>"
       ) |>
-        plotly::layout(
+        meridian_plotly_layout(
           title = paste("Environments Grouped by Mega-Environment (", input$trait, ")", sep = ""),
           xaxis = list(title = "Environment"),
           yaxis = list(title = paste("Max Mean", input$trait)),
+          margin = list(l = 70, r = 20, b = 90, t = 55),
           barmode = "group"
         )
     })
@@ -227,7 +228,7 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
           hoverinfo = "skip",
           showlegend = FALSE
         ) |>
-        plotly::layout(
+        meridian_plotly_layout(
           title = paste("Reaction Norms (Finlay-Wilkinson) -", input$trait),
           xaxis = list(title = "Environmental Index"),
           yaxis = list(title = paste("Genotype Mean", input$trait))
@@ -241,13 +242,14 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
       if (is.null(df_stat)) stop("Mega-environment results are unavailable.")
       ggplot2::ggplot(df_stat, ggplot2::aes(x = ENV, y = MEAN, fill = MEGA_ENV)) +
         ggplot2::geom_col(alpha = 0.85) +
+        scale_fill_meridian_discrete() +
         ggplot2::labs(
           title = paste0("Environments Grouped by Mega-Environment (", trait, ")"),
           x = "Environment",
           y = paste("Max Mean", trait),
           fill = "Mega-env"
         ) +
-        ggplot2::theme_bw() +
+        theme_meridian_nature() +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
     }
 
@@ -264,13 +266,14 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
           alpha = 0.75,
           show.legend = dplyr::n_distinct(fw$fw_data[[gen_col]]) <= 25
         ) +
+        scale_color_meridian_discrete() +
         ggplot2::labs(
           title = paste("Reaction Norms (Finlay-Wilkinson) -", trait),
           x = "Environmental Index",
           y = paste("Genotype Mean", trait),
           color = "Genotype"
         ) +
-        ggplot2::theme_bw()
+        theme_meridian_nature()
     }
 
     register_adaptation_plot <- function(name, label, builder, metadata = list()) {
@@ -358,16 +361,16 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
       df_pca$Environment <- env_labels
       
       p <- ggplot2::ggplot(df_pca, ggplot2::aes(x = PC1, y = PC2, label = Environment)) +
-        ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
-        ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
-        ggplot2::geom_point(color = "#2c7a51", size = 3) +
-        ggrepel::geom_text_repel() +
+        ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = meridian_nature_color("neutral_mid"), linewidth = 0.35) +
+        ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = meridian_nature_color("neutral_mid"), linewidth = 0.35) +
+        ggplot2::geom_point(color = meridian_nature_color("signal_blue"), size = 1.8) +
+        ggrepel::geom_text_repel(size = 2.1, max.overlaps = 20) +
         ggplot2::labs(
           title = "Environmental PCA",
           x = paste0("PC1 (", round(summary(pca)$importance[2,1]*100, 1), "%)"),
           y = paste0("PC2 (", round(summary(pca)$importance[2,2]*100, 1), "%)")
         ) +
-        ggplot2::theme_minimal()
+        theme_meridian_nature()
       
       plotly::ggplotly(p)
     })
@@ -382,7 +385,7 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
       
       heatmaply::heatmaply_cor(
         cor_mat,
-        colors = heatmaply::cool_warm,
+        colors = grDevices::colorRampPalette(unname(meridian_nature_palette()[c("heat_low", "heat_mid", "heat_high")]))(256),
         main = "Covariate Correlation Heatmap",
         margins = c(50, 50, 50, 50)
       )
@@ -420,10 +423,10 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
           text = ~paste(Environment, "<br>Mean:", round(env_mean, 2)),
           hoverinfo = "text",
           color = ~env_mean,
-          colors = "YlOrRd",
+          colors = unname(meridian_nature_palette()[c("signal_blue", "accent_orange", "accent_red")]),
           size = ~env_mean,
           sizes = c(8, 20),
-          marker = list(line = list(width = 0.5, color = "gray40"))
+          marker = list(line = list(width = 0.5, color = meridian_nature_color("neutral_dark")))
         ) |>
         plotly::layout(
           title = "Geo-Spatial Trial Map",

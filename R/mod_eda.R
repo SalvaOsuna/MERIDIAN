@@ -63,7 +63,7 @@ mod_eda_ui <- function(id) {
           shiny::sliderInput(ns("dist_bins"), "Number of bins",
             min = 5, max = 100, value = 30, step = 1
           ),
-          colourpicker::colourInput(ns("dist_fill"), "Fill color", value = "#4CAF50"),
+          colourpicker::colourInput(ns("dist_fill"), "Fill color", value = meridian_nature_color("signal_blue")),
           shiny::sliderInput(ns("dist_alpha"), "Transparency (alpha)",
             min = 0.1, max = 1.0, value = 0.8, step = 0.05
           ),
@@ -128,9 +128,9 @@ mod_eda_ui <- function(id) {
           shiny::checkboxInput(ns("heat_cluster_rows"), LABELS$m2_cluster_rows, value = TRUE),
           shiny::checkboxInput(ns("heat_cluster_cols"), LABELS$m2_cluster_cols, value = TRUE),
           shiny::selectInput(ns("heat_palette"), LABELS$m2_color_palette,
-            choices = c("RdYlGn", "Viridis" = "viridis", "Inferno" = "inferno",
+            choices = c("MERIDIAN Nature" = "meridian", "Viridis" = "viridis", "Inferno" = "inferno",
                         "Plasma" = "plasma", "Blues" = "Blues", "YlOrRd"),
-            selected = "RdYlGn"
+            selected = "meridian"
           ),
           shiny::tags$hr(),
           shiny::actionButton(ns("send_heatmap_report"), "Send this plot to Reports",
@@ -335,7 +335,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
     output$boxplot <- plotly::renderPlotly({
       req(boxplot_obj())
       plotly::ggplotly(boxplot_obj(), tooltip = c("x", "y")) |>
-        plotly::layout(autosize = TRUE, margin = list(l = 70, r = 20, b = 100, t = 60)) |>
+        meridian_plotly_layout(margin = list(l = 70, r = 20, b = 100, t = 60)) |>
         plotly::config(responsive = TRUE)
     })
 
@@ -545,7 +545,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
           x = if (length(traits) == 1) traits else "Trait value",
           y = "Count"
         ) +
-        ggplot2::theme_bw(base_size = 12)
+        theme_meridian_nature()
 
       if (isTRUE(show_mean)) {
         p <- p +
@@ -554,8 +554,8 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
             ggplot2::aes(xintercept = env_mean),
             stat = "identity",
             linetype = "dashed",
-            color = "#1565C0",
-            linewidth = 0.8
+            color = meridian_nature_color("signal_blue"),
+            linewidth = 0.35
           )
       }
 
@@ -591,7 +591,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
               data = density_data,
               ggplot2::aes(x = trait_value, y = count),
               inherit.aes = FALSE,
-              color = "#B71C1C",
+              color = meridian_nature_color("accent_red"),
               linewidth = normal_linewidth
             )
         }
@@ -708,9 +708,9 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       names(plot_df) <- c("Genotype", "Environment", "Value")
       ggplot2::ggplot(plot_df, ggplot2::aes(x = Environment, y = Genotype, fill = Value)) +
         ggplot2::geom_tile(color = "white", linewidth = 0.2) +
-        ggplot2::scale_fill_viridis_c(option = "D", na.value = "grey90") +
+        scale_fill_meridian_sequential(na.value = "grey90") +
         ggplot2::labs(title = paste0("GxE Means: ", trait), x = "Environment", y = "Genotype", fill = trait) +
-        ggplot2::theme_bw(base_size = 12) +
+        theme_meridian_nature() +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
     }
 
@@ -728,7 +728,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
             palette      = input$heat_palette
           )
         ) |>
-          plotly::layout(autosize = TRUE, margin = list(l = 120, r = 30, b = 100, t = 80)) |>
+          meridian_plotly_layout(margin = list(l = 120, r = 30, b = 100, t = 80)) |>
           plotly::config(responsive = TRUE)
       }, error = function(e) {
         shiny::showNotification(
@@ -770,11 +770,10 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       names(plot_df) <- c("Env1", "Env2", "Correlation")
       ggplot2::ggplot(plot_df, ggplot2::aes(x = Env2, y = Env1, fill = Correlation)) +
         ggplot2::geom_tile(color = "white", linewidth = 0.2) +
-        ggplot2::geom_text(ggplot2::aes(label = sprintf("%.2f", Correlation)), size = 3) +
-        ggplot2::scale_fill_gradient2(low = "#c44e52", mid = "#f8f9fa", high = "#2c7a51",
-          midpoint = 0, limits = c(-1, 1), name = "r") +
+        ggplot2::geom_text(ggplot2::aes(label = sprintf("%.2f", Correlation)), size = 1.8) +
+        scale_fill_meridian_diverging(midpoint = 0, limits = c(-1, 1), name = "r") +
         ggplot2::labs(title = paste("Environment Correlations:", trait, "(", method, ")"), x = NULL, y = NULL) +
-        ggplot2::theme_bw(base_size = 12) +
+        theme_meridian_nature() +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
     }
 
@@ -833,7 +832,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         gen_col   = db()$gen_col
       )
       plotly::ggplotly(p, tooltip = "text") |>
-        plotly::layout(autosize = TRUE, margin = list(l = 70, r = 20, b = 100, t = 60)) |>
+        meridian_plotly_layout(margin = list(l = 70, r = 20, b = 100, t = 60)) |>
         plotly::config(responsive = TRUE)
     })
 

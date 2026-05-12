@@ -4,16 +4,16 @@
 
 default_plot_cfg <- function() {
   list(
-    theme_name = "theme_bw",
-    font_family = "sans",
-    base_size = 12,
-    axis_title_size = 12,
-    axis_text_size = 10,
-    legend_title_size = 10,
-    legend_text_size = 9,
-    plot_title_size = 14,
-    caption_size = 9,
-    label_size = 3.5,
+    theme_name = "theme_nature",
+    font_family = "Arial",
+    base_size = 6.5,
+    axis_title_size = 6.5,
+    axis_text_size = 6,
+    legend_title_size = 6.2,
+    legend_text_size = 5.8,
+    plot_title_size = 7,
+    caption_size = 5.8,
+    label_size = 2.1,
     label_face = "plain",
     label_color = "#222222",
     max_overlaps = 30,
@@ -24,15 +24,15 @@ default_plot_cfg <- function() {
     use_repel = TRUE,
     show_labels = TRUE,
     exclude_labels = character(0),
-    geno_color = "#1f77b4",
-    env_color = "#d62728",
-    pos_fill = "#1B5E20",
-    neg_fill = "#B71C1C",
-    point_size = 2.8,
+    geno_color = meridian_nature_color("signal_blue"),
+    env_color = meridian_nature_color("accent_orange"),
+    pos_fill = meridian_nature_color("heat_high"),
+    neg_fill = meridian_nature_color("heat_low"),
+    point_size = 1.8,
     point_alpha = 0.9,
     line_width = 0.8,
     arrow_size = 0.2,
-    show_grid_major = TRUE,
+    show_grid_major = FALSE,
     show_grid_minor = FALSE,
     show_legend = TRUE,
     legend_position = "right",
@@ -49,7 +49,8 @@ parse_label_exclusions <- function(x) {
 
 base_theme_from_name <- function(name, base_size = 12, base_family = "sans") {
   switch(
-    name %||% "theme_bw",
+    name %||% "theme_nature",
+    "theme_nature" = theme_meridian_nature(base_size = base_size, base_family = base_family),
     "theme_bw" = ggplot2::theme_bw(base_size = base_size, base_family = base_family),
     "theme_classic" = ggplot2::theme_classic(base_size = base_size, base_family = base_family),
     "theme_minimal" = ggplot2::theme_minimal(base_size = base_size, base_family = base_family),
@@ -61,7 +62,7 @@ base_theme_from_name <- function(name, base_size = 12, base_family = "sans") {
         ggplot2::theme_minimal(base_size = base_size, base_family = base_family)
       }
     },
-    ggplot2::theme_bw(base_size = base_size, base_family = base_family)
+    theme_meridian_nature(base_size = base_size, base_family = base_family)
   )
 }
 
@@ -75,7 +76,7 @@ apply_common_theme_controls <- function(p, cfg) {
       legend.title = ggplot2::element_text(size = cfg$legend_title_size, family = cfg$font_family),
       legend.text = ggplot2::element_text(size = cfg$legend_text_size, family = cfg$font_family),
       plot.caption = ggplot2::element_text(size = cfg$caption_size, family = cfg$font_family),
-      panel.grid.major = if (isTRUE(cfg$show_grid_major)) ggplot2::element_line() else ggplot2::element_blank(),
+      panel.grid.major = if (isTRUE(cfg$show_grid_major)) ggplot2::element_line(linewidth = 0.2, colour = meridian_nature_color("neutral_light")) else ggplot2::element_blank(),
       panel.grid.minor = if (isTRUE(cfg$show_grid_minor)) ggplot2::element_line() else ggplot2::element_blank(),
       legend.position = if (isTRUE(cfg$show_legend)) cfg$legend_position else "none",
       plot.title = if (isTRUE(cfg$show_plot_title)) ggplot2::element_text(size = cfg$plot_title_size, family = cfg$font_family, face = "bold") else ggplot2::element_blank(),
@@ -180,8 +181,13 @@ save_ggplot_by_format <- function(plot_obj, file, format, width, height, dpi) {
     ggplot2::ggsave(file, plot = plot_obj, width = width, height = height,
       device = svglite::svglite, bg = "white")
   } else if (fmt == "TIFF") {
-    ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi,
-      device = "tiff", compression = "lzw", bg = "white")
+    if (requireNamespace("ragg", quietly = TRUE)) {
+      ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi,
+        device = ragg::agg_tiff, compression = "lzw", bg = "white")
+    } else {
+      ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi,
+        device = "tiff", compression = "lzw", bg = "white")
+    }
   } else {
     ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi, device = "png", bg = "white")
   }
@@ -288,7 +294,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
       df <- ammi$interaction_long
       p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = GEN, fill = interaction)) +
         ggplot2::geom_tile(color = "white", linewidth = 0.2) +
-        ggplot2::scale_fill_gradient2(low = cfg$neg_fill, mid = "white", high = cfg$pos_fill, midpoint = 0) +
+        scale_fill_meridian_diverging(low = cfg$neg_fill, high = cfg$pos_fill, midpoint = 0) +
         ggplot2::labs(title = paste0("GxE Interaction Heatmap - ", trait), x = "Environment", y = "Genotype")
       apply_common_theme_controls(p, cfg)
     })
@@ -313,7 +319,8 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
         ggplot2::geom_point(size = cfg$point_size, alpha = cfg$point_alpha) +
         ggplot2::geom_abline(data = slopes, ggplot2::aes(intercept = intercept, slope = slope, color = .data[[gen_col]]),
           linewidth = cfg$line_width, alpha = 0.8, show.legend = FALSE) +
-        ggplot2::labs(title = paste0("Reaction Norms - ", trait), x = "Environmental Index", y = paste0("Mean ", trait))
+        ggplot2::labs(title = paste0("Reaction Norms - ", trait), x = "Environmental Index", y = paste0("Mean ", trait)) +
+        scale_color_meridian_discrete()
       apply_common_theme_controls(p, cfg)
     })
   }
@@ -325,7 +332,8 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
       df <- adapt_res$mega_env$env_strat
       p <- ggplot2::ggplot(df, ggplot2::aes(x = ENV, y = MEAN, fill = MEGA_ENV)) +
         ggplot2::geom_col(alpha = cfg$point_alpha) +
-        ggplot2::labs(title = paste0("Mega-Environments - ", trait), x = "Environment", y = "Winning Mean")
+        ggplot2::labs(title = paste0("Mega-Environments - ", trait), x = "Environment", y = "Winning Mean") +
+        scale_fill_meridian_discrete()
       apply_common_theme_controls(p, cfg)
     })
   }
@@ -356,6 +364,7 @@ create_plot_library <- function(db, anova_res = NULL, stab_res = NULL, adapt_res
         ggplot2::geom_boxplot(alpha = cfg$point_alpha, outlier.shape = NA) +
         ggplot2::geom_jitter(width = 0.15, size = cfg$point_size * 0.5, alpha = cfg$point_alpha * 0.6) +
         ggplot2::labs(title = paste0("EDA Boxplot - ", trait), x = "Environment", y = trait) +
+        scale_fill_meridian_discrete() +
         ggplot2::theme(legend.position = "none")
       apply_common_theme_controls(p, cfg)
     })

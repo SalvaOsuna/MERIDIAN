@@ -488,13 +488,14 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         labels = ~Component,
         values = ~Variance,
         type   = "pie",
+        marker = list(colors = meridian_nature_discrete(nrow(df))),
         textinfo = "label+percent",
         hovertemplate = "%{label}<br>Var = %{value:.4f}<br>%{percent}%<extra></extra>"
       ) |>
-        plotly::layout(
-          title       = "Variance Component Partition",
+        meridian_plotly_layout(
+          title = "Variance Component Partition",
           showlegend  = FALSE,
-          margin      = list(t = 40)
+          margin = list(l = 20, r = 20, b = 20, t = 55)
       )
     })
 
@@ -678,13 +679,14 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
     build_spats_var_plot_gg <- function(df, trait) {
       ggplot2::ggplot(df, ggplot2::aes(x = Component, y = Pct, fill = Component)) +
         ggplot2::geom_col(show.legend = FALSE, alpha = 0.85) +
-        ggplot2::geom_text(ggplot2::aes(label = paste0(Pct, "%")), vjust = -0.3, size = 3) +
+        ggplot2::geom_text(ggplot2::aes(label = paste0(Pct, "%")), vjust = -0.3, size = 2.1) +
+        scale_fill_meridian_discrete() +
         ggplot2::labs(
           title = paste("SpATS Variance Partition:", trait),
           x = NULL,
           y = "% of Total Variance"
         ) +
-        ggplot2::theme_bw() +
+        theme_meridian_nature() +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
     }
 
@@ -807,19 +809,17 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         ggplot2::geom_tile() +
         ggplot2::coord_equal(expand = FALSE) +
         ggplot2::labs(title = title, x = "Column", y = "Row", fill = fill_label) +
-        ggplot2::theme_bw(base_size = 10) +
+        theme_meridian_nature_map() +
         ggplot2::theme(
-          plot.title = ggplot2::element_text(face = "bold", size = 11),
           legend.position = "right",
           panel.grid = ggplot2::element_blank()
         )
       if (isTRUE(divergent) && is.finite(limit) && limit > 0) {
-        p <- p + ggplot2::scale_fill_gradient2(
-          low = "#B71C1C", mid = "#FFF9C4", high = "#1B5E20",
+        p <- p + scale_fill_meridian_diverging(
           midpoint = 0, limits = c(-limit, limit), na.value = "grey90"
         )
       } else {
-        p <- p + ggplot2::scale_fill_gradientn(colors = grDevices::topo.colors(100), na.value = "grey90")
+        p <- p + scale_fill_meridian_sequential(na.value = "grey90")
       }
       apply_field_direction(p, col_direction = col_direction, row_direction = row_direction)
     }
@@ -833,19 +833,17 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         ggplot2::geom_raster(interpolate = TRUE) +
         ggplot2::coord_equal(expand = FALSE) +
         ggplot2::labs(title = title, x = "Column", y = "Row", fill = fill_label) +
-        ggplot2::theme_bw(base_size = 10) +
+        theme_meridian_nature_map() +
         ggplot2::theme(
-          plot.title = ggplot2::element_text(face = "bold", size = 11),
           legend.position = "right",
           panel.grid = ggplot2::element_blank()
         )
       if (isTRUE(divergent) && is.finite(limit) && limit > 0) {
-        p <- p + ggplot2::scale_fill_gradient2(
-          low = "#B71C1C", mid = "#FFF9C4", high = "#1B5E20",
+        p <- p + scale_fill_meridian_diverging(
           midpoint = 0, limits = c(-limit, limit), na.value = "grey90"
         )
       } else {
-        p <- p + ggplot2::scale_fill_gradientn(colors = grDevices::topo.colors(100), na.value = "grey90")
+        p <- p + scale_fill_meridian_sequential(na.value = "grey90")
       }
       apply_field_direction(p, col_direction = col_direction, row_direction = row_direction)
     }

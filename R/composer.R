@@ -83,7 +83,7 @@ compose_patchwork_figure <- function(plot_list, selected_ids, cfg) {
     ) &
       ggplot2::theme(
         plot.tag = ggplot2::element_text(
-          size = cfg$label_size %||% 12,
+          size = cfg$label_size %||% 8,
           face = cfg$label_face %||% "bold",
           colour = cfg$label_color %||% "#111111"
         ),
@@ -114,15 +114,17 @@ compose_patchwork_figure <- function(plot_list, selected_ids, cfg) {
 
   if (isTRUE(cfg$shared_theme)) {
     shared_theme <- switch(
-      cfg$shared_theme_name %||% "theme_minimal",
-      "theme_bw" = ggplot2::theme_bw(base_family = cfg$shared_font_family %||% "serif",
-                                     base_size = cfg$shared_base_size %||% 11),
-      "theme_classic" = ggplot2::theme_classic(base_family = cfg$shared_font_family %||% "serif",
-                                               base_size = cfg$shared_base_size %||% 11),
-      "theme_void" = ggplot2::theme_void(base_family = cfg$shared_font_family %||% "serif",
-                                         base_size = cfg$shared_base_size %||% 11),
-      ggplot2::theme_minimal(base_family = cfg$shared_font_family %||% "serif",
-                             base_size = cfg$shared_base_size %||% 11)
+      cfg$shared_theme_name %||% "theme_nature",
+      "theme_nature" = theme_meridian_nature(base_family = cfg$shared_font_family %||% "Arial",
+                                             base_size = cfg$shared_base_size %||% 6.5),
+      "theme_bw" = ggplot2::theme_bw(base_family = cfg$shared_font_family %||% "Arial",
+                                     base_size = cfg$shared_base_size %||% 6.5),
+      "theme_classic" = ggplot2::theme_classic(base_family = cfg$shared_font_family %||% "Arial",
+                                               base_size = cfg$shared_base_size %||% 6.5),
+      "theme_void" = ggplot2::theme_void(base_family = cfg$shared_font_family %||% "Arial",
+                                         base_size = cfg$shared_base_size %||% 6.5),
+      theme_meridian_nature(base_family = cfg$shared_font_family %||% "Arial",
+                            base_size = cfg$shared_base_size %||% 6.5)
     )
     composed <- composed &
       shared_theme &

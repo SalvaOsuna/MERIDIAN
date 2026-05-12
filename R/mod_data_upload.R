@@ -700,7 +700,7 @@ mod_data_upload_server <- function(id) {
       trait <- db$traits[1]
       p <- plot_boxplots(db$data, trait, db$env_col, db$env_col, show_points = TRUE)
       plotly::ggplotly(p, tooltip = c("x", "y")) |>
-        plotly::layout(
+        meridian_plotly_layout(
           margin = list(b = 80),
           legend = list(orientation = "h", y = -0.2)
         )
