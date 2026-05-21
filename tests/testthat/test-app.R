@@ -123,3 +123,19 @@ test_that("calculate_enviromic_indices supports growth-stage partitioning", {
   expect_equal(indices$TotalRainfall_Late, 1.00) # 1 + 0
   expect_equal(indices$MeanTemp_Late, 25.00) # (26 + 24) / 2
 })
+
+test_that("read_met_file correctly handles CSV files", {
+  tmp_csv <- tempfile(fileext = ".csv")
+  write.csv(data.frame(A = 1:3, B = 4:6), tmp_csv, row.names = FALSE)
+  
+  df_csv <- read_met_file(tmp_csv)
+  expect_equal(nrow(df_csv), 3)
+  expect_equal(names(df_csv), c("A", "B"))
+  unlink(tmp_csv)
+})
+
+test_that("read_met_file on Excel files behaves gracefully", {
+  # When readxl is available, a nonexistent file should throw a file-not-found error,
+  # not a missing package error.
+  expect_error(read_met_file("nonexistent.xlsx"), "does not exist")
+})

@@ -34,7 +34,8 @@ Imports:
     SpATS,
     rlang,
     Rcpp,
-    nasapower
+    nasapower,
+    readxl
 LinkingTo:
     Rcpp
 Suggests:
@@ -47,7 +48,6 @@ Suggests:
     patchwork,
     ragg,
     RColorBrewer,
-    readxl,
     rmarkdown,
     heatmaply,
     shinytest2,

@@ -288,17 +288,35 @@ mod_data_upload_server <- function(id) {
     raw_data <- shiny::reactive({
       # Check for uploaded file or example data flag
       if (!is.null(input$file_upload)) {
-        read_met_file(
-          path   = input$file_upload$datapath,
-          sep    = input$csv_sep,
-          header = input$header
-        )
+        tryCatch({
+          read_met_file(
+            path   = input$file_upload$datapath,
+            sep    = input$csv_sep,
+            header = input$header
+          )
+        }, error = function(e) {
+          shiny::showNotification(
+            paste("Error reading phenotypic data file:", e$message),
+            type = "error",
+            duration = 10
+          )
+          NULL
+        })
       } else if (isTRUE(example_loaded())) {
-        read_met_file(
-          path   = app_sys("extdata", "example_phenotypic.csv"),
-          sep    = ",",
-          header = TRUE
-        )
+        tryCatch({
+          read_met_file(
+            path   = app_sys("extdata", "example_phenotypic.csv"),
+            sep    = ",",
+            header = TRUE
+          )
+        }, error = function(e) {
+          shiny::showNotification(
+            paste("Error reading example phenotypic data:", e$message),
+            type = "error",
+            duration = 10
+          )
+          NULL
+        })
       } else {
         NULL
       }
@@ -307,17 +325,35 @@ mod_data_upload_server <- function(id) {
     # ---- Reactive: Raw environmental data ----
     raw_env_data <- shiny::reactive({
       if (!is.null(input$file_env_upload)) {
-        read_met_file(
-          path   = input$file_env_upload$datapath,
-          sep    = input$csv_sep_env,
-          header = input$header
-        )
+        tryCatch({
+          read_met_file(
+            path   = input$file_env_upload$datapath,
+            sep    = input$csv_sep_env,
+            header = input$header
+          )
+        }, error = function(e) {
+          shiny::showNotification(
+            paste("Error reading environmental data file:", e$message),
+            type = "error",
+            duration = 10
+          )
+          NULL
+        })
       } else if (isTRUE(example_loaded())) {
-        read_met_file(
-          path   = app_sys("extdata", "example_envdata.csv"),
-          sep    = ",",
-          header = TRUE
-        )
+        tryCatch({
+          read_met_file(
+            path   = app_sys("extdata", "example_envdata.csv"),
+            sep    = ",",
+            header = TRUE
+          )
+        }, error = function(e) {
+          shiny::showNotification(
+            paste("Error reading example environmental data:", e$message),
+            type = "error",
+            duration = 10
+          )
+          NULL
+        })
       } else {
         NULL
       }
