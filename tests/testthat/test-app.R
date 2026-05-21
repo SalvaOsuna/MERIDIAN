@@ -139,3 +139,19 @@ test_that("read_met_file on Excel files behaves gracefully", {
   # not a missing package error.
   expect_error(read_met_file("nonexistent.xlsx"), "does not exist")
 })
+
+test_that("validate_environmental_data handles missing HarvestDate values gracefully", {
+  df <- data.frame(
+    Environment = c("E1", "E2"),
+    Latitude = c(52.1, 52.2),
+    Longitude = c(-106.6, -106.7),
+    PlantingDate = c("2025-05-10", "2025-05-12"),
+    HarvestDate = c("2025-09-10", NA),
+    stringsAsFactors = FALSE
+  )
+  
+  res <- validate_environmental_data(df)
+  expect_true(res$valid)
+  expect_equal(length(res$errors), 0)
+  expect_true(any(grepl("missing HarvestDate", res$warnings)))
+})

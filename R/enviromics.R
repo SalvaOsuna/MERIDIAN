@@ -418,8 +418,33 @@ process_environmental_covariates <- function(env_data, dtf_means = NULL, dtm_mea
   p_dates <- parse_date_robustly(env_data[[pdate_col]])
   h_dates <- parse_date_robustly(env_data[[hdate_col]])
   
-  if (any(is.na(p_dates)) || any(is.na(h_dates))) {
-    stop("Could not parse PlantingDate or HarvestDate. Please ensure they are valid dates (e.g. YYYY-MM-DD).", call. = FALSE)
+  if (any(is.na(p_dates))) {
+    stop("Could not parse PlantingDate. Please ensure all environments have a valid PlantingDate (e.g. YYYY-MM-DD).", call. = FALSE)
+  }
+  
+  # Dynamic imputation for missing HarvestDates
+  if (any(is.na(h_dates))) {
+    valid_idx <- !is.na(h_dates) & !is.na(p_dates)
+    mean_dur <- 120
+    if (sum(valid_idx) > 0) {
+      durations <- as.numeric(h_dates[valid_idx] - p_dates[valid_idx])
+      valid_durs <- durations[durations >= 30 & durations <= 200]
+      if (length(valid_durs) > 0) {
+        mean_dur <- round(mean(valid_durs))
+      } else {
+        mean_dur <- round(mean(durations))
+        if (mean_dur < 30 || mean_dur > 200) mean_dur <- 120
+      }
+    }
+    
+    missing_idx <- which(is.na(h_dates))
+    for (idx in missing_idx) {
+      h_dates[idx] <- p_dates[idx] + mean_dur
+    }
+  }
+  
+  if (any(is.na(h_dates))) {
+    stop("Could not parse HarvestDate. Please ensure they are valid dates (e.g. YYYY-MM-DD).", call. = FALSE)
   }
   
   indices_list <- list()

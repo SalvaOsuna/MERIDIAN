@@ -916,8 +916,29 @@ validate_environmental_data <- function(env_df) {
     if (is.null(p_dates) || any(is.na(p_dates))) {
       errors <- c(errors, "PlantingDate column has invalid or unparseable dates.")
     }
-    if (is.null(h_dates) || any(is.na(h_dates))) {
+    if (is.null(h_dates)) {
       errors <- c(errors, "HarvestDate column has invalid or unparseable dates.")
+    } else if (any(is.na(h_dates))) {
+      # Some are NA! Calculate mean duration from valid ones
+      valid_idx <- !is.na(h_dates) & !is.na(p_dates)
+      mean_dur <- 120
+      if (sum(valid_idx) > 0) {
+        durations <- as.numeric(h_dates[valid_idx] - p_dates[valid_idx])
+        valid_durs <- durations[durations >= 30 & durations <= 200]
+        if (length(valid_durs) > 0) {
+          mean_dur <- round(mean(valid_durs))
+        } else {
+          mean_dur <- round(mean(durations))
+          if (mean_dur < 30 || mean_dur > 200) mean_dur <- 120
+        }
+      }
+      
+      missing_envs <- env_df[[env_col]][is.na(h_dates)]
+      warnings <- c(warnings, sprintf(
+        "Some environments (%s) have missing HarvestDate values. They will be dynamically estimated using a crop cycle of %d days from planting.", 
+        paste(missing_envs, collapse = ", "), 
+        mean_dur
+      ))
     }
     
     if (!is.null(p_dates) && !is.null(h_dates) && any(!is.na(p_dates)) && any(!is.na(h_dates))) {
