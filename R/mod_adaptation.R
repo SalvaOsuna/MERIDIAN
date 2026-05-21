@@ -315,38 +315,88 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
     
     output$enviromics_ui <- shiny::renderUI({
       res <- adapt_results()
-      if (is.null(res)) return(shiny::p("Run analysis first."))
+      if (is.null(res)) return(shiny::p("Run analysis first.", style = "padding: 20px; font-weight: bold;"))
       
       if (!res$has_env) {
         return(
           shiny::div(
-            class = "alert alert-warning",
+            class = "alert alert-warning m-3",
             shiny::icon("exclamation-triangle"), 
             " No environmental covariates loaded. Please upload environmental data in the Data Upload tab to use these features."
           )
         )
       }
       
-      bslib::layout_column_wrap(
-        width = 1/2,
-        fill = FALSE,
-        bslib::card(
-          bslib::card_header("Environmental Typology (PCA)"),
-          full_screen = TRUE,
-          style = "min-height: 400px;",
-          plotly::plotlyOutput(ns("plot_env_pca"))
+      bslib::navset_card_tab(
+        title = "Enviromics Analytics",
+        full_screen = TRUE,
+        bslib::nav_panel(
+          title = shiny::tagList(shiny::icon("chart-bar"), "Environmental Characterization"),
+          bslib::layout_column_wrap(
+            width = 1/2,
+            fill = FALSE,
+            bslib::card(
+              bslib::card_header("Environmental Typology (PCA)"),
+              full_screen = TRUE,
+              style = "min-height: 400px;",
+              plotly::plotlyOutput(ns("plot_env_pca"))
+            ),
+            bslib::card(
+              bslib::card_header("Covariate-Phenotype Correlations"),
+              full_screen = TRUE,
+              style = "min-height: 400px;",
+              plotly::plotlyOutput(ns("plot_env_cor"))
+            ),
+            bslib::card(
+              bslib::card_header("Geo-Spatial Map"),
+              full_screen = TRUE,
+              style = "min-height: 400px;",
+              plotly::plotlyOutput(ns("plot_env_map"))
+            )
+          )
         ),
-        bslib::card(
-          bslib::card_header("Covariate-Phenotype Correlations"),
-          full_screen = TRUE,
-          style = "min-height: 400px;",
-          plotly::plotlyOutput(ns("plot_env_cor"))
-        ),
-        bslib::card(
-          bslib::card_header("Geo-Spatial Map"),
-          full_screen = TRUE,
-          style = "min-height: 400px;",
-          plotly::plotlyOutput(ns("plot_env_map"))
+        bslib::nav_panel(
+          title = shiny::tagList(shiny::icon("temperature-high"), "Climatic Drivers of Traits"),
+          shiny::div(
+            class = "container-fluid mt-3",
+            bslib::layout_column_wrap(
+              width = 1,
+              fill = FALSE,
+              bslib::card(
+                bslib::card_body(
+                  shiny::selectInput(
+                    ns("climatic_covariate"),
+                    "Select Climatic Covariate/Index",
+                    choices = NULL
+                  )
+                )
+              )
+            ),
+            bslib::layout_column_wrap(
+              width = 1/2,
+              fill = FALSE,
+              bslib::card(
+                bslib::card_header("Trait Response to Climatic Covariate"),
+                shiny::div(class = "px-3 pt-2",
+                  shiny::actionButton(ns("send_climatic_driver_report"), "Send this plot to Reports",
+                    icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+                ),
+                full_screen = TRUE,
+                style = "min-height: 400px;",
+                plotly::plotlyOutput(ns("plot_climatic_driver"))
+              ),
+              bslib::card(
+                bslib::card_header("Climatic Covariate Importance (Pearson Correlation)"),
+                shiny::div(class = "px-3 pt-2",
+                  shiny::actionButton(ns("send_climatic_importance_report"), "Send this plot to Reports",
+                    icon = shiny::icon("paper-plane"), class = "btn-success btn-sm w-100")
+                ),
+                full_screen = TRUE,
+                style = "min-height: 400px;",
+                plotly::plotlyOutput(ns("plot_climatic_importance"))
+              )
+            )
+          )
         )
       )
     })
@@ -377,18 +427,52 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
     
     output$plot_env_cor <- plotly::renderPlotly({
       req(adapt_results()$env_cor)
-      if (!requireNamespace("heatmaply", quietly = TRUE)) {
-        return(plotly::plotly_empty() |>
-          plotly::layout(title = "Covariate heatmaps require the optional package 'heatmaply'."))
-      }
       cor_mat <- adapt_results()$env_cor$cor_mat
+      color_vec <- grDevices::colorRampPalette(unname(meridian_nature_palette()[c("heat_low", "heat_mid", "heat_high")]))(256)
       
-      heatmaply::heatmaply_cor(
-        cor_mat,
-        colors = grDevices::colorRampPalette(unname(meridian_nature_palette()[c("heat_low", "heat_mid", "heat_high")]))(256),
-        main = "Covariate Correlation Heatmap",
-        margins = c(50, 50, 50, 50)
-      )
+      if (requireNamespace("heatmaply", quietly = TRUE)) {
+        heatmaply::heatmaply_cor(
+          cor_mat,
+          colors = color_vec,
+          main = "Covariate Correlation Heatmap",
+          margins = c(50, 50, 50, 50)
+        )
+      } else {
+        row_order <- seq_len(nrow(cor_mat))
+        col_order <- seq_len(ncol(cor_mat))
+        
+        if (nrow(cor_mat) > 1) {
+          row_order <- tryCatch({
+            d_mat <- cor_mat
+            d_mat[is.na(d_mat)] <- 0
+            stats::hclust(stats::as.dist(1 - d_mat))$order
+          }, error = function(e) seq_len(nrow(cor_mat)))
+          col_order <- row_order
+        }
+        
+        cor_mat_clustered <- cor_mat[row_order, col_order, drop = FALSE]
+        
+        n_colors <- length(color_vec)
+        colorscale_plotly <- lapply(seq_along(color_vec), function(i) {
+          list((i - 1) / (n_colors - 1), color_vec[i])
+        })
+        
+        plotly::plot_ly(
+          x = colnames(cor_mat_clustered),
+          y = rownames(cor_mat_clustered),
+          z = cor_mat_clustered,
+          type = "heatmap",
+          colorscale = colorscale_plotly,
+          zmin = -1, zmax = 1,
+          hovertemplate = "Var1: %{y}<br>Var2: %{x}<br>Correlation: %{z:.2f}<extra></extra>"
+        ) |>
+          meridian_plotly_layout(
+            title = "Covariate Correlation Heatmap",
+            xaxis = list(title = "", tickangle = -45),
+            yaxis = list(title = "", autorange = "reversed"),
+            margin = list(l = 100, r = 30, b = 100, t = 80)
+          )
+      }
     })
     
     output$plot_env_map <- plotly::renderPlotly({
@@ -404,7 +488,7 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
       if (is.na(lat_col) || is.na(lon_col)) {
         return(plotly::plotly_empty() |> plotly::layout(title = "Latitude and Longitude columns not found"))
       }
-
+      
       map_df <- merged |>
         dplyr::transmute(
           Environment = as.character(.data[[env_col_name]]),
@@ -413,11 +497,11 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
           env_mean = as.numeric(env_mean)
         ) |>
         dplyr::filter(!is.na(Latitude), !is.na(Longitude), !is.na(env_mean))
-
+      
       if (nrow(map_df) == 0) {
         return(plotly::plotly_empty() |> plotly::layout(title = "No valid coordinates available for mapping"))
       }
-
+      
       plotly::plot_geo(map_df, lat = ~Latitude, lon = ~Longitude) |>
         plotly::add_markers(
           text = ~paste(Environment, "<br>Mean:", round(env_mean, 2)),
@@ -438,6 +522,320 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
           )
         )
     })
+    
+    # ---- Dynamic Covariate Selection Observer ----
+    shiny::observeEvent(db()$env_data, {
+      env_df <- db()$env_data
+      req(env_df)
+      col_names <- names(env_df)
+      env_col <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+      lat_col <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
+      lon_col <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
+      
+      exclude_cols <- c(env_col, lat_col, lon_col, "PlantingDate", "HarvestDate")
+      num_cols <- names(env_df)[sapply(env_df, is.numeric)]
+      covariate_choices <- setdiff(num_cols, exclude_cols)
+      
+      shiny::updateSelectInput(
+        session,
+        "climatic_covariate",
+        choices = covariate_choices,
+        selected = if ("MeanTemp_C" %in% covariate_choices) "MeanTemp_C" else covariate_choices[1]
+      )
+    })
+    
+    # ---- Trait-Environment Mean Reactive ----
+    env_means_trait <- shiny::reactive({
+      req(db(), input$trait)
+      df <- db()$data
+      env_col <- db()$env_col
+      trait <- input$trait
+      
+      df_std <- df[!is.na(df[[trait]]), ]
+      env_f <- as.factor(df_std[[env_col]])
+      y <- as.numeric(df_std[[trait]])
+      
+      means <- tapply(y, env_f, mean, na.rm = TRUE)
+      data.frame(
+        Environment = names(means),
+        Trait_Mean = as.numeric(means),
+        stringsAsFactors = FALSE
+      )
+    })
+    
+    merged_climatic_data <- shiny::reactive({
+      req(db()$env_data, env_means_trait())
+      env_df <- db()$env_data
+      trait_means <- env_means_trait()
+      
+      col_names <- names(env_df)
+      env_col <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+      
+      # Ensure column names are standardized for merge
+      names(trait_means)[1] <- env_col
+      
+      # Merge
+      dplyr::inner_join(env_df, trait_means, by = env_col)
+    })
+    
+    # ---- Climatic Drivers Plots ----
+    output$plot_climatic_driver <- plotly::renderPlotly({
+      req(merged_climatic_data(), input$climatic_covariate, input$trait)
+      df_merged <- merged_climatic_data()
+      covariate <- input$climatic_covariate
+      trait <- input$trait
+      
+      # Select env column
+      col_names <- names(df_merged)
+      env_col <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+      
+      x_vals <- as.numeric(df_merged[[covariate]])
+      y_vals <- as.numeric(df_merged$Trait_Mean)
+      envs <- as.character(df_merged[[env_col]])
+      
+      valid_idx <- !is.na(x_vals) & !is.na(y_vals)
+      x_vals <- x_vals[valid_idx]
+      y_vals <- y_vals[valid_idx]
+      envs <- envs[valid_idx]
+      
+      if (length(x_vals) < 3) {
+        return(plotly::plotly_empty() |> plotly::layout(title = "Insufficient data points for regression"))
+      }
+      
+      # Fit linear regression model
+      fit <- lm(y_vals ~ x_vals)
+      fit_sum <- summary(fit)
+      
+      r_coef <- cor(x_vals, y_vals, use = "complete.obs")
+      r2 <- fit_sum$r.squared
+      p_val <- if (nrow(fit_sum$coefficients) > 1) fit_sum$coefficients[2, 4] else NA
+      
+      # Generate regression line grid
+      grid_x <- seq(min(x_vals), max(x_vals), length.out = 100)
+      pred_y <- predict(fit, newdata = data.frame(x_vals = grid_x))
+      
+      # Formatting statistics string
+      p_val_str <- if (is.na(p_val)) "N/A" else if (p_val < 0.001) "< 0.001" else sprintf("%.3f", p_val)
+      stats_annotation <- sprintf(
+        "r = %.3f<br>R² = %.3f<br>p-value = %s",
+        r_coef, r2, p_val_str
+      )
+      
+      # Plotly
+      plotly::plot_ly() |>
+        plotly::add_trace(
+          x = x_vals,
+          y = y_vals,
+          type = "scatter",
+          mode = "markers",
+          marker = list(
+            size = 10,
+            color = meridian_nature_color("signal_blue"),
+            line = list(width = 1, color = "white")
+          ),
+          text = envs,
+          hovertemplate = "Environment: %{text}<br>Covariate: %{x:.2f}<br>Trait Mean: %{y:.2f}<extra></extra>",
+          name = "Observed Mean"
+        ) |>
+        plotly::add_trace(
+          x = grid_x,
+          y = pred_y,
+          type = "scatter",
+          mode = "lines",
+          line = list(
+            color = meridian_nature_color("accent_red"),
+            width = 2
+          ),
+          hoverinfo = "skip",
+          name = "Linear Fit"
+        ) |>
+        meridian_plotly_layout(
+          title = paste("Trait Mean (", trait, ") vs ", covariate, sep = ""),
+          xaxis = list(title = covariate),
+          yaxis = list(title = paste("Environment Mean (", trait, ")", sep = ""))
+        ) |>
+        plotly::layout(
+          annotations = list(
+            list(
+              x = 0.05,
+              y = 0.95,
+              xref = "paper",
+              yref = "paper",
+              text = stats_annotation,
+              showarrow = FALSE,
+              align = "left",
+              bgcolor = "rgba(255, 255, 255, 0.85)",
+              bordercolor = "#ddd",
+              borderwidth = 1,
+              borderpad = 6,
+              font = list(size = 11, family = "Outfit, sans-serif")
+            )
+          )
+        )
+    })
+    
+    output$plot_climatic_importance <- plotly::renderPlotly({
+      req(merged_climatic_data(), input$trait)
+      df_merged <- merged_climatic_data()
+      trait <- input$trait
+      
+      # Select all covariate columns (numeric and not lat/lon/dates)
+      col_names <- names(df_merged)
+      env_col <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+      lat_col <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
+      lon_col <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
+      
+      exclude_cols <- c(env_col, lat_col, lon_col, "PlantingDate", "HarvestDate", "Trait_Mean")
+      num_cols <- names(df_merged)[sapply(df_merged, is.numeric)]
+      covariates <- setdiff(num_cols, exclude_cols)
+      
+      if (length(covariates) == 0) {
+        return(plotly::plotly_empty() |> plotly::layout(title = "No covariates available for correlation analysis"))
+      }
+      
+      # Calculate Pearson correlations
+      cor_results <- sapply(covariates, function(cov) {
+        cor(as.numeric(df_merged[[cov]]), as.numeric(df_merged$Trait_Mean), use = "complete.obs")
+      })
+      
+      importance_df <- data.frame(
+        Covariate = names(cor_results),
+        Correlation = as.numeric(cor_results),
+        stringsAsFactors = FALSE
+      )
+      
+      importance_df <- importance_df[order(importance_df$Correlation), ]
+      importance_df$Covariate <- factor(importance_df$Covariate, levels = importance_df$Covariate)
+      
+      # Select colors dynamically: positive = emerald green, negative = coral/orange
+      importance_df$Color <- ifelse(
+        importance_df$Correlation >= 0,
+        meridian_nature_color("signal_blue"),
+        meridian_nature_color("accent_orange")
+      )
+      
+      plotly::plot_ly(
+        data = importance_df,
+        y = ~Covariate,
+        x = ~Correlation,
+        type = "bar",
+        orientation = "h",
+        marker = list(
+          color = ~Color,
+          line = list(width = 0.5, color = "white")
+        ),
+        hovertemplate = "Covariate: %{y}<br>Pearson r: %{x:.3f}<extra></extra>"
+      ) |>
+        meridian_plotly_layout(
+          title = paste("Climatic Driver Influence on ", trait, sep = ""),
+          xaxis = list(title = "Pearson Correlation Coefficient (r)", range = c(-1.1, 1.1)),
+          yaxis = list(title = "")
+        )
+    })
+    
+    # ---- Report Exporting Handlers ----
+    build_climatic_driver_gg <- function(res, current_db, trait, covariate) {
+      req(current_db$env_data, trait, covariate)
+      df <- current_db$data
+      env_col <- current_db$env_col
+      df_std <- df[!is.na(df[[trait]]), ]
+      means <- tapply(df_std[[trait]], df_std[[env_col]], mean, na.rm = TRUE)
+      
+      trait_means <- data.frame(
+        Environment = names(means),
+        Trait_Mean = as.numeric(means),
+        stringsAsFactors = FALSE
+      )
+      names(trait_means)[1] <- env_col
+      
+      df_merged <- dplyr::inner_join(current_db$env_data, trait_means, by = env_col)
+      
+      x_vals <- as.numeric(df_merged[[covariate]])
+      y_vals <- as.numeric(df_merged$Trait_Mean)
+      
+      ggplot2::ggplot(df_merged, ggplot2::aes(x = .data[[covariate]], y = Trait_Mean)) +
+        ggplot2::geom_point(color = meridian_nature_color("signal_blue"), size = 3, alpha = 0.8) +
+        ggplot2::geom_smooth(method = "lm", formula = y ~ x, color = meridian_nature_color("accent_red"), se = TRUE, fill = "gray90", alpha = 0.5) +
+        ggplot2::labs(
+          title = paste0("Trait Mean (", trait, ") vs ", covariate),
+          x = covariate,
+          y = paste("Environment Mean (", trait, ")", sep = "")
+        ) +
+        theme_meridian_nature()
+    }
+    
+    build_climatic_importance_gg <- function(res, current_db, trait) {
+      req(current_db$env_data, trait)
+      df <- current_db$data
+      env_col <- current_db$env_col
+      df_std <- df[!is.na(df[[trait]]), ]
+      means <- tapply(df_std[[trait]], df_std[[env_col]], mean, na.rm = TRUE)
+      
+      trait_means <- data.frame(
+        Environment = names(means),
+        Trait_Mean = as.numeric(means),
+        stringsAsFactors = FALSE
+      )
+      names(trait_means)[1] <- env_col
+      
+      df_merged <- dplyr::inner_join(current_db$env_data, trait_means, by = env_col)
+      
+      col_names <- names(df_merged)
+      lat_col <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
+      lon_col <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
+      
+      exclude_cols <- c(env_col, lat_col, lon_col, "PlantingDate", "HarvestDate", "Trait_Mean")
+      num_cols <- names(df_merged)[sapply(df_merged, is.numeric)]
+      covariates <- setdiff(num_cols, exclude_cols)
+      
+      cor_results <- sapply(covariates, function(cov) {
+        cor(as.numeric(df_merged[[cov]]), as.numeric(df_merged$Trait_Mean), use = "complete.obs")
+      })
+      
+      importance_df <- data.frame(
+        Covariate = names(cor_results),
+        Correlation = as.numeric(cor_results),
+        stringsAsFactors = FALSE
+      )
+      
+      importance_df <- importance_df[order(importance_df$Correlation), ]
+      importance_df$Covariate <- factor(importance_df$Covariate, levels = importance_df$Covariate)
+      
+      ggplot2::ggplot(importance_df, ggplot2::aes(y = Covariate, x = Correlation, fill = Correlation >= 0)) +
+        ggplot2::geom_col(width = 0.7, alpha = 0.85) +
+        ggplot2::scale_fill_manual(
+          values = c("TRUE" = meridian_nature_color("signal_blue"), "FALSE" = meridian_nature_color("accent_orange")),
+          guide = "none"
+        ) +
+        ggplot2::labs(
+          title = paste("Climatic Driver Influence on", trait),
+          x = "Pearson Correlation Coefficient (r)",
+          y = ""
+        ) +
+        ggplot2::xlim(-1.1, 1.1) +
+        theme_meridian_nature()
+    }
+    
+    shiny::observeEvent(input$send_climatic_driver_report, {
+      covariate <- input$climatic_covariate
+      req(covariate)
+      register_adaptation_plot(
+        paste0("climatic_driver_", covariate), 
+        paste0("Climatic driver plot (", covariate, ")"),
+        function(res, current_db, trait) build_climatic_driver_gg(res, current_db, trait, covariate),
+        list(plot_family = "climatic_driver", climatic_covariate = covariate)
+      )
+    })
+    
+    shiny::observeEvent(input$send_climatic_importance_report, {
+      register_adaptation_plot(
+        "climatic_importance", 
+        "Climatic driver importance plot",
+        function(res, current_db, trait) build_climatic_importance_gg(res, current_db, trait),
+        list(plot_family = "climatic_importance")
+      )
+    })
+    
     return(list(
       adapt_results = adapt_results
     ))

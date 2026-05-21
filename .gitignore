@@ -35,3 +35,4 @@ CRAN-SUBMISSION
 inst/doc
 src/*.dll
 src/*.o
+src/*.so

@@ -57,16 +57,11 @@ plot_boxplots <- function(df, trait, group_col, color_col = NULL, show_points = 
 #' @param cluster_rows Logical
 #' @param cluster_cols Logical
 #' @param palette Color palette name for heatmaply
-#' @return heatmaply object (htmlwidget)
+#' @return heatmaply object (htmlwidget) or plotly object
 plot_ge_heatmap <- function(df, gen_col, env_col, trait,
                             cluster_rows = TRUE, cluster_cols = TRUE,
                             palette = "meridian") {
-  if (!requireNamespace("heatmaply", quietly = TRUE)) {
-    stop("Interactive GxE heatmaps require the optional package 'heatmaply'.", call. = FALSE)
-  }
-
   ge_matrix <- pivot_ge_means(df, gen_col, env_col, trait)
-
   plot_title <- paste0("GxE Means: ", trait)
 
   # Resolve palette: convert all names to actual color vectors
@@ -89,54 +84,59 @@ plot_ge_heatmap <- function(df, gen_col, env_col, trait,
     color_vec <- grDevices::colorRampPalette(c(pal[["heat_low"]], pal[["heat_mid"]], pal[["heat_high"]]))(256)
   }
 
-  heatmaply::heatmaply(
-    ge_matrix,
-    Rowv         = cluster_rows,
-    Colv         = cluster_cols,
-    colors       = color_vec,
-    xlab         = "Environment",
-    ylab         = "Genotype",
-    main         = plot_title,
-    margins      = c(80, 120, 60, 20),
-    label_names  = c("Genotype", "Environment", "Value"),
-    fontsize_row = 8,
-    fontsize_col = 8
-  )
-}
+  if (requireNamespace("heatmaply", quietly = TRUE)) {
+    return(heatmaply::heatmaply(
+      ge_matrix,
+      colors = color_vec,
+      Rowv = cluster_rows,
+      Colv = cluster_cols,
+      main = plot_title,
+      margins = c(80, 120, 50, 50),
+      label_names = c("Genotype", "Environment", "Value")
+    ))
+  }
 
+  # Fallback to plotly if heatmaply is not installed
+  mat <- as.matrix(ge_matrix)
+  row_order <- seq_len(nrow(mat))
+  col_order <- seq_len(ncol(mat))
 
-#' Create an environment correlation matrix plot
-#' @param df Data frame
-#' @param gen_col Genotype column
-#' @param env_col Environment column
-#' @param trait Trait column
-#' @param method Correlation method: "pearson", "spearman", or "kendall"
-#' @return plotly object
-plot_env_correlation <- function(df, gen_col, env_col, trait, method = "pearson") {
-  ge_matrix <- pivot_ge_means(df, gen_col, env_col, trait)
-  cor_matrix <- cor(ge_matrix, use = "pairwise.complete.obs", method = method)
-  cor_matrix <- round(cor_matrix, 2)
+  if (isTRUE(cluster_rows) && nrow(mat) > 1) {
+    row_order <- tryCatch({
+      dist_mat <- mat
+      dist_mat[is.na(dist_mat)] <- mean(dist_mat, na.rm = TRUE)
+      stats::hclust(stats::dist(dist_mat))$order
+    }, error = function(e) seq_len(nrow(mat)))
+  }
 
-  # Create plotly heatmap
+  if (isTRUE(cluster_cols) && ncol(mat) > 1) {
+    col_order <- tryCatch({
+      dist_mat <- mat
+      dist_mat[is.na(dist_mat)] <- mean(dist_mat, na.rm = TRUE)
+      stats::hclust(stats::dist(t(dist_mat)))$order
+    }, error = function(e) seq_len(ncol(mat)))
+  }
+
+  mat_clustered <- mat[row_order, col_order, drop = FALSE]
+
+  n_colors <- length(color_vec)
+  colorscale_plotly <- lapply(seq_along(color_vec), function(i) {
+    list((i - 1) / (n_colors - 1), color_vec[i])
+  })
+
   plotly::plot_ly(
-    x = colnames(cor_matrix),
-    y = rownames(cor_matrix),
-    z = cor_matrix,
-    type   = "heatmap",
-    colorscale = list(
-      list(0, meridian_nature_color("heat_low")),
-      list(0.5, meridian_nature_color("heat_mid")),
-      list(1, meridian_nature_color("heat_high"))
-    ),
-    zmin = -1, zmax = 1,
-    text = cor_matrix,
-    hovertemplate = "Env1: %{y}<br>Env2: %{x}<br>r = %{z:.2f}<extra></extra>"
+    x = colnames(mat_clustered),
+    y = rownames(mat_clustered),
+    z = mat_clustered,
+    type = "heatmap",
+    colorscale = colorscale_plotly,
+    hovertemplate = "Genotype: %{y}<br>Environment: %{x}<br>Value: %{z:.2f}<extra></extra>"
   ) |>
     meridian_plotly_layout(
-      title = paste("Environment Correlations:", trait, "(", method, ")"),
-      xaxis = list(title = "", tickangle = -45),
-      yaxis = list(title = "", autorange = "reversed"),
-      margin = list(l = 80, r = 20, b = 80, t = 55)
+      title = plot_title,
+      xaxis = list(title = "Environment", tickangle = -45),
+      yaxis = list(title = "Genotype", autorange = "reversed"),
+      margin = list(l = 120, r = 30, b = 100, t = 80)
     )
 }
 

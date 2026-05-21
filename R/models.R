@@ -234,13 +234,30 @@ compute_blues <- function(df, gen_col, env_col, rep_col, trait) {
   emm <- emmeans::emmeans(model, specs = gen_col)
   emm_df <- as.data.frame(emm)
 
+  # Safely extract confidence limits depending on df type (finite vs asymptotic)
+  lower_val <- if (!is.null(emm_df$lower.CL)) {
+    emm_df$lower.CL
+  } else if (!is.null(emm_df$asymp.LCL)) {
+    emm_df$asymp.LCL
+  } else {
+    emm_df$emmean - 1.96 * emm_df$SE
+  }
+
+  upper_val <- if (!is.null(emm_df$upper.CL)) {
+    emm_df$upper.CL
+  } else if (!is.null(emm_df$asymp.UCL)) {
+    emm_df$asymp.UCL
+  } else {
+    emm_df$emmean + 1.96 * emm_df$SE
+  }
+
   # Rename columns for clarity
   result <- data.frame(
     Genotype  = emm_df[[1]],
     BLUE      = round(emm_df$emmean, 3),
     SE        = round(emm_df$SE, 3),
-    CI_lower  = round(emm_df$lower.CL, 3),
-    CI_upper  = round(emm_df$upper.CL, 3),
+    CI_lower  = round(lower_val, 3),
+    CI_upper  = round(upper_val, 3),
     stringsAsFactors = FALSE
   )
 

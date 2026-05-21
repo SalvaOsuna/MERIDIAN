@@ -11,7 +11,6 @@ Description: An interactive Shiny application for comprehensive analysis of
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 Depends:
     R (>= 4.3.0)
 Imports:
@@ -34,7 +33,8 @@ Imports:
     emmeans,
     SpATS,
     rlang,
-    Rcpp
+    Rcpp,
+    nasapower
 LinkingTo:
     Rcpp
 Suggests:
@@ -60,3 +60,4 @@ Suggests:
     devtools
 Config/testthat/edition: 3
 NeedsCompilation: yes
+Config/roxygen2/version: 8.0.0

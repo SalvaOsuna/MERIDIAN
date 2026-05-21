@@ -11,7 +11,7 @@ plot_ge_heatmap(
   trait,
   cluster_rows = TRUE,
   cluster_cols = TRUE,
-  palette = "RdYlGn"
+  palette = "meridian"
 )
 }
 \arguments{
@@ -30,7 +30,7 @@ plot_ge_heatmap(
 \item{palette}{Color palette name for heatmaply}
 }
 \value{
-heatmaply object (htmlwidget)
+heatmaply object (htmlwidget) or plotly object
 }
 \description{
 Create a genotype × environment heatmap of means

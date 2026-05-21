@@ -44,6 +44,13 @@ mod_spatial_ui <- function(id) {
       shiny::checkboxInput(ns("plot_annotated"), "Annotated Plot", value = FALSE),
       shiny::checkboxInput(ns("plot_missing"), "Depict Missing Data", value = FALSE),
       shiny::selectInput(ns("plot_spatrend"), "Spatial Trend Scale", choices = c("raw", "percentage"), selected = "raw"),
+      shiny::selectInput(ns("plot_x_axis"), "X-axis Mapping",
+        choices = c(
+          "Column" = "Column",
+          "Row" = "Row"
+        ),
+        selected = "Column"
+      ),
       shiny::selectInput(ns("plot_col_direction"), "Column direction",
         choices = c(
           "Increasing left to right" = "left_to_right",
@@ -79,7 +86,7 @@ mod_spatial_ui <- function(id) {
           shiny::actionButton(ns("send_spats_trend_report"), "Send this plot to Reports",
             icon = shiny::icon("paper-plane"), class = "btn-success btn-sm mb-3"),
           shinycssloaders::withSpinner(
-            shiny::plotOutput(ns("spats_plot"), height = "700px"),
+            shiny::plotOutput(ns("spats_plot"), height = "500px"),
             type = 6, color = "#2c7a51"
           )
         )
@@ -784,12 +791,21 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       )
     }
 
-    apply_field_direction <- function(p, col_direction = "left_to_right", row_direction = "bottom_to_top") {
-      if (identical(col_direction, "right_to_left")) {
-        p <- p + ggplot2::scale_x_reverse()
-      }
-      if (identical(row_direction, "top_to_bottom")) {
-        p <- p + ggplot2::scale_y_reverse()
+    apply_field_direction <- function(p, col_direction = "left_to_right", row_direction = "bottom_to_top", x_axis = "Column") {
+      if (identical(x_axis, "Row")) {
+        if (identical(row_direction, "top_to_bottom")) {
+          p <- p + ggplot2::scale_x_reverse()
+        }
+        if (identical(col_direction, "right_to_left")) {
+          p <- p + ggplot2::scale_y_reverse()
+        }
+      } else {
+        if (identical(col_direction, "right_to_left")) {
+          p <- p + ggplot2::scale_x_reverse()
+        }
+        if (identical(row_direction, "top_to_bottom")) {
+          p <- p + ggplot2::scale_y_reverse()
+        }
       }
       p
     }
@@ -802,13 +818,27 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
 
     build_spats_tile_map <- function(df, value_col, title, fill_label, divergent = FALSE,
                                      col_direction = "left_to_right",
-                                     row_direction = "bottom_to_top") {
+                                     row_direction = "bottom_to_top",
+                                     x_axis = "Column") {
       vals <- df[[value_col]]
       limit <- max(abs(vals), na.rm = TRUE)
-      p <- ggplot2::ggplot(df, ggplot2::aes(x = Column, y = Row, fill = .data[[value_col]])) +
+
+      if (identical(x_axis, "Row")) {
+        x_aes <- "Row"
+        y_aes <- "Column"
+        x_lab <- "Row"
+        y_lab <- "Column"
+      } else {
+        x_aes <- "Column"
+        y_aes <- "Row"
+        x_lab <- "Column"
+        y_lab <- "Row"
+      }
+
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = .data[[x_aes]], y = .data[[y_aes]], fill = .data[[value_col]])) +
         ggplot2::geom_tile() +
         ggplot2::coord_equal(expand = FALSE) +
-        ggplot2::labs(title = title, x = "Column", y = "Row", fill = fill_label) +
+        ggplot2::labs(title = title, x = x_lab, y = y_lab, fill = fill_label) +
         theme_meridian_nature_map() +
         ggplot2::theme(
           legend.position = "right",
@@ -821,18 +851,32 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       } else {
         p <- p + scale_fill_meridian_sequential(na.value = "grey90")
       }
-      apply_field_direction(p, col_direction = col_direction, row_direction = row_direction)
+      apply_field_direction(p, col_direction = col_direction, row_direction = row_direction, x_axis = x_axis)
     }
 
     build_spats_surface_map <- function(df, title, fill_label, divergent = FALSE,
                                         col_direction = "left_to_right",
-                                        row_direction = "bottom_to_top") {
+                                        row_direction = "bottom_to_top",
+                                        x_axis = "Column") {
       vals <- df$Value
       limit <- max(abs(vals), na.rm = TRUE)
-      p <- ggplot2::ggplot(df, ggplot2::aes(x = Column, y = Row, fill = Value)) +
+
+      if (identical(x_axis, "Row")) {
+        x_aes <- "Row"
+        y_aes <- "Column"
+        x_lab <- "Row"
+        y_lab <- "Column"
+      } else {
+        x_aes <- "Column"
+        y_aes <- "Row"
+        x_lab <- "Column"
+        y_lab <- "Row"
+      }
+
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = .data[[x_aes]], y = .data[[y_aes]], fill = Value)) +
         ggplot2::geom_raster(interpolate = TRUE) +
         ggplot2::coord_equal(expand = FALSE) +
-        ggplot2::labs(title = title, x = "Column", y = "Row", fill = fill_label) +
+        ggplot2::labs(title = title, x = x_lab, y = y_lab, fill = fill_label) +
         theme_meridian_nature_map() +
         ggplot2::theme(
           legend.position = "right",
@@ -845,25 +889,26 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       } else {
         p <- p + scale_fill_meridian_sequential(na.value = "grey90")
       }
-      apply_field_direction(p, col_direction = col_direction, row_direction = row_direction)
+      apply_field_direction(p, col_direction = col_direction, row_direction = row_direction, x_axis = x_axis)
     }
 
     build_spats_trend_figure_gg <- function(mod, trait, env, spa_trend = "raw",
                                             depict_missing = FALSE, annotated = FALSE,
                                             panel = "trend",
                                             col_direction = "left_to_right",
-                                            row_direction = "bottom_to_top") {
+                                            row_direction = "bottom_to_top",
+                                            x_axis = "Column") {
       field_grid <- build_spats_plot_grid(mod, depict_missing = depict_missing)
       trend_label <- if (identical(spa_trend, "percentage")) "Spatial trend (%)" else "Spatial trend"
       panel <- panel %||% "trend"
 
       p <- switch(panel,
         raw = build_spats_tile_map(field_grid, "Raw", "Raw data", "Raw",
-          col_direction = col_direction, row_direction = row_direction),
+          col_direction = col_direction, row_direction = row_direction, x_axis = x_axis),
         fitted = build_spats_tile_map(field_grid, "Fitted", "Fitted data", "Fitted",
-          col_direction = col_direction, row_direction = row_direction),
+          col_direction = col_direction, row_direction = row_direction, x_axis = x_axis),
         residual = build_spats_tile_map(field_grid, "Residual", "Residuals", "Residual",
-          divergent = TRUE, col_direction = col_direction, row_direction = row_direction),
+          divergent = TRUE, col_direction = col_direction, row_direction = row_direction, x_axis = x_axis),
         genotype = {
           if (!any(!is.na(field_grid$Genotype))) {
             build_empty_spats_map("Genotypic BLUEs / BLUPs are not available for this model.")
@@ -874,7 +919,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
               if (isTRUE(mod$model$geno$as.random)) "Genotypic BLUPs" else "Genotypic BLUEs",
               if (isTRUE(mod$model$geno$as.random)) "BLUP" else "BLUE",
               col_direction = col_direction,
-              row_direction = row_direction
+              row_direction = row_direction,
+              x_axis = x_axis
             )
           }
         },
@@ -886,7 +932,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
             trend_label,
             divergent = identical(spa_trend, "percentage"),
             col_direction = col_direction,
-            row_direction = row_direction
+            row_direction = row_direction,
+            x_axis = x_axis
           )
         },
         {
@@ -897,7 +944,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
             trend_label,
             divergent = identical(spa_trend, "percentage"),
             col_direction = col_direction,
-            row_direction = row_direction
+            row_direction = row_direction,
+            x_axis = x_axis
           )
         }
       )
@@ -908,7 +956,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
           " | trend scale = ", spa_trend,
           " | missing cells ", if (isTRUE(depict_missing)) "shown" else "hidden",
           " | columns ", if (identical(col_direction, "right_to_left")) "right-to-left" else "left-to-right",
-          " | rows ", if (identical(row_direction, "top_to_bottom")) "top-to-bottom" else "bottom-to-top"
+          " | rows ", if (identical(row_direction, "top_to_bottom")) "top-to-bottom" else "bottom-to-top",
+          " | x-axis mapped to ", x_axis
         )
       } else {
         NULL
@@ -934,7 +983,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         annotated = input$plot_annotated,
         panel = input$plot_panel,
         col_direction = input$plot_col_direction,
-        row_direction = input$plot_row_direction
+        row_direction = input$plot_row_direction,
+        x_axis = input$plot_x_axis
       )
     }, res = 96)
 
@@ -988,7 +1038,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         depict_missing = isTRUE(input$plot_missing),
         annotated = isTRUE(input$plot_annotated),
         col_direction = input$plot_col_direction,
-        row_direction = input$plot_row_direction
+        row_direction = input$plot_row_direction,
+        x_axis = input$plot_x_axis
       ))
       register_spatial_plot(paste0("spatial_trend_", env), paste("SpATS spatial trend map -", env),
         function() {
@@ -1003,7 +1054,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
             annotated = plot_opts$annotated,
             panel = plot_opts$panel,
             col_direction = plot_opts$col_direction,
-            row_direction = plot_opts$row_direction
+            row_direction = plot_opts$row_direction,
+            x_axis = plot_opts$x_axis
           )
         },
         list(
@@ -1014,7 +1066,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
           depict_missing = plot_opts$depict_missing,
           annotated = plot_opts$annotated,
           col_direction = plot_opts$col_direction,
-          row_direction = plot_opts$row_direction
+          row_direction = plot_opts$row_direction,
+          x_axis = plot_opts$x_axis
         )
       )
     })

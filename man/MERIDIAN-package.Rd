@@ -11,5 +11,10 @@ An interactive Shiny application for comprehensive analysis of Multi-Environment
 \author{
 \strong{Maintainer}: Salva Osuna \email{salvadorosunacaballero@gmail.com}
 
+Authors:
+\itemize{
+  \item Salva Osuna \email{salvadorosunacaballero@gmail.com}
+}
+
 }
 \keyword{internal}

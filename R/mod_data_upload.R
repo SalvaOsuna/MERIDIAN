@@ -324,13 +324,61 @@ mod_data_upload_server <- function(id) {
     # ---- Reactive: Example data flag ----
     example_loaded <- shiny::reactiveVal(FALSE)
 
-    # ---- Observe: Update column dropdowns when data loads ----
+    # ---- Reactive: Processed environmental data with weather indices ----
+    processed_env_data <- shiny::reactive({
+      raw_env <- raw_env_data()
+      if (is.null(raw_env)) return(NULL)
+      
+      v_env <- validate_environmental_data(raw_env)
+      if (!v_env$valid) {
+        shiny::showNotification(
+          paste("Environmental Data validation failed:", paste(v_env$errors, collapse = "; ")),
+          type = "error",
+          duration = 10
+        )
+        return(NULL)
+      }
+      
+      if (length(v_env$warnings) > 0) {
+        lapply(v_env$warnings, function(w) {
+          shiny::showNotification(w, type = "warning", duration = 8)
+        })
+      }
+      
+      col_names <- names(raw_env)
+      lat_col  <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
+      lon_col  <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
+      pdate_col <- col_names[grep("plant", col_names, ignore.case = TRUE)][1]
+      hdate_col <- col_names[grep("harvest", col_names, ignore.case = TRUE)][1]
+      
+      if (is.na(lat_col) || is.na(lon_col) || is.na(pdate_col) || is.na(hdate_col)) {
+        return(raw_env)
+      }
+      
+      res <- tryCatch({
+        shiny::withProgress(
+          message = "Fetching NASA POWER daily weather...",
+          value = 0,
+          {
+            process_environmental_covariates(raw_env, session = session)
+          }
+        )
+      }, error = function(e) {
+        shiny::showNotification(
+          paste("NASA POWER weather retrieval is currently unavailable: ", e$message),
+          type = "error",
+          duration = 10
+        )
+        NULL
+      })
+      
+      res
+    })
+
     shiny::observeEvent(raw_data(), {
       req(raw_data())
       df <- raw_data()
       col_names <- names(df)
-
-      # Auto-detect columns
       detected <- auto_detect_columns(col_names)
 
       # All columns for mapping
@@ -486,10 +534,9 @@ mod_data_upload_server <- function(id) {
         design     = design,
         augmented_checks = aug_checks,
         validation = validation,
-        env_data   = raw_env_data()
+        env_data   = processed_env_data()
       )
     })
-
     # ---- Outputs: Value boxes ----
     output$n_obs <- shiny::renderText({
       req(raw_data())
@@ -532,9 +579,9 @@ mod_data_upload_server <- function(id) {
 
     # ---- Output: Environmental Data preview table ----
     output$env_data_table <- DT::renderDataTable({
-      req(raw_env_data())
+      req(processed_env_data())
       DT::datatable(
-        raw_env_data(),
+        processed_env_data(),
         options = list(
           pageLength = 15,
           scrollX    = TRUE,
@@ -568,6 +615,7 @@ mod_data_upload_server <- function(id) {
           backgroundColor = DT::styleInterval(c(0, 5), c("#e8f5e9", "#fff9c4", "#ffebee"))
         )
     })
+
 
     # ---- Output: Design details ----
     output$design_details <- shiny::renderUI({
@@ -725,4 +773,70 @@ mod_data_upload_server <- function(id) {
       load_example = load_example
     )
   })
+}
+
+#' Validate environmental covariates dataset
+#' @param env_df Data frame
+#' @return List of errors and warnings
+validate_environmental_data <- function(env_df) {
+  errors <- character(0)
+  warnings <- character(0)
+  
+  if (is.null(env_df) || nrow(env_df) == 0) {
+    return(list(valid = FALSE, errors = "Environmental data is empty.", warnings = warnings))
+  }
+  
+  col_names <- names(env_df)
+  env_col  <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+  lat_col  <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
+  lon_col  <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
+  pdate_col <- col_names[grep("plant", col_names, ignore.case = TRUE)][1]
+  hdate_col <- col_names[grep("harvest", col_names, ignore.case = TRUE)][1]
+  
+  if (is.na(env_col)) {
+    errors <- c(errors, "An 'Environment' column is required.")
+  }
+  
+  has_gps_dates <- !is.na(lat_col) && !is.na(lon_col) && !is.na(pdate_col) && !is.na(hdate_col)
+  
+  if (!has_gps_dates) {
+    num_cols <- col_names[sapply(env_df, is.numeric)]
+    num_cols <- setdiff(num_cols, c(env_col, lat_col, lon_col))
+    if (length(num_cols) == 0) {
+      errors <- c(errors, "Environmental data must either contain all five geolocational columns (Environment, Latitude, Longitude, PlantingDate, HarvestDate) or pre-computed numeric covariates.")
+    } else {
+      warnings <- c(warnings, "Missing Latitude, Longitude, PlantingDate, or HarvestDate. Online weather retrieval via NASA POWER is disabled; relying on pre-computed covariates.")
+    }
+  } else {
+    lats <- suppressWarnings(as.numeric(env_df[[lat_col]]))
+    lons <- suppressWarnings(as.numeric(env_df[[lon_col]]))
+    if (any(is.na(lats)) || any(lats < -90) || any(lats > 90)) {
+      errors <- c(errors, "Latitude values must be numeric and between -90 and 90.")
+    }
+    if (any(is.na(lons)) || any(lons < -180) || any(lons > 180)) {
+      errors <- c(errors, "Longitude values must be numeric and between -180 and 180.")
+    }
+    
+    p_dates <- tryCatch(parse_date_robustly(env_df[[pdate_col]]), error = function(e) NULL)
+    h_dates <- tryCatch(parse_date_robustly(env_df[[hdate_col]]), error = function(e) NULL)
+    
+    if (is.null(p_dates) || any(is.na(p_dates))) {
+      errors <- c(errors, "PlantingDate column has invalid or unparseable dates.")
+    }
+    if (is.null(h_dates) || any(is.na(h_dates))) {
+      errors <- c(errors, "HarvestDate column has invalid or unparseable dates.")
+    }
+    
+    if (!is.null(p_dates) && !is.null(h_dates) && any(!is.na(p_dates)) && any(!is.na(h_dates))) {
+      if (any(h_dates <= p_dates, na.rm = TRUE)) {
+        errors <- c(errors, "HarvestDate must be strictly after PlantingDate.")
+      }
+    }
+  }
+  
+  list(
+    valid = length(errors) == 0,
+    errors = errors,
+    warnings = warnings
+  )
 }

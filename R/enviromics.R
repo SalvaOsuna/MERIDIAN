@@ -160,6 +160,7 @@ compute_env_pca <- function(env_data, env_col) {
   )
 }
 
+
 #' Compute Covariate-Phenotype Correlations
 #' @param env_data Environmental covariates
 #' @param env_means Data frame from run_finlay_wilkinson (contains env_mean)
@@ -179,4 +180,228 @@ compute_covariate_correlations <- function(env_data, env_means, env_col) {
     cor_mat = cor_mat,
     merged_data = merged
   )
+}
+
+# ---------------------------------------------------------------------------
+# NASA POWER Weather Fetching & Indexing
+# ---------------------------------------------------------------------------
+
+#' Parse dates robustly from various formats
+#' @param date_val Vector or single value of dates in char, factor, numeric, or date format
+#' @return Date vector
+#' @export
+parse_date_robustly <- function(date_val) {
+  if (is.null(date_val) || length(date_val) == 0) return(as.Date(character(0)))
+  
+  if (inherits(date_val, c("Date", "POSIXt"))) {
+    return(as.Date(date_val))
+  }
+  
+  date_char <- as.character(date_val)
+  parsed_dates <- rep(as.Date(NA), length(date_char))
+  
+  formats_to_try <- c(
+    "%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y",
+    "%Y%m%d", "%d-%m-%Y", "%m-%d-%Y"
+  )
+  
+  for (i in seq_along(date_char)) {
+    val <- date_char[i]
+    if (is.na(val) || trimws(val) == "") next
+    
+    if (suppressWarnings(!is.na(as.numeric(val)))) {
+      num_val <- as.numeric(val)
+      if (num_val > 10000 && num_val < 60000) { 
+        parsed_dates[i] <- as.Date(num_val, origin = "1899-12-30")
+        next
+      }
+    }
+    
+    for (fmt in formats_to_try) {
+      d <- as.Date(val, format = fmt)
+      if (!is.na(d)) {
+        yr <- as.numeric(format(d, "%Y"))
+        if (!is.na(yr) && yr >= 1900 && yr <= 2100) {
+          parsed_dates[i] <- d
+          break
+        }
+      }
+    }
+    
+    if (is.na(parsed_dates[i])) {
+      d <- tryCatch(as.Date(val), error = function(e) as.Date(NA))
+      if (!is.na(d)) {
+        yr <- as.numeric(format(d, "%Y"))
+        if (!is.na(yr) && yr >= 1900 && yr <= 2100) {
+          parsed_dates[i] <- d
+        }
+      }
+    }
+  }
+  
+  parsed_dates
+}
+
+#' Fetch daily weather parameters from NASA POWER API
+#' @param lat Numeric latitude
+#' @param lon Numeric longitude
+#' @param start_date R Date object
+#' @param end_date R Date object
+#' @return A data frame with daily weather variables, or NULL if query fails
+#' @export
+fetch_nasa_weather <- function(lat, lon, start_date, end_date) {
+  if (is.na(lat) || is.na(lon) || is.na(start_date) || is.na(end_date)) {
+    return(NULL)
+  }
+  
+  s_str <- format(start_date, "%Y-%m-%d")
+  e_str <- format(end_date, "%Y-%m-%d")
+  
+  max_retries <- 2
+  daily_weather <- NULL
+  
+  for (attempt in seq_len(max_retries + 1)) {
+    daily_weather <- tryCatch({
+      nasapower::get_power(
+        community = "ag",
+        lonlat = c(as.numeric(lon), as.numeric(lat)),
+        pars = c("T2M_MAX", "T2M_MIN", "PRECTOTCORR", "RH2M", "ALLSKY_SFC_SW_DWN"),
+        dates = c(s_str, e_str),
+        temporal_api = "daily"
+      )
+    }, error = function(e) {
+      if (attempt <= max_retries) {
+        Sys.sleep(1)
+      }
+      NULL
+    })
+    
+    if (!is.null(daily_weather)) break
+  }
+  
+  if (is.null(daily_weather) || nrow(daily_weather) == 0) {
+    stop("NASA POWER API call failed or is unavailable. Please check your internet connection.", call. = FALSE)
+  }
+  
+  as.data.frame(daily_weather)
+}
+
+#' Calculate summary agroclimatic indices from daily weather series
+#' @param daily_weather Data frame containing daily variables
+#' @return A single-row data frame with computed indices
+#' @export
+calculate_enviromic_indices <- function(daily_weather) {
+  if (is.null(daily_weather) || nrow(daily_weather) == 0) {
+    return(data.frame(
+      MeanTemp_C = as.numeric(NA),
+      TotalRainfall_mm = as.numeric(NA),
+      GDD = as.numeric(NA),
+      MeanRH_pct = as.numeric(NA),
+      TotalSolar_MJ = as.numeric(NA)
+    ))
+  }
+  
+  tmax <- as.numeric(daily_weather$T2M_MAX)
+  tmin <- as.numeric(daily_weather$T2M_MIN)
+  precip <- as.numeric(daily_weather$PRECTOTCORR)
+  rh <- as.numeric(daily_weather$RH2M)
+  solar <- as.numeric(daily_weather$ALLSKY_SFC_SW_DWN)
+  
+  avg_temp <- (tmax + tmin) / 2
+  mean_temp <- mean(avg_temp, na.rm = TRUE)
+  total_rainfall <- sum(precip, na.rm = TRUE)
+  total_gdd <- sum(pmax(avg_temp - 10, 0), na.rm = TRUE)
+  mean_rh <- mean(rh, na.rm = TRUE)
+  total_solar <- sum(solar, na.rm = TRUE)
+  
+  data.frame(
+    MeanTemp_C = round(mean_temp, 2),
+    TotalRainfall_mm = round(total_rainfall, 2),
+    GDD = round(total_gdd, 2),
+    MeanRH_pct = round(mean_rh, 2),
+    TotalSolar_MJ = round(total_solar, 2)
+  )
+}
+
+#' Process environmental covariates table and calculate derived indices
+#' @param env_data Input data frame with Environment, Latitude, Longitude, PlantingDate, HarvestDate
+#' @param session Optional Shiny session object
+#' @return Processed data frame with computed environmental indices
+#' @export
+process_environmental_covariates <- function(env_data, session = NULL) {
+  if (is.null(env_data) || nrow(env_data) == 0) return(env_data)
+  
+  col_names <- names(env_data)
+  
+  env_col  <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+  lat_col  <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
+  lon_col  <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
+  pdate_col <- col_names[grep("plant", col_names, ignore.case = TRUE)][1]
+  hdate_col <- col_names[grep("harvest", col_names, ignore.case = TRUE)][1]
+  
+  if (is.na(env_col)) stop("An 'Environment' column is required in the environmental data.", call. = FALSE)
+  if (is.na(lat_col) || is.na(lon_col) || is.na(pdate_col) || is.na(hdate_col)) {
+    return(env_data)
+  }
+  
+  p_dates <- parse_date_robustly(env_data[[pdate_col]])
+  h_dates <- parse_date_robustly(env_data[[hdate_col]])
+  
+  if (any(is.na(p_dates)) || any(is.na(h_dates))) {
+    stop("Could not parse PlantingDate or HarvestDate. Please ensure they are valid dates (e.g. YYYY-MM-DD).", call. = FALSE)
+  }
+  
+  indices_list <- list()
+  n_envs <- nrow(env_data)
+  
+  for (i in seq_len(n_envs)) {
+    env_name <- as.character(env_data[[env_col]][i])
+    lat <- as.numeric(env_data[[lat_col]][i])
+    lon <- as.numeric(env_data[[lon_col]][i])
+    s_date <- p_dates[i]
+    e_date <- h_dates[i]
+    
+    if (!is.null(session) && exists("incProgress", where = "package:shiny")) {
+      shiny::incProgress(
+        amount = 1 / n_envs,
+        detail = paste("Fetching weather for", env_name)
+      )
+    }
+    
+    daily_w <- fetch_nasa_weather(lat, lon, s_date, e_date)
+    indices_df <- calculate_enviromic_indices(daily_w)
+    indices_df[[env_col]] <- env_name
+    indices_list[[i]] <- indices_df
+  }
+  
+  computed_indices <- dplyr::bind_rows(indices_list)
+  
+  original_extra <- env_data |> 
+    dplyr::select(-dplyr::any_of(c(lat_col, lon_col, pdate_col, hdate_col)))
+  
+  original_extra <- original_extra |> 
+    dplyr::select(-dplyr::any_of(c("MeanTemp_C", "TotalRainfall_mm", "GDD", "MeanRH_pct", "TotalSolar_MJ")))
+  
+  geo_date_info <- data.frame(
+    Environment = env_data[[env_col]],
+    Latitude = env_data[[lat_col]],
+    Longitude = env_data[[lon_col]],
+    PlantingDate = p_dates,
+    HarvestDate = h_dates,
+    stringsAsFactors = FALSE
+  )
+  names(geo_date_info)[1] <- env_col
+  
+  res_df <- computed_indices |>
+    dplyr::inner_join(geo_date_info, by = env_col) |>
+    dplyr::inner_join(original_extra, by = env_col)
+  
+  calculated_names <- c("MeanTemp_C", "TotalRainfall_mm", "GDD", "MeanRH_pct", "TotalSolar_MJ")
+  std_names <- c(env_col, "Latitude", "Longitude", "PlantingDate", "HarvestDate", calculated_names)
+  extra_names <- setdiff(names(res_df), std_names)
+  
+  res_df <- res_df |>
+    dplyr::select(dplyr::all_of(c(std_names, extra_names)))
+  
+  as.data.frame(res_df)
 }
