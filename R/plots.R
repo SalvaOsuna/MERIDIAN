@@ -155,7 +155,7 @@ plot_env_correlation <- function(df, gen_col, env_col, trait, method = "pearson"
   cor_matrix <- round(cor_matrix, 2)
 
   # Fetch palette and colors
-  pal <- meridian_palette("meridian")
+  pal <- meridian_nature_palette()
   color_vec <- grDevices::colorRampPalette(c(pal[["heat_low"]], pal[["heat_mid"]], pal[["heat_high"]]))(256)
   n_colors <- length(color_vec)
   colorscale_plotly <- lapply(seq_along(color_vec), function(i) {

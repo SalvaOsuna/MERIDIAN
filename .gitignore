@@ -26,6 +26,7 @@ data/*.private.*
 run_app_dev.R
 Shiny_MET.Rproj
 CRAN-SUBMISSION
+token.txt
 
 # Session files
 .httr-oauth
