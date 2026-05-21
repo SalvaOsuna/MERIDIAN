@@ -524,9 +524,15 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
     })
     
     # ---- Dynamic Covariate Selection Observer ----
-    shiny::observeEvent(db()$env_data, {
+    shiny::observe({
       env_df <- db()$env_data
       req(env_df)
+      
+      # Also take dependency on adapt_results so this updates whenever the analysis is run
+      # and the UI is dynamically created in the DOM
+      res <- adapt_results()
+      req(res)
+      
       col_names <- names(env_df)
       env_col <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
       lat_col <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
