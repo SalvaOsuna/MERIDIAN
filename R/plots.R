@@ -141,6 +141,47 @@ plot_ge_heatmap <- function(df, gen_col, env_col, trait,
 }
 
 
+#' Create an environment correlation matrix plot
+#' @param df Data frame
+#' @param gen_col Genotype column
+#' @param env_col Environment column
+#' @param trait Trait column
+#' @param method Correlation method: "pearson", "spearman", or "kendall"
+#' @return plotly object
+#' @export
+plot_env_correlation <- function(df, gen_col, env_col, trait, method = "pearson") {
+  ge_matrix <- pivot_ge_means(df, gen_col, env_col, trait)
+  cor_matrix <- stats::cor(ge_matrix, use = "pairwise.complete.obs", method = method)
+  cor_matrix <- round(cor_matrix, 2)
+
+  # Fetch palette and colors
+  pal <- meridian_palette("meridian")
+  color_vec <- grDevices::colorRampPalette(c(pal[["heat_low"]], pal[["heat_mid"]], pal[["heat_high"]]))(256)
+  n_colors <- length(color_vec)
+  colorscale_plotly <- lapply(seq_along(color_vec), function(i) {
+    list((i - 1) / (n_colors - 1), color_vec[i])
+  })
+
+  # Create plotly heatmap
+  plotly::plot_ly(
+    x = colnames(cor_matrix),
+    y = rownames(cor_matrix),
+    z = cor_matrix,
+    type   = "heatmap",
+    colorscale = colorscale_plotly,
+    zmin = -1, zmax = 1,
+    text = cor_matrix,
+    hovertemplate = "Env1: %{y}<br>Env2: %{x}<br>r = %{z:.2f}<extra></extra>"
+  ) |>
+    meridian_plotly_layout(
+      title = paste("Environment Correlations:", trait, "(", method, ")"),
+      xaxis = list(title = "", tickangle = -45),
+      yaxis = list(title = "", autorange = "reversed"),
+      margin = list(l = 100, r = 30, b = 100, t = 80)
+    )
+}
+
+
 #' Create an outlier detection scatter plot
 #' @param df Data frame with 'is_outlier' column
 #' @param trait Trait column name
