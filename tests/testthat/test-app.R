@@ -155,3 +155,42 @@ test_that("validate_environmental_data handles missing HarvestDate values gracef
   expect_equal(length(res$errors), 0)
   expect_true(any(grepl("missing HarvestDate", res$warnings)))
 })
+
+test_that("validate_environmental_data matches Site and Loc columns robustly", {
+  df_site <- data.frame(
+    Site = c("S1", "S2"),
+    Latitude = c(52.1, 52.2),
+    Longitude = c(-106.6, -106.7),
+    PlantingDate = c("2025-05-10", "2025-05-12"),
+    HarvestDate = c("2025-09-10", "2025-09-12"),
+    stringsAsFactors = FALSE
+  )
+  res_site <- validate_environmental_data(df_site)
+  expect_true(res_site$valid)
+  expect_equal(length(res_site$errors), 0)
+
+  df_loc <- data.frame(
+    Loc = c("L1", "L2"),
+    Latitude = c(52.1, 52.2),
+    Longitude = c(-106.6, -106.7),
+    PlantingDate = c("2025-05-10", "2025-05-12"),
+    HarvestDate = c("2025-09-10", "2025-09-12"),
+    stringsAsFactors = FALSE
+  )
+  res_loc <- validate_environmental_data(df_loc)
+  expect_true(res_loc$valid)
+  expect_equal(length(res_loc$errors), 0)
+})
+
+test_that("process_environmental_covariates supports robust Site/Loc columns", {
+  bad_data_site <- data.frame(
+    Site = "E1"
+  )
+  expect_equal(process_environmental_covariates(bad_data_site), bad_data_site)
+
+  bad_data_loc <- data.frame(
+    Loc = "E1"
+  )
+  expect_equal(process_environmental_covariates(bad_data_loc), bad_data_loc)
+})
+

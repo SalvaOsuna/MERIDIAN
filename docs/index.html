@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MERIDIAN — Premium Crop Phenomics & Climatic Modeling Suite</title>
+  <meta name="description" content="An elegant, scientific, and unified R shiny suite for multi-environment trial analysis, spatial adjustments, mixed models, stability analytics, and stage-specific enviromic characterization.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;1,400&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- MathJax for rendering publication-grade scientific formulas -->
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+  <!-- Header & Navigation -->
+  <header>
+    <div class="container nav-wrapper">
+      <a href="#" class="logo">
+        <!-- SVG Seedling & Genome Hybrid Logo -->
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12c0 3.09 1.41 5.85 3.63 7.7a1 1 0 0 0 1.25-.13c.48-.48.42-1.28-.13-1.68C5.07 16.65 4 14.45 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 2.45-1.07 4.65-2.75 5.89-.55.4-.61 1.2-.13 1.68a1 1 0 0 0 1.25.13C20.59 17.85 22 15.09 22 12c0-5.52-4.48-10-10-10zm-1.5 6a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm-.5 4a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm1 4a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm1 4a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0z" />
+          <path d="M12 6c-3.31 0-6 2.69-6 6 0 1.66.67 3.16 1.76 4.24a1 1 0 0 0 1.41-1.41C8.42 14.07 8 13.09 8 12c0-2.21 1.79-4 4-4s4 1.79 4 4c0 1.09-.42 2.07-1.17 2.83a1 1 0 0 0 1.41 1.41C17.33 15.16 18 13.66 18 12c0-3.31-2.69-6-6-6z" />
+        </svg>
+        MERIDIAN<span>.</span>
+      </a>
+      <nav>
+        <ul>
+          <li><a href="#about" class="active">Overview</a></li>
+          <li><a href="#modules">Modules</a></li>
+          <li><a href="#interactive-calculator">Enviromics Demo</a></li>
+          <li><a href="#science">Scientific Rigor</a></li>
+          <li><a href="#installation">Get Started</a></li>
+        </ul>
+      </nav>
+      <a href="https://github.com/SalvaOsuna/MERIDIAN" target="_blank" rel="noopener noreferrer" class="btn-github">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+        </svg>
+        GitHub Repository
+      </a>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero" id="about">
+    <div class="hero-bg"></div>
+    <div class="hero-overlay"></div>
+    <div class="container">
+      <div class="hero-content">
+        <span class="badge">Multi-Environment Crop Analytics</span>
+        <h1>Bridging Phenomics and Climatic Big Data</h1>
+        <p class="hero-subtitle">
+          MERIDIAN is a premium scientific computing suite engineered to dissect genotype-by-environment (G&times;E) interactions, correct spatial field trials, partition linear mixed model variance, and characterize adaptive crop traits using stage-aware agroclimatic covariates.
+        </p>
+        <div class="hero-actions">
+          <a href="#modules" class="btn-primary">Explore Modules</a>
+          <a href="#installation" class="btn-secondary">Install Package</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid Section -->
+  <section class="section-padding" id="modules">
+    <div class="container">
+      <div class="features-header">
+        <span class="badge">Functional Architecture</span>
+        <h2>Unified Scientific Modules</h2>
+        <p>Dissect phenotypic variation, model spatial field trends, conduct multi-environment variance partitioning, and compute stage-specific climate responses in one cohesive workspace.</p>
+      </div>
+
+      <div class="features-grid">
+        <!-- 1. Data Engine -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+          </div>
+          <h3>1. Unified Data Engine</h3>
+          <p>Seamlessly upload, clean, and validate massive multi-environment trials (MET) in CSV and Excel formats. Features automatic robust date parser, missing value imputation, and field trial mapping.</p>
+        </div>
+
+        <!-- 2. EDA -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2zm0 8H7v-2h10v2z"/></svg>
+          </div>
+          <h3>2. Interactive EDA</h3>
+          <p>Explore trait distributions across environments using glassmorphic density plots, interactive scatter matrix grids, Pearson correlation maps, and automated boxplot outlier identification.</p>
+        </div>
+
+        <!-- 3. Spatial Trends -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg viewBox="0 0 24 24"><path d="M4 3.01c-1.1 0-2 .9-2 2V19c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5.01c0-1.1-.9-2-2-2H4zm8 15.99c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
+          </div>
+          <h3>3. Spatial Correction</h3>
+          <p>Remove experimental row-and-column trends using advanced spatial mixed modeling (SpATS or custom spatial algorithms). Automatically fit 2D tensor-product P-splines to reveal true genetic merits.</p>
+        </div>
+
+        <!-- 4. ANOVA & LMM -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2zm0 8H7v-2h10v2z"/></svg>
+          </div>
+          <h3>4. ANOVA & Mixed Models</h3>
+          <p>Partition overall phenotypic variation via Linear Mixed Models (LMM) with REML. Calculate broad-sense heritability ($H^2$), extract genetic BLUPs and BLUEs, and model G&times;E structures.</p>
+        </div>
+
+        <!-- 5. Stability & Adaptability -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+          </div>
+          <h3>5. Stability & GxE Models</h3>
+          <p>Dissect environmental adaptability using rigorous statistical frameworks: Finlay-Wilkinson regressions, Additive Main Effects and Multiplicative Interactions (AMMI) models, and GGE biplots.</p>
+        </div>
+
+        <!-- 6. Enviromics & Adaptation -->
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8 1.42-1.42zM4 10.5H1v2h3v-2zm9-8h-2v3h2v-3zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.75l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zm-12.1-1.8l-1.79 1.79 1.41 1.41 1.8-1.79-1.42-1.41zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm-1 7.5h2v3h-2v-3z"/></svg>
+          </div>
+          <h3>6. Enviromic Integration</h3>
+          <p>Query NASA POWER daily climate databases in real time. Divide growth cycles dynamically into Vegetative, Reproductive, and Late stages to compute stage-aware indices (e.g. GDD, thermal stress days).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Exploration Tabs -->
+  <section class="section-padding explore-bg">
+    <div class="container">
+      <div class="features-header">
+        <span class="badge">Visual Walkthrough</span>
+        <h2>Inside the MERIDIAN Interface</h2>
+        <p>Click the modules below to preview how MERIDIAN visualizes core agronomic metrics and drives scientific breakthroughs.</p>
+      </div>
+
+      <div class="tabs-nav">
+        <button class="tab-btn active" onclick="switchTab(event, 'tab-data')">Data Engine</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-spatial')">Spatial trends</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-lmm')">REML LMM</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-gge')">AMMI / GGE</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-enviromics')">Enviromics</button>
+      </div>
+
+      <!-- Tab: Data Engine -->
+      <div id="tab-data" class="tab-content active">
+        <div class="tab-text">
+          <h3>Schema-Validated Data Upload</h3>
+          <p>A smart portal verifying file headers, parsing complex string dates robustly, and matching environmental names.</p>
+          <ul class="tab-features-list">
+            <li>Automatic environment matching (e.g. Site, Loc, Env)</li>
+            <li>Fuzzy role detection for Flowering and Maturity phenology columns</li>
+            <li>Dynamic CSV and Excel file handler avoiding optional dependency failures</li>
+          </ul>
+        </div>
+        <div class="tab-visual">
+          <div class="tab-mockup-ui">
+            <div class="mockup-header">
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+            </div>
+            <div class="mockup-body" style="background: #FFF; font-family: var(--font-primary); font-size: 0.8rem;">
+              <div style="border: 1px solid rgba(27,67,50,0.15); border-radius: 6px; padding: 1rem; background: rgba(82, 183, 136, 0.04);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                  <strong style="color: var(--color-primary);">Lentil_Trial_2025.xlsx</strong>
+                  <span style="background: #2D6A4F; color: #FFF; padding: 2px 8px; border-radius: 50px; font-size: 0.7rem; font-weight: 700;">✓ Synced & Parsed</span>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                  <thead>
+                    <tr style="border-bottom: 2px solid rgba(27,67,50,0.1);">
+                      <th style="padding: 4px;">Site</th>
+                      <th style="padding: 4px;">Flowering</th>
+                      <th style="padding: 4px;">Maturity</th>
+                      <th style="padding: 4px;">Yield</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style="border-bottom: 1px solid rgba(0,0,0,0.05);">
+                      <td style="padding: 4px; font-weight: 600;">Saskatoon</td>
+                      <td style="padding: 4px; color: #555;">2025-06-15</td>
+                      <td style="padding: 4px; color: #555;">2025-08-10</td>
+                      <td style="padding: 4px; font-weight: 600; color: #2D6A4F;">3.45 t/ha</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 4px; font-weight: 600;">Rosthern</td>
+                      <td style="padding: 4px; color: #555;">2025-06-18</td>
+                      <td style="padding: 4px; color: #555;">2025-08-14</td>
+                      <td style="padding: 4px; font-weight: 600; color: #2D6A4F;">2.91 t/ha</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Spatial trends -->
+      <div id="tab-spatial" class="tab-content">
+        <div class="tab-text">
+          <h3>2D Tensor-Product Spline Adjustment</h3>
+          <p>Extract spatial field trial patterns using SpATS. Isolate localized micro-environmental effects to reveal actual genotype performance.</p>
+          <ul class="tab-features-list">
+            <li>Row-and-column linear mixed model integration</li>
+            <li>Interactive 2D spatial heatmap plots</li>
+            <li>Calculations of spatially-corrected phenotypic BLUEs</li>
+          </ul>
+        </div>
+        <div class="tab-visual">
+          <div class="tab-mockup-ui">
+            <div class="mockup-header">
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+            </div>
+            <div class="mockup-body" style="background: #111; padding: 1.5rem; text-align: center;">
+              <div style="font-family: var(--font-display); font-size: 0.75rem; color: #FAF9F6; margin-bottom: 0.5rem; text-align: left;">2D Spatial Trend Surface (Row & Col)</div>
+              <!-- Mock heatmap using CSS grid -->
+              <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; width: 100%; max-width: 250px; margin: 0 auto;">
+                <div style="background: #1B4332; height: 25px; border-radius: 2px; opacity: 0.4;"></div>
+                <div style="background: #1B4332; height: 25px; border-radius: 2px; opacity: 0.6;"></div>
+                <div style="background: #2D6A4F; height: 25px; border-radius: 2px; opacity: 0.8;"></div>
+                <div style="background: #D4A373; height: 25px; border-radius: 2px; opacity: 0.9;"></div>
+                <div style="background: #D4A373; height: 25px; border-radius: 2px; opacity: 0.6;"></div>
+                <div style="background: #1B4332; height: 25px; border-radius: 2px; opacity: 0.3;"></div>
+                <div style="background: #1B4332; height: 25px; border-radius: 2px; opacity: 0.5;"></div>
+                <div style="background: #2D6A4F; height: 25px; border-radius: 2px; opacity: 0.7;"></div>
+                <div style="background: #D4A373; height: 25px; border-radius: 2px; opacity: 1;"></div>
+                <div style="background: #D4A373; height: 25px; border-radius: 2px; opacity: 0.8;"></div>
+                <div style="background: #2D6A4F; height: 25px; border-radius: 2px; opacity: 0.5;"></div>
+                <div style="background: #1B4332; height: 25px; border-radius: 2px; opacity: 0.4;"></div>
+              </div>
+              <div style="font-family: var(--font-primary); font-size: 0.65rem; color: #8CCF9C; margin-top: 0.5rem;">SpATS Model Converged (Heritability: 0.74)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: LMM -->
+      <div id="tab-lmm" class="tab-content">
+        <div class="tab-text">
+          <h3>Variance Component Partitioning</h3>
+          <p>Quantify sources of phenotypic variation. Partition variance into Genotype ($G$), Environment ($E$), and $G \times E$ interaction terms using Restricted Maximum Likelihood (REML).</p>
+          <ul class="tab-features-list">
+            <li>Calculates precise broad-sense heritability ($H^2$) coefficients</li>
+            <li>Models homogeneous and heterogeneous error variances</li>
+            <li>Extracts empirical BLUPs for crop breeding decisions</li>
+          </ul>
+        </div>
+        <div class="tab-visual">
+          <div class="tab-mockup-ui">
+            <div class="mockup-header">
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+            </div>
+            <div class="mockup-body" style="background: #FFF; padding: 1.5rem;">
+              <div style="font-family: var(--font-display); font-size: 0.8rem; font-weight:700; color: var(--color-primary); margin-bottom: 0.8rem;">Phenotypic Variance Partitioning (LMM)</div>
+              <!-- Mock graphical bar representation -->
+              <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                <div>
+                  <div style="display:flex; justify-content:space-between; font-size:0.7rem; margin-bottom:2px;"><span>Genotype (G) - 28%</span><span>H² = 0.68</span></div>
+                  <div style="background:#E5E5E5; height:8px; border-radius:4px;"><div style="background:#2D6A4F; width:28%; height:100%; border-radius:4px;"></div></div>
+                </div>
+                <div>
+                  <div style="display:flex; justify-content:space-between; font-size:0.7rem; margin-bottom:2px;"><span>Environment (E) - 52%</span></div>
+                  <div style="background:#E5E5E5; height:8px; border-radius:4px;"><div style="background:#D4A373; width:52%; height:100%; border-radius:4px;"></div></div>
+                </div>
+                <div>
+                  <div style="display:flex; justify-content:space-between; font-size:0.7rem; margin-bottom:2px;"><span>G × E Interaction - 12%</span></div>
+                  <div style="background:#E5E5E5; height:8px; border-radius:4px;"><div style="background:#52B788; width:12%; height:100%; border-radius:4px;"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: GGE -->
+      <div id="tab-gge" class="tab-content">
+        <div class="tab-text">
+          <h3>AMMI Models & GGE Biplots</h3>
+          <p>Unravel complex adaptation patterns visually. Determine "which-won-where" using scientific PCA-based bilinear projections.</p>
+          <ul class="tab-features-list">
+            <li>Interactive singular value decomposition (SVD) of residuals</li>
+            <li>GGE Biplots comparing Genotypes vs. Environments</li>
+            <li>Identifies mega-environments and highly stable genotypes</li>
+          </ul>
+        </div>
+        <div class="tab-visual">
+          <div class="tab-mockup-ui">
+            <div class="mockup-header">
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+            </div>
+            <div class="mockup-body" style="background: #FCFBF9; padding: 1.5rem; text-align: center;">
+              <div style="font-family: var(--font-display); font-size: 0.8rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.5rem; text-align: left;">GGE Biplot (PC1 vs PC2)</div>
+              <!-- Mock biplot illustration -->
+              <div style="border: 1px solid rgba(0,0,0,0.06); height: 120px; border-radius: 6px; background: #FFF; position: relative; display: flex; align-items: center; justify-content: center;">
+                <div style="position: absolute; width: 100%; height: 1px; background: rgba(0,0,0,0.1);"></div>
+                <div style="position: absolute; height: 100%; width: 1px; background: rgba(0,0,0,0.1);"></div>
+                <!-- Genotypes plotted -->
+                <span style="position: absolute; top: 25px; left: 60px; color: #2D6A4F; font-size: 0.65rem; font-weight: 800;">G04 ✦</span>
+                <span style="position: absolute; bottom: 35px; right: 50px; color: #2D6A4F; font-size: 0.65rem; font-weight: 800;">G12 ✦</span>
+                <span style="position: absolute; top: 40px; right: 80px; color: #2D6A4F; font-size: 0.65rem; font-weight: 800;">G01 ✦</span>
+                <!-- Environments plotted -->
+                <span style="position: absolute; top: 15px; left: 140px; color: #D4A373; font-size: 0.65rem; font-weight: 800;">⭓ Saskatoon_2024</span>
+                <span style="position: absolute; bottom: 20px; left: 35px; color: #D4A373; font-size: 0.65rem; font-weight: 800;">⭓ Rosthern_2024</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Enviromics -->
+      <div id="tab-enviromics" class="tab-content">
+        <div class="tab-text">
+          <h3>Agroclimatic & Phenological Drivers</h3>
+          <p>Unify physiological traits with real-time weather analytics. Build models that quantify environmental constraints directly impacting yield.</p>
+          <ul class="tab-features-list">
+            <li>Dynamic integration with NASA POWER APIs</li>
+            <li>Calculations of phenology-segmented Growing Degree Days ($GDD$)</li>
+            <li>Pearson correlation profiles mapping trait-weather connections</li>
+          </ul>
+        </div>
+        <div class="tab-visual">
+          <div class="tab-mockup-ui">
+            <div class="mockup-header">
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+              <span class="mockup-dot"></span>
+            </div>
+            <div class="mockup-body" style="background: #0A1410; padding: 1.5rem; color: #FFF;">
+              <div style="font-family: var(--font-display); font-size: 0.8rem; font-weight:700; color: var(--color-accent); margin-bottom: 0.5rem;">Flowering stage enviromic indices</div>
+              <div style="font-family: var(--font-primary); font-size: 0.7rem; line-height: 1.4; color: rgba(250,249,246,0.7);">
+                <div style="background: rgba(250,249,246,0.04); border-radius: 4px; padding: 6px; margin-bottom: 4px; border-left: 3px solid var(--color-primary-light);">
+                  <strong>GDD_Veg:</strong> 540.2 Growing Degree Days calculated.
+                </div>
+                <div style="background: rgba(250,249,246,0.04); border-radius: 4px; padding: 6px; border-left: 3px solid var(--color-accent);">
+                  <strong>Rainfall_Rep:</strong> 42.5 mm accumulated during grain filling.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Calculator Section -->
+  <section class="section-padding" id="interactive-calculator">
+    <div class="container">
+      <div class="features-header">
+        <span class="badge">Live Demonstration</span>
+        <h2>Stage-Specific Agroclimatic Calculator</h2>
+        <p>Simulate weather conditions across growth stages. Drag the sliders to instantly calculate accumulated Growing Degree Days ($GDD$), total stage rainfall, and environmental adaptability indices in real time.</p>
+      </div>
+
+      <div class="calc-grid">
+        <!-- Interactive Inputs Panel -->
+        <div class="calc-panel">
+          <h3 style="font-family: var(--font-display); color: var(--color-primary); margin-bottom: 1.5rem; font-size: 1.4rem;">Simulate Crop Growth Cycle</h3>
+          
+          <!-- Base Temperature -->
+          <div class="form-group">
+            <label for="base-temp">Base Temperature for GDD (&deg;C)</label>
+            <input type="number" id="base-temp" class="form-control" value="10.0" step="0.5" oninput="calculateIndices()">
+          </div>
+
+          <!-- Vegetative Duration -->
+          <div class="form-group">
+            <label for="veg-duration">Vegetative Stage Duration (days)</label>
+            <div class="range-slider-wrapper">
+              <input type="range" id="veg-duration" class="range-slider" min="10" max="90" value="45" oninput="updateSliderVal('veg-duration', 'd'); calculateIndices();">
+              <span id="veg-duration-val" class="slider-val">45 d</span>
+            </div>
+          </div>
+
+          <!-- Vegetative Mean Temperature -->
+          <div class="form-group">
+            <label for="veg-temp">Vegetative Avg Daily Temp (&deg;C)</label>
+            <div class="range-slider-wrapper">
+              <input type="range" id="veg-temp" class="range-slider" min="5" max="40" value="22" oninput="updateSliderVal('veg-temp', '&deg;C'); calculateIndices();">
+              <span id="veg-temp-val" class="slider-val">22 &deg;C</span>
+            </div>
+          </div>
+
+          <!-- Vegetative Daily Rainfall -->
+          <div class="form-group">
+            <label for="veg-rain">Vegetative Daily Rainfall (mm/day)</label>
+            <div class="range-slider-wrapper">
+              <input type="range" id="veg-rain" class="range-slider" min="0" max="25" value="4" oninput="updateSliderVal('veg-rain', ' mm'); calculateIndices();">
+              <span id="veg-rain-val" class="slider-val">4 mm</span>
+            </div>
+          </div>
+
+          <!-- Reproductive Duration -->
+          <div class="form-group">
+            <label for="rep-duration">Reproductive Stage Duration (days)</label>
+            <div class="range-slider-wrapper">
+              <input type="range" id="rep-duration" class="range-slider" min="10" max="90" value="35" oninput="updateSliderVal('rep-duration', 'd'); calculateIndices();">
+              <span id="rep-duration-val" class="slider-val">35 d</span>
+            </div>
+          </div>
+
+          <!-- Reproductive Mean Temperature -->
+          <div class="form-group">
+            <label for="rep-temp">Reproductive Avg Daily Temp (&deg;C)</label>
+            <div class="range-slider-wrapper">
+              <input type="range" id="rep-temp" class="range-slider" min="5" max="40" value="26" oninput="updateSliderVal('rep-temp', '&deg;C'); calculateIndices();">
+              <span id="rep-temp-val" class="slider-val">26 &deg;C</span>
+            </div>
+          </div>
+
+          <!-- Reproductive Max Temperature (for heat stress calculation) -->
+          <div class="form-group">
+            <label for="rep-max-temp">Reproductive Max Daily Temp (&deg;C)</label>
+            <div class="range-slider-wrapper">
+              <input type="range" id="rep-max-temp" class="range-slider" min="15" max="45" value="33" oninput="updateSliderVal('rep-max-temp', '&deg;C'); calculateIndices();">
+              <span id="rep-max-temp-val" class="slider-val">33 &deg;C</span>
+            </div>
+          </div>
+
+          <!-- Reproductive Daily Rainfall -->
+          <div class="form-group">
+            <label for="rep-rain">Reproductive Daily Rainfall (mm/day)</label>
+            <div class="range-slider-wrapper">
+              <input type="range" id="rep-rain" class="range-slider" min="0" max="25" value="1" oninput="updateSliderVal('rep-rain', ' mm'); calculateIndices();">
+              <span id="rep-rain-val" class="slider-val">1 mm</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulated Results Panel -->
+        <div class="calc-results">
+          <h3>Simulated Enviromic Outputs</h3>
+          
+          <div class="results-grid">
+            <!-- 1. Vegetative GDD -->
+            <div class="result-card">
+              <div class="result-meta">
+                <span class="result-label">Stage 1: Vegetative</span>
+                <span class="result-title">GDD Vegetative (GDD_Veg)</span>
+              </div>
+              <span id="res-veg-gdd" class="result-value">540</span>
+            </div>
+
+            <!-- 2. Reproductive GDD -->
+            <div class="result-card">
+              <div class="result-meta">
+                <span class="result-label">Stage 2: Reproductive</span>
+                <span class="result-title">GDD Reproductive (GDD_Rep)</span>
+              </div>
+              <span id="res-rep-gdd" class="result-value">560</span>
+            </div>
+
+            <!-- 3. Total Accumulated Rainfall -->
+            <div class="result-card">
+              <div class="result-meta">
+                <span class="result-label">Water Hydrology</span>
+                <span class="result-title">Total Trial Rainfall</span>
+              </div>
+              <span id="res-total-rain" class="result-value">215 mm</span>
+            </div>
+
+            <!-- 4. Thermal Stress Assessment -->
+            <div class="result-card">
+              <div class="result-meta">
+                <span class="result-label">Abiotic Stress Factor</span>
+                <span class="result-title">Heat Stress Exposure</span>
+              </div>
+              <span id="res-heat-stress" class="result-value accent">Moderate</span>
+            </div>
+
+            <!-- 5. General Adaptability Index -->
+            <div class="result-card" style="border-color: rgba(212, 163, 115, 0.3); background: rgba(212, 163, 115, 0.04);">
+              <div class="result-meta">
+                <span class="result-label" style="color: var(--color-accent);">Predictive Model</span>
+                <span class="result-title" style="color: var(--color-text-light);">Phenoclimatic Adaptability Index (PAI)</span>
+              </div>
+              <span id="res-pai" class="result-value accent">84%</span>
+            </div>
+          </div>
+
+          <p style="font-size: 0.8rem; color: rgba(250, 249, 246, 0.4); margin-top: 2rem; line-height: 1.5; text-align: center; font-style: italic;">
+            Note: This calculator simulates daily meteorological variables inside MERIDIAN's engine to compute stage-aware aggregates based on date files.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Scientific Rigor Section -->
+  <section class="section-padding rigor-bg" id="science">
+    <div class="container">
+      <div class="rigor-cols">
+        <div class="rigor-desc">
+          <span class="badge" style="background: rgba(212, 163, 115, 0.12); color: var(--color-accent);">Scientific Excellence</span>
+          <h2>Publication-Grade Biometrics</h2>
+          <p>MERIDIAN implements rigorous mathematical equations mapped to major peer-reviewed breeding journals. We represent mixed model structures and multi-environment interactions accurately.</p>
+          <p>We leverage advanced tensor-product P-splines to partition localized field row-column gradients cleanly, bypassing experimental design limitations seamlessly.</p>
+          <p>By integrating AMMI Singular Value Decomposition, the system isolates genotype variance components across PCA projections to locate optimal breeding targets.</p>
+        </div>
+        <div>
+          <!-- Equation 1: Mixed Model -->
+          <div style="font-family: var(--font-display); font-size: 0.85rem; letter-spacing: 0.05em; color: var(--color-accent); text-transform: uppercase; margin-bottom: 0.5rem;">1. Linear Mixed Model (LMM) Structure</div>
+          <div class="math-formula-box">
+            \[ \mathbf{y} = \mathbf{X}\boldsymbol{\beta} + \mathbf{Z}\mathbf{u} + \boldsymbol{\varepsilon} \]
+          </div>
+          <p style="font-size: 0.85rem; color: rgba(250, 249, 246, 0.5); margin-bottom: 2rem;">
+            Where \(\mathbf{y}\) represents phenotypic measurements, \(\boldsymbol{\beta}\) is the vector of environmental and block fixed effects, \(\mathbf{u} \sim \mathcal{N}(\mathbf{0}, \mathbf{G})\) is the vector of random genotypic effects, and \(\boldsymbol{\varepsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{R})\) represents standard experimental error components.
+          </p>
+
+          <!-- Equation 2: AMMI Model -->
+          <div style="font-family: var(--font-display); font-size: 0.85rem; letter-spacing: 0.05em; color: var(--color-accent); text-transform: uppercase; margin-bottom: 0.5rem;">2. Additive Main Effects & Multiplicative Interaction</div>
+          <div class="math-formula-box">
+            \[ Y_{ij} = \mu + g_i + e_j + \sum_{k=1}^{n} \lambda_k \alpha_{ik} \gamma_{jk} + \theta_{ij} \]
+          </div>
+          <p style="font-size: 0.85rem; color: rgba(250, 249, 246, 0.5);">
+            Where \(Y_{ij}\) is the mean trait value of genotype \(i\) in environment \(j\), \(g_i\) and \(e_j\) represent main genotype and environmental effects, \(\lambda_k\) represents eigenvalues of PC axis \(k\), and \(\alpha_{ik}, \gamma_{jk}\) are genotypic and environmental eigenvector loadings.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Installation / CLI Guide -->
+  <section class="section-padding" id="installation">
+    <div class="container" style="max-width: 850px; text-align: center;">
+      <span class="badge">Quick Deployment</span>
+      <h2>Deploy MERIDIAN to Your Machine</h2>
+      <p style="margin-bottom: 2rem;">Run standard package commands directly in R or RStudio to boot the full application environment locally.</p>
+      
+      <div class="cli-box">
+        <div class="cli-header">
+          <span class="cli-title">R CONSOLE INSTALLATION</span>
+          <button class="btn-copy" onclick="copyConsoleCode()">Copy Code</button>
+        </div>
+        <div class="cli-body" id="r-console-code" style="text-align: left;">
+          <span class="comment"># 1. Install devtools package if missing</span><br>
+          if (!require("devtools", quietly = TRUE)) install.packages("devtools")<br><br>
+          <span class="comment"># 2. Retrieve MERIDIAN directly from your repository</span><br>
+          devtools::install_github("SalvaOsuna/MERIDIAN")<br><br>
+          <span class="comment"># 3. Initialize the application server</span><br>
+          library(MERIDIAN)<br>
+          run_app()
+        </div>
+      </div>
+      <div id="copy-confirmation" style="margin-top: 0.8rem; font-size: 0.85rem; color: var(--color-primary-light); font-weight: bold; opacity: 0; transition: opacity 0.3s ease;">
+        ✓ R code block copied to clipboard!
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-grid">
+      <div class="footer-logo">
+        MERIDIAN<span>.</span>
+      </div>
+      <div>
+        &copy; 2026 MERIDIAN Development Team. All rights reserved. Elegant Science & Crop Analytics.
+      </div>
+      <a href="https://github.com/SalvaOsuna" target="_blank" rel="noopener noreferrer" style="color: var(--color-accent); font-weight: 600;">
+        Author Profile
+      </a>
+    </div>
+  </footer>
+
+  <!-- Web Interactions Script -->
+  <script>
+    // Tab switching controller
+    function switchTab(event, tabId) {
+      // Deactivate all tabs
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      const tabContents = document.querySelectorAll('.tab-content');
+      
+      tabBtns.forEach(btn => btn.classList.remove('active'));
+      tabContents.forEach(content => content.classList.remove('active'));
+      
+      // Activate target tab
+      event.currentTarget.classList.add('active');
+      const targetContent = document.getElementById(tabId);
+      if (targetContent) {
+        targetContent.classList.add('active');
+      }
+    }
+
+    // Dynamic slider label values updates
+    function updateSliderVal(id, unit) {
+      const slider = document.getElementById(id);
+      const output = document.getElementById(id + '-val');
+      if (slider && output) {
+        output.innerHTML = slider.value + unit;
+      }
+    }
+
+    // Agroclimatic calculator formula calculations
+    function calculateIndices() {
+      // Inputs
+      const baseTemp = parseFloat(document.getElementById('base-temp').value) || 10.0;
+      const vegDuration = parseInt(document.getElementById('veg-duration').value) || 0;
+      const vegTemp = parseFloat(document.getElementById('veg-temp').value) || 0;
+      const vegRain = parseFloat(document.getElementById('veg-rain').value) || 0;
+      
+      const repDuration = parseInt(document.getElementById('rep-duration').value) || 0;
+      const repTemp = parseFloat(document.getElementById('rep-temp').value) || 0;
+      const repMaxTemp = parseFloat(document.getElementById('rep-max-temp').value) || 0;
+      const repRain = parseFloat(document.getElementById('rep-rain').value) || 0;
+
+      // 1. Vegetative GDD
+      const vegGDD = Math.max(0, Math.round(vegDuration * Math.max(0, vegTemp - baseTemp)));
+      document.getElementById('res-veg-gdd').innerText = vegGDD;
+
+      // 2. Reproductive GDD
+      const repGDD = Math.max(0, Math.round(repDuration * Math.max(0, repTemp - baseTemp)));
+      document.getElementById('res-rep-gdd').innerText = repGDD;
+
+      // 3. Water Hydrology (Rainfall Sum)
+      const totalRain = Math.round((vegDuration * vegRain) + (repDuration * repRain));
+      document.getElementById('res-total-rain').innerText = totalRain + ' mm';
+
+      // 4. Heat Stress Exposure Assessment
+      let stressRating = 'Optimal';
+      let stressColor = '#52B788'; // green
+      if (repMaxTemp >= 38) {
+        stressRating = 'Critical Abiotic Stress';
+        stressColor = '#FF5F56'; // red
+      } else if (repMaxTemp >= 34) {
+        stressRating = 'Severe Heat Stress';
+        stressColor = '#FFBD2E'; // yellow
+      } else if (repMaxTemp >= 31) {
+        stressRating = 'Moderate Heat Stress';
+        stressColor = '#D4A373'; // gold
+      }
+      
+      const heatStressSpan = document.getElementById('res-heat-stress');
+      heatStressSpan.innerText = stressRating;
+      heatStressSpan.style.color = stressColor;
+
+      // 5. Phenoclimatic Adaptability Index (PAI) calculation
+      // Perfect rain range: 200mm - 450mm
+      // Perfect Temp: 20C - 28C
+      let rainfallPenalty = 0;
+      if (totalRain < 150) {
+        rainfallPenalty = (150 - totalRain) * 0.35; // drought
+      } else if (totalRain > 500) {
+        rainfallPenalty = (totalRain - 500) * 0.15; // flooding
+      }
+
+      let heatPenalty = 0;
+      if (repMaxTemp > 30) {
+        heatPenalty = (repMaxTemp - 30) * 4.5;
+      }
+      if (vegTemp > 30) {
+        heatPenalty += (vegTemp - 30) * 2;
+      }
+
+      let gddAchievement = Math.min(100, Math.max(0, (vegGDD + repGDD) / 12)); // mock scale
+
+      let pai = Math.round(Math.max(10, Math.min(100, 95 - rainfallPenalty - heatPenalty)));
+      document.getElementById('res-pai').innerText = pai + '%';
+    }
+
+    // CLI code block clipboard copy functionality
+    function copyConsoleCode() {
+      const codeText = `if (!require("devtools", quietly = TRUE)) install.packages("devtools")\ndevtools::install_github("SalvaOsuna/MERIDIAN")\nlibrary(MERIDIAN)\nrun_app()`;
+      navigator.clipboard.writeText(codeText).then(() => {
+        const confirmation = document.getElementById('copy-confirmation');
+        confirmation.style.opacity = '1';
+        setTimeout(() => {
+          confirmation.style.opacity = '0';
+        }, 2500);
+      });
+    }
+
+    // Initialize calculator outputs on load
+    window.onload = function() {
+      calculateIndices();
+    };
+  </script>
+</body>
+</html>

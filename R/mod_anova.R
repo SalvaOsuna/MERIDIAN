@@ -558,7 +558,8 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_anova_table_report, {
       req(report_registry, anova_results(), anova_results()$anova$anova_table)
-      trait <- shiny::isolate(anova_results()$trait)
+      res_snapshot <- shiny::isolate(anova_results())
+      trait <- res_snapshot$trait
       sig <- make_dataset_signature(db())
       register_report_table(
         registry = report_registry,
@@ -567,11 +568,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
         module = "ANOVA & Variance Components",
         trait = trait,
         table_builder = function() {
-          res <- anova_results()
-          if (is.null(res) || !identical(res$trait, trait)) {
-            stop("ANOVA results for this trait are no longer active. Please rerun and resend.")
-          }
-          as.data.frame(res$anova$anova_table)
+          as.data.frame(res_snapshot$anova$anova_table)
         },
         metadata = list(table_family = "anova", dataset_signature = sig)
       )
@@ -580,7 +577,8 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_ss_barplot_report, {
       req(report_registry, anova_results(), anova_results()$anova$anova_table)
-      trait <- shiny::isolate(anova_results()$trait)
+      res_snapshot <- shiny::isolate(anova_results())
+      trait <- res_snapshot$trait
       sig <- make_dataset_signature(db())
       register_report_plot(
         registry = report_registry,
@@ -589,11 +587,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
         module = "ANOVA & Variance Components",
         trait = trait,
         plot_builder = function() {
-          res <- anova_results()
-          if (is.null(res) || !identical(res$trait, trait)) {
-            stop("ANOVA sum of squares for this trait is no longer active. Please rerun and resend.")
-          }
-          build_ss_barplot_gg(res)
+          build_ss_barplot_gg(res_snapshot)
         },
         metadata = list(plot_family = "sum_squares", dataset_signature = sig)
       )
@@ -602,7 +596,8 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_blues_plot_report, {
       req(report_registry, anova_results(), anova_results()$blues)
-      trait <- shiny::isolate(anova_results()$trait)
+      res_snapshot <- shiny::isolate(anova_results())
+      trait <- res_snapshot$trait
       sig <- make_dataset_signature(db())
       register_report_plot(
         registry = report_registry,
@@ -611,11 +606,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
         module = "ANOVA & Variance Components",
         trait = trait,
         plot_builder = function() {
-          res <- anova_results()
-          if (is.null(res) || !identical(res$trait, trait)) {
-            stop("ANOVA BLUEs for this trait are no longer active. Please rerun and resend.")
-          }
-          build_blues_plot_gg(res)
+          build_blues_plot_gg(res_snapshot)
         },
         metadata = list(plot_family = "blues", dataset_signature = sig)
       )
@@ -624,7 +615,8 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_var_partition_report, {
       req(report_registry, anova_results(), anova_results()$mixed$var_table)
-      trait <- shiny::isolate(anova_results()$trait)
+      res_snapshot <- shiny::isolate(anova_results())
+      trait <- res_snapshot$trait
       sig <- make_dataset_signature(db())
       register_report_plot(
         registry = report_registry,
@@ -633,11 +625,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
         module = "ANOVA & Variance Components",
         trait = trait,
         plot_builder = function() {
-          res <- anova_results()
-          if (is.null(res) || !identical(res$trait, trait)) {
-            stop("ANOVA variance partition for this trait is no longer active. Please rerun and resend.")
-          }
-          build_var_partition_gg(res)
+          build_var_partition_gg(res_snapshot)
         },
         metadata = list(plot_family = "variance_partition", dataset_signature = sig)
       )
@@ -646,7 +634,8 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_blups_plot_report, {
       req(report_registry, anova_results(), anova_results()$blups)
-      trait <- shiny::isolate(anova_results()$trait)
+      res_snapshot <- shiny::isolate(anova_results())
+      trait <- res_snapshot$trait
       sig <- make_dataset_signature(db())
       register_report_plot(
         registry = report_registry,
@@ -655,11 +644,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
         module = "ANOVA & Variance Components",
         trait = trait,
         plot_builder = function() {
-          res <- anova_results()
-          if (is.null(res) || !identical(res$trait, trait)) {
-            stop("ANOVA BLUPs for this trait are no longer active. Please rerun and resend.")
-          }
-          build_blups_plot_gg(res)
+          build_blups_plot_gg(res_snapshot)
         },
         metadata = list(plot_family = "blups", dataset_signature = sig)
       )

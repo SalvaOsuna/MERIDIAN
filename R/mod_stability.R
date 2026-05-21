@@ -704,7 +704,8 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
 
     register_stability_plot <- function(name, label, builder, metadata = list()) {
       req(report_registry, stab_results())
-      trait <- shiny::isolate(stab_results()$trait)
+      res_snapshot <- shiny::isolate(stab_results())
+      trait <- res_snapshot$trait
       sig <- make_dataset_signature(db())
       register_report_plot(
         registry = report_registry,
@@ -713,11 +714,7 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
         module = "Stability Analysis",
         trait = trait,
         plot_builder = function() {
-          res <- stab_results()
-          if (is.null(res) || !identical(res$trait, trait)) {
-            stop("Stability results for this trait are no longer active. Please rerun and resend.")
-          }
-          builder(res)
+          builder(res_snapshot)
         },
         metadata = c(metadata, list(dataset_signature = sig))
       )
@@ -726,7 +723,8 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
 
     register_stability_table <- function(name, label, builder, metadata = list()) {
       req(report_registry, stab_results())
-      trait <- shiny::isolate(stab_results()$trait)
+      res_snapshot <- shiny::isolate(stab_results())
+      trait <- res_snapshot$trait
       sig <- make_dataset_signature(db())
       register_report_table(
         registry = report_registry,
@@ -735,11 +733,7 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
         module = "Stability Analysis",
         trait = trait,
         table_builder = function() {
-          res <- stab_results()
-          if (is.null(res) || !identical(res$trait, trait)) {
-            stop("Stability results for this trait are no longer active. Please rerun and resend.")
-          }
-          as.data.frame(builder(res))
+          as.data.frame(builder(res_snapshot))
         },
         metadata = c(metadata, list(dataset_signature = sig))
       )

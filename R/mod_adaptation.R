@@ -125,14 +125,23 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
         env_cor <- NULL
         
         if (!is.null(db()$env_data)) {
+          # Dynamically detect environment column in env_data
+          env_names <- names(db()$env_data)
+          env_data_env_col <- env_names[grep("^(env|site|loc)", env_names, ignore.case = TRUE)][1]
+          if (is.na(env_data_env_col)) env_data_env_col <- db()$env_col
+          
           env_res <- safe_analysis(
-            compute_env_pca(db()$env_data, db()$env_col),
+            compute_env_pca(db()$env_data, env_data_env_col),
             session
           )
           
           if (!is.null(fw_res$env_means)) {
+             # Standardize environment column in env_means for merging
+             env_means_std <- fw_res$env_means
+             names(env_means_std)[1] <- env_data_env_col
+             
              env_cor <- safe_analysis(
-               compute_covariate_correlations(db()$env_data, fw_res$env_means, db()$env_col),
+               compute_covariate_correlations(db()$env_data, env_means_std, env_data_env_col),
                session
              )
           }
@@ -278,6 +287,8 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
 
     register_adaptation_plot <- function(name, label, builder, metadata = list()) {
       req(report_registry, adapt_results(), input$trait)
+      res_snapshot <- shiny::isolate(adapt_results())
+      db_snapshot <- shiny::isolate(data_result$data_bundle())
       trait <- shiny::isolate(input$trait)
       sig <- make_dataset_signature(db())
       register_report_plot(
@@ -287,10 +298,8 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
         module = "Adaptation & Enviromics",
         trait = trait,
         plot_builder = function() {
-          res <- adapt_results()
-          current_db <- data_result$data_bundle()
-          if (is.null(res) || is.null(current_db)) stop("Adaptation results are unavailable.")
-          builder(res, current_db, trait)
+          if (is.null(res_snapshot) || is.null(db_snapshot)) stop("Adaptation results are unavailable.")
+          builder(res_snapshot, db_snapshot, trait)
         },
         metadata = c(metadata, list(dataset_signature = sig))
       )
@@ -410,20 +419,57 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
       df_pca <- as.data.frame(pca$x)
       df_pca$Environment <- env_labels
       
-      p <- ggplot2::ggplot(df_pca, ggplot2::aes(x = PC1, y = PC2, label = Environment)) +
-        ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = meridian_nature_color("neutral_mid"), linewidth = 0.35) +
-        ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = meridian_nature_color("neutral_mid"), linewidth = 0.35) +
-        ggplot2::geom_point(color = meridian_nature_color("signal_blue"), size = 1.8) +
-        ggrepel::geom_text_repel(size = 2.1, max.overlaps = 20) +
-        ggplot2::labs(
-          title = "Environmental PCA",
-          x = paste0("PC1 (", round(summary(pca)$importance[2,1]*100, 1), "%)"),
-          y = paste0("PC2 (", round(summary(pca)$importance[2,2]*100, 1), "%)")
-        ) +
-        theme_meridian_nature()
+      pc1_pct <- round(summary(pca)$importance[2,1]*100, 1)
+      pc2_pct <- round(summary(pca)$importance[2,2]*100, 1)
       
-      plotly::ggplotly(p)
+      p <- plotly::plot_ly(
+        data = df_pca,
+        x = ~PC1,
+        y = ~PC2,
+        type = "scatter",
+        mode = "markers+text",
+        text = ~Environment,
+        textposition = "top center",
+        marker = list(
+          color = meridian_nature_color("signal_blue"),
+          size = 8
+        ),
+        textfont = list(
+          color = meridian_nature_color("neutral_dark"),
+          size = 11
+        ),
+        hoverinfo = "text",
+        hovertext = ~paste0("Environment: ", Environment, "<br>PC1: ", round(PC1, 3), "<br>PC2: ", round(PC2, 3))
+      )
+      
+      p <- plotly::layout(
+        p,
+        title = list(
+          text = "Environmental PCA",
+          font = list(family = "Arial", size = 14, color = meridian_nature_color("neutral_dark"))
+        ),
+        xaxis = list(
+          title = paste0("PC1 (", pc1_pct, "%)"),
+          zeroline = TRUE,
+          zerolinecolor = meridian_nature_color("neutral_mid"),
+          zerolinedash = "dash",
+          zerolinewidth = 1,
+          showgrid = FALSE
+        ),
+        yaxis = list(
+          title = paste0("PC2 (", pc2_pct, "%)"),
+          zeroline = TRUE,
+          zerolinecolor = meridian_nature_color("neutral_mid"),
+          zerolinedash = "dash",
+          zerolinewidth = 1,
+          showgrid = FALSE
+        ),
+        plot_bgcolor = "#ffffff",
+        paper_bgcolor = "#ffffff"
+      )
+      p
     })
+
     
     output$plot_env_cor <- plotly::renderPlotly({
       req(adapt_results()$env_cor)
@@ -534,7 +580,8 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
       req(res)
       
       col_names <- names(env_df)
-      env_col <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+      env_col <- col_names[grep("^(env|site|loc)", col_names, ignore.case = TRUE)][1]
+      if (is.na(env_col)) env_col <- db()$env_col
       lat_col <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
       lon_col <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
       
@@ -575,7 +622,8 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
       trait_means <- env_means_trait()
       
       col_names <- names(env_df)
-      env_col <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+      env_col <- col_names[grep("^(env|site|loc)", col_names, ignore.case = TRUE)][1]
+      if (is.na(env_col)) env_col <- db()$env_col
       
       # Ensure column names are standardized for merge
       names(trait_means)[1] <- env_col
@@ -591,9 +639,8 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
       covariate <- input$climatic_covariate
       trait <- input$trait
       
-      # Select env column
-      col_names <- names(df_merged)
-      env_col <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+      env_col <- col_names[grep("^(env|site|loc)", col_names, ignore.case = TRUE)][1]
+      if (is.na(env_col)) env_col <- db()$env_col
       
       x_vals <- as.numeric(df_merged[[covariate]])
       y_vals <- as.numeric(df_merged$Trait_Mean)
@@ -687,7 +734,8 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
       
       # Select all covariate columns (numeric and not lat/lon/dates)
       col_names <- names(df_merged)
-      env_col <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+      env_col <- col_names[grep("^(env|site|loc)", col_names, ignore.case = TRUE)][1]
+      if (is.na(env_col)) env_col <- db()$env_col
       lat_col <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
       lon_col <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
       
@@ -739,22 +787,26 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
         )
     })
     
-    # ---- Report Exporting Handlers ----
     build_climatic_driver_gg <- function(res, current_db, trait, covariate) {
       req(current_db$env_data, trait, covariate)
       df <- current_db$data
-      env_col <- current_db$env_col
+      env_col_pheno <- current_db$env_col
       df_std <- df[!is.na(df[[trait]]), ]
-      means <- tapply(df_std[[trait]], df_std[[env_col]], mean, na.rm = TRUE)
+      means <- tapply(df_std[[trait]], df_std[[env_col_pheno]], mean, na.rm = TRUE)
       
       trait_means <- data.frame(
         Environment = names(means),
         Trait_Mean = as.numeric(means),
         stringsAsFactors = FALSE
       )
-      names(trait_means)[1] <- env_col
       
-      df_merged <- dplyr::inner_join(current_db$env_data, trait_means, by = env_col)
+      env_data_col_names <- names(current_db$env_data)
+      env_data_env_col <- env_data_col_names[grep("^(env|site|loc)", env_data_col_names, ignore.case = TRUE)][1]
+      if (is.na(env_data_env_col)) env_data_env_col <- env_col_pheno
+      
+      names(trait_means)[1] <- env_data_env_col
+      
+      df_merged <- dplyr::inner_join(current_db$env_data, trait_means, by = env_data_env_col)
       
       x_vals <- as.numeric(df_merged[[covariate]])
       y_vals <- as.numeric(df_merged$Trait_Mean)
@@ -773,24 +825,29 @@ mod_adaptation_server <- function(id, data_result, report_registry = NULL) {
     build_climatic_importance_gg <- function(res, current_db, trait) {
       req(current_db$env_data, trait)
       df <- current_db$data
-      env_col <- current_db$env_col
+      env_col_pheno <- current_db$env_col
       df_std <- df[!is.na(df[[trait]]), ]
-      means <- tapply(df_std[[trait]], df_std[[env_col]], mean, na.rm = TRUE)
+      means <- tapply(df_std[[trait]], df_std[[env_col_pheno]], mean, na.rm = TRUE)
       
       trait_means <- data.frame(
         Environment = names(means),
         Trait_Mean = as.numeric(means),
         stringsAsFactors = FALSE
       )
-      names(trait_means)[1] <- env_col
       
-      df_merged <- dplyr::inner_join(current_db$env_data, trait_means, by = env_col)
+      env_data_col_names <- names(current_db$env_data)
+      env_data_env_col <- env_data_col_names[grep("^(env|site|loc)", env_data_col_names, ignore.case = TRUE)][1]
+      if (is.na(env_data_env_col)) env_data_env_col <- env_col_pheno
+      
+      names(trait_means)[1] <- env_data_env_col
+      
+      df_merged <- dplyr::inner_join(current_db$env_data, trait_means, by = env_data_env_col)
       
       col_names <- names(df_merged)
       lat_col <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
       lon_col <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
       
-      exclude_cols <- c(env_col, lat_col, lon_col, "PlantingDate", "HarvestDate", "Trait_Mean")
+      exclude_cols <- c(env_data_env_col, lat_col, lon_col, "PlantingDate", "HarvestDate", "Trait_Mean")
       num_cols <- names(df_merged)[sapply(df_merged, is.numeric)]
       covariates <- setdiff(num_cols, exclude_cols)
       

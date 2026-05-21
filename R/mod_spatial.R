@@ -1022,14 +1022,16 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_spats_var_plot_report, {
       req(var_components_df())
+      var_comp_snapshot <- shiny::isolate(var_components_df())
       trait <- shiny::isolate(input$trait)
       register_spatial_plot("variance_partition", "SpATS variance partition plot",
-        function() build_spats_var_plot_gg(var_components_df(), trait),
+        function() build_spats_var_plot_gg(var_comp_snapshot, trait),
         list(plot_family = "variance_partition")
       )
     })
     shiny::observeEvent(input$send_spats_trend_report, {
       req(spats_model())
+      mod_snapshot <- shiny::isolate(spats_model())
       trait <- shiny::isolate(input$trait)
       env <- shiny::isolate(input$env)
       plot_opts <- shiny::isolate(list(
@@ -1043,10 +1045,9 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       ))
       register_spatial_plot(paste0("spatial_trend_", env), paste("SpATS spatial trend map -", env),
         function() {
-          mod <- spats_model()
-          if (is.null(mod)) stop("The SpATS model is no longer active. Please rerun and resend.")
+          if (is.null(mod_snapshot)) stop("The SpATS model is no longer active. Please rerun and resend.")
           build_spats_trend_figure_gg(
-            mod = mod,
+            mod = mod_snapshot,
             trait = trait,
             env = env,
             spa_trend = plot_opts$spa_trend,
@@ -1073,20 +1074,23 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
     })
     shiny::observeEvent(input$send_spats_var_table_report, {
       req(var_components_df())
+      var_comp_snapshot <- shiny::isolate(var_components_df())
       register_spatial_table("variance_components", "SpATS variance components table",
-        function() var_components_df()
+        function() var_comp_snapshot
       )
     })
     shiny::observeEvent(input$send_means_table_report, {
       req(adjusted_means())
+      adj_means_snapshot <- shiny::isolate(adjusted_means())
       register_spatial_table("within_environment_means", "SpATS adjusted means table",
-        function() adjusted_means()
+        function() adj_means_snapshot
       )
     })
     shiny::observeEvent(input$send_means_all_table_report, {
       req(across_env_results())
+      across_env_snapshot <- shiny::isolate(across_env_results())
       register_spatial_table("across_environment_means", "SpATS across-environment means table",
-        function() across_env_results()$across
+        function() across_env_snapshot$across
       )
     })
 

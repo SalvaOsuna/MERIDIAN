@@ -880,7 +880,7 @@ validate_environmental_data <- function(env_df) {
   }
   
   col_names <- names(env_df)
-  env_col  <- col_names[grep("^env", col_names, ignore.case = TRUE)][1]
+  env_col  <- col_names[grep("^(env|site|loc)", col_names, ignore.case = TRUE)][1]
   lat_col  <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
   lon_col  <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
   pdate_col <- col_names[grep("plant", col_names, ignore.case = TRUE)][1]

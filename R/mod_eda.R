@@ -348,6 +348,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_boxplot_report, {
       req(report_registry, db(), input$box_trait)
+      db_snapshot <- shiny::isolate(data_result$data_bundle())
       trait <- shiny::isolate(input$box_trait)
       group_by <- shiny::isolate(input$box_group)
       group_col <- shiny::isolate(box_group_col())
@@ -362,10 +363,9 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         module = "Exploratory Analysis",
         trait = trait,
         plot_builder = function() {
-          current_db <- data_result$data_bundle()
-          if (is.null(current_db)) stop("No dataset is currently loaded.")
+          if (is.null(db_snapshot)) stop("No dataset is currently loaded.")
           plot_boxplots(
-            df = current_db$data,
+            df = db_snapshot$data,
             trait = trait,
             group_col = group_col,
             color_col = group_col,
@@ -643,6 +643,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_distribution_report, {
       req(report_registry, distribution_plot_obj(), input$dist_trait)
+      db_snapshot <- shiny::isolate(data_result$data_bundle())
       traits <- shiny::isolate(input$dist_trait)
       settings <- shiny::isolate(list(
         traits = traits,
@@ -667,10 +668,9 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         module = "Exploratory Analysis",
         trait = trait_label,
         plot_builder = function() {
-          current_db <- data_result$data_bundle()
-          if (is.null(current_db)) stop("No dataset is currently loaded.")
+          if (is.null(db_snapshot)) stop("No dataset is currently loaded.")
           build_distribution_plot(
-            current_db = current_db,
+            current_db = db_snapshot,
             traits = settings$traits,
             envs = settings$envs,
             bins = settings$bins,
@@ -742,6 +742,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_heatmap_report, {
       req(report_registry, db(), input$heat_trait)
+      db_snapshot <- shiny::isolate(data_result$data_bundle())
       trait <- shiny::isolate(input$heat_trait)
       cluster_rows <- shiny::isolate(input$heat_cluster_rows)
       cluster_cols <- shiny::isolate(input$heat_cluster_cols)
@@ -753,9 +754,8 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         module = "Exploratory Analysis",
         trait = trait,
         plot_builder = function() {
-          current_db <- data_result$data_bundle()
-          if (is.null(current_db)) stop("No dataset is currently loaded.")
-          build_ge_heatmap_gg(current_db, trait, cluster_rows, cluster_cols)
+          if (is.null(db_snapshot)) stop("No dataset is currently loaded.")
+          build_ge_heatmap_gg(db_snapshot, trait, cluster_rows, cluster_cols)
         },
         metadata = list(plot_family = "gxe_heatmap", dataset_signature = sig)
       )
@@ -793,6 +793,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_cor_report, {
       req(report_registry, db(), input$cor_trait)
+      db_snapshot <- shiny::isolate(data_result$data_bundle())
       trait <- shiny::isolate(input$cor_trait)
       method <- shiny::isolate(input$cor_method)
       sig <- make_dataset_signature(db())
@@ -803,9 +804,8 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         module = "Exploratory Analysis",
         trait = trait,
         plot_builder = function() {
-          current_db <- data_result$data_bundle()
-          if (is.null(current_db)) stop("No dataset is currently loaded.")
-          build_env_correlation_gg(current_db, trait, method)
+          if (is.null(db_snapshot)) stop("No dataset is currently loaded.")
+          build_env_correlation_gg(db_snapshot, trait, method)
         },
         metadata = list(plot_family = "environment_correlation", method = method, dataset_signature = sig)
       )
@@ -838,6 +838,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_outlier_report, {
       req(report_registry, outlier_data(), input$out_trait)
+      db_snapshot <- shiny::isolate(data_result$data_bundle())
       trait <- shiny::isolate(input$out_trait)
       method <- shiny::isolate(input$out_method)
       sig <- make_dataset_signature(db())
@@ -848,10 +849,9 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         module = "Exploratory Analysis",
         trait = trait,
         plot_builder = function() {
-          current_db <- data_result$data_bundle()
-          if (is.null(current_db)) stop("No dataset is currently loaded.")
-          od <- detect_outliers(current_db$data, trait, current_db$env_col, method)
-          plot_outlier_scatter(od, trait, current_db$env_col, current_db$gen_col)
+          if (is.null(db_snapshot)) stop("No dataset is currently loaded.")
+          od <- detect_outliers(db_snapshot$data, trait, db_snapshot$env_col, method)
+          plot_outlier_scatter(od, trait, db_snapshot$env_col, db_snapshot$gen_col)
         },
         metadata = list(plot_family = "outlier_scatter", method = method, dataset_signature = sig)
       )
@@ -933,6 +933,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_grand_report, {
       req(report_registry, grand_summary())
+      db_snapshot <- shiny::isolate(data_result$data_bundle())
       sig <- make_dataset_signature(db())
       register_report_table(
         registry = report_registry,
@@ -941,9 +942,8 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         module = "Exploratory Analysis",
         trait = "All traits",
         table_builder = function() {
-          current_db <- data_result$data_bundle()
-          if (is.null(current_db)) stop("No dataset is currently loaded.")
-          compute_grand_summary(current_db$data, current_db$traits)
+          if (is.null(db_snapshot)) stop("No dataset is currently loaded.")
+          compute_grand_summary(db_snapshot$data, db_snapshot$traits)
         },
         metadata = list(table_family = "grand_summary", dataset_signature = sig)
       )
@@ -952,6 +952,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
     shiny::observeEvent(input$send_env_report, {
       req(report_registry, env_summary())
+      db_snapshot <- shiny::isolate(data_result$data_bundle())
       sig <- make_dataset_signature(db())
       register_report_table(
         registry = report_registry,
@@ -960,9 +961,8 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
         module = "Exploratory Analysis",
         trait = "All traits",
         table_builder = function() {
-          current_db <- data_result$data_bundle()
-          if (is.null(current_db)) stop("No dataset is currently loaded.")
-          descriptive_summary(current_db$data, current_db$env_col, current_db$traits)
+          if (is.null(db_snapshot)) stop("No dataset is currently loaded.")
+          descriptive_summary(db_snapshot$data, db_snapshot$env_col, db_snapshot$traits)
         },
         metadata = list(table_family = "environment_summary", dataset_signature = sig)
       )
