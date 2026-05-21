@@ -113,6 +113,8 @@ mod_data_upload_ui <- function(id) {
       shiny::selectInput(ns("col_block"), LABELS$m1_select_block, choices = NULL),
       shiny::selectInput(ns("col_row"),   LABELS$m1_select_row,   choices = NULL),
       shiny::selectInput(ns("col_col"),   LABELS$m1_select_col,   choices = NULL),
+      shiny::selectInput(ns("col_pheno_flowering"), "Days to Flowering (Optional)", choices = NULL),
+      shiny::selectInput(ns("col_pheno_maturity"),  "Days to Maturity (Optional)",  choices = NULL),
 
       shinyWidgets::pickerInput(
         ns("col_traits"),
@@ -360,7 +362,48 @@ mod_data_upload_server <- function(id) {
           message = "Fetching NASA POWER daily weather...",
           value = 0,
           {
-            process_environmental_covariates(raw_env, session = session)
+            dtf_means <- NULL
+            dtm_means <- NULL
+            pheno_df <- raw_data()
+            pheno_env_col <- input$col_env
+            
+            if (!is.null(pheno_df) && !is.null(pheno_env_col) && pheno_env_col %in% names(pheno_df)) {
+              flowering_col <- input$col_pheno_flowering
+              maturity_col <- input$col_pheno_maturity
+              
+              if (!is.null(flowering_col) && flowering_col != "" && flowering_col %in% names(pheno_df)) {
+                dtf_vals <- suppressWarnings(as.numeric(pheno_df[[flowering_col]]))
+                if (any(!is.na(dtf_vals))) {
+                  dtf_agg <- aggregate(
+                    dtf_vals, 
+                    by = list(Env = pheno_df[[pheno_env_col]]), 
+                    FUN = mean, 
+                    na.rm = TRUE
+                  )
+                  dtf_means <- stats::setNames(dtf_agg$x, as.character(dtf_agg$Env))
+                }
+              }
+              
+              if (!is.null(maturity_col) && maturity_col != "" && maturity_col %in% names(pheno_df)) {
+                dtm_vals <- suppressWarnings(as.numeric(pheno_df[[maturity_col]]))
+                if (any(!is.na(dtm_vals))) {
+                  dtm_agg <- aggregate(
+                    dtm_vals, 
+                    by = list(Env = pheno_df[[pheno_env_col]]), 
+                    FUN = mean, 
+                    na.rm = TRUE
+                  )
+                  dtm_means <- stats::setNames(dtm_agg$x, as.character(dtm_agg$Env))
+                }
+              }
+            }
+            
+            process_environmental_covariates(
+              raw_env, 
+              dtf_means = dtf_means, 
+              dtm_means = dtm_means, 
+              session = session
+            )
           }
         )
       }, error = function(e) {
@@ -420,11 +463,23 @@ mod_data_upload_server <- function(id) {
         selected = detected$col %||% ""
       )
 
+      # Update pheno mapping dropdowns
+      shiny::updateSelectInput(session, "col_pheno_flowering",
+        choices  = choices_with_none,
+        selected = detected$flowering %||% ""
+      )
+      
+      shiny::updateSelectInput(session, "col_pheno_maturity",
+        choices  = choices_with_none,
+        selected = detected$maturity %||% ""
+      )
+
       # Detect numeric columns for traits
       numeric_cols <- col_names[sapply(df, is.numeric)]
       # Remove already-mapped columns from trait candidates
       mapped <- c(detected$genotype, detected$environment,
-                  detected$rep, detected$block, detected$row, detected$col)
+                  detected$rep, detected$block, detected$row, detected$col,
+                  detected$flowering, detected$maturity)
       trait_candidates <- setdiff(numeric_cols, mapped)
 
       shinyWidgets::updatePickerInput(session, "col_traits",
@@ -531,6 +586,8 @@ mod_data_upload_server <- function(id) {
         row_col    = row_col,
         col_col    = col_col,
         traits     = traits,
+        col_pheno_flowering = if (is.null(input$col_pheno_flowering) || input$col_pheno_flowering == "") NULL else input$col_pheno_flowering,
+        col_pheno_maturity  = if (is.null(input$col_pheno_maturity) || input$col_pheno_maturity == "") NULL else input$col_pheno_maturity,
         design     = design,
         augmented_checks = aug_checks,
         validation = validation,

@@ -4,10 +4,14 @@
 \alias{calculate_enviromic_indices}
 \title{Calculate summary agroclimatic indices from daily weather series}
 \usage{
-calculate_enviromic_indices(daily_weather)
+calculate_enviromic_indices(daily_weather, dtf_mean = NULL, dtm_mean = NULL)
 }
 \arguments{
 \item{daily_weather}{Data frame containing daily variables}
+
+\item{dtf_mean}{Mean days to flowering (optional)}
+
+\item{dtm_mean}{Mean days to maturity (optional)}
 }
 \value{
 A single-row data frame with computed indices

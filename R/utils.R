@@ -107,7 +107,9 @@ auto_detect_columns <- function(col_names) {
     block       = c("^block$", "^blk$", "^iblock$", "^sub_block$",
                     "^subblock$", "^incomplete_block$"),
     row         = c("^row$", "^row_coord$", "^r$"),
-    col         = c("^col$", "^column$", "^col_coord$", "^c$")
+    col         = c("^col$", "^column$", "^col_coord$", "^c$"),
+    flowering   = c("^days_to_flowering$", "^days_to_flower$", "^flowering$", "^dtf$", "^dth$"),
+    maturity    = c("^days_to_maturity$", "^maturity$", "^dtm$")
   )
 
   result <- list()

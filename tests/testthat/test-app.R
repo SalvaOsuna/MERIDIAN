@@ -83,3 +83,43 @@ test_that("process_environmental_covariates handles validation and offline statu
   )
   expect_equal(process_environmental_covariates(bad_data), bad_data)
 })
+
+test_that("calculate_enviromic_indices supports growth-stage partitioning", {
+  mock_daily <- data.frame(
+    T2M_MAX = c(25, 27, 24, 28, 31, 29),
+    T2M_MIN = c(15, 17, 14, 18, 21, 19),
+    PRECTOTCORR = c(2, 5, 0, 10, 1, 0),
+    RH2M = c(60, 70, 50, 65, 80, 75),
+    ALLSKY_SFC_SW_DWN = c(18, 20, 15, 22, 19, 21),
+    stringsAsFactors = FALSE
+  )
+  
+  # flowering at Day 2, maturity at Day 4 (total length 6 days)
+  indices <- calculate_enviromic_indices(mock_daily, dtf_mean = 2, dtm_mean = 4)
+  
+  # Standard variables
+  expect_true(all(c("MeanTemp_C", "TotalRainfall_mm", "GDD", "MeanRH_pct", "TotalSolar_MJ") %in% names(indices)))
+  
+  # Vegetative phase variables: Days 1 to 2
+  expect_true(all(c("GDD_Veg", "TotalRainfall_Veg", "MeanTemp_Veg") %in% names(indices)))
+  # GDD_Veg: Day 1 (avg 20 -> GDD = 10) + Day 2 (avg 22 -> GDD = 12) = 22
+  expect_equal(indices$GDD_Veg, 22.00)
+  expect_equal(indices$TotalRainfall_Veg, 7.00) # 2 + 5
+  expect_equal(indices$MeanTemp_Veg, 21.00) # (20 + 22) / 2
+  
+  # Reproductive phase variables: Days 3 to 4
+  expect_true(all(c("GDD_Rep", "TotalRainfall_Rep", "MeanTemp_Rep", "HeatStressDays_Rep") %in% names(indices)))
+  # GDD_Rep: Day 3 (avg 19 -> GDD = 9) + Day 4 (avg 23 -> GDD = 13) = 22
+  expect_equal(indices$GDD_Rep, 22.00)
+  expect_equal(indices$TotalRainfall_Rep, 10.00) # 0 + 10
+  expect_equal(indices$MeanTemp_Rep, 21.00) # (19 + 23) / 2
+  # HeatStressDays_Rep: T2M_MAX > 30. Day 3 (24), Day 4 (28) -> 0 days
+  expect_equal(indices$HeatStressDays_Rep, 0)
+  
+  # Late phase variables: Days 5 to 6
+  expect_true(all(c("GDD_Late", "TotalRainfall_Late", "MeanTemp_Late") %in% names(indices)))
+  # GDD_Late: Day 5 (avg 26 -> GDD = 16) + Day 6 (avg 24 -> GDD = 14) = 30
+  expect_equal(indices$GDD_Late, 30.00)
+  expect_equal(indices$TotalRainfall_Late, 1.00) # 1 + 0
+  expect_equal(indices$MeanTemp_Late, 25.00) # (26 + 24) / 2
+})

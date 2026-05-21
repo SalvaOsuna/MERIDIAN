@@ -288,9 +288,11 @@ fetch_nasa_weather <- function(lat, lon, start_date, end_date) {
 
 #' Calculate summary agroclimatic indices from daily weather series
 #' @param daily_weather Data frame containing daily variables
+#' @param dtf_mean Mean days to flowering (optional)
+#' @param dtm_mean Mean days to maturity (optional)
 #' @return A single-row data frame with computed indices
 #' @export
-calculate_enviromic_indices <- function(daily_weather) {
+calculate_enviromic_indices <- function(daily_weather, dtf_mean = NULL, dtm_mean = NULL) {
   if (is.null(daily_weather) || nrow(daily_weather) == 0) {
     return(data.frame(
       MeanTemp_C = as.numeric(NA),
@@ -314,21 +316,90 @@ calculate_enviromic_indices <- function(daily_weather) {
   mean_rh <- mean(rh, na.rm = TRUE)
   total_solar <- sum(solar, na.rm = TRUE)
   
-  data.frame(
+  res <- data.frame(
     MeanTemp_C = round(mean_temp, 2),
     TotalRainfall_mm = round(total_rainfall, 2),
     GDD = round(total_gdd, 2),
     MeanRH_pct = round(mean_rh, 2),
-    TotalSolar_MJ = round(total_solar, 2)
+    TotalSolar_MJ = round(total_solar, 2),
+    stringsAsFactors = FALSE
   )
+  
+  # Stage divisions
+  n_days <- nrow(daily_weather)
+  has_dtf <- !is.null(dtf_mean) && !is.na(dtf_mean) && dtf_mean > 0
+  has_dtm <- !is.null(dtm_mean) && !is.na(dtm_mean) && dtm_mean > 0
+  
+  if (has_dtf) {
+    dtf_idx <- min(n_days, round(dtf_mean))
+    
+    # Vegetative phase: 1 to dtf_idx
+    veg_avg_temp <- avg_temp[1:dtf_idx]
+    veg_precip <- precip[1:dtf_idx]
+    
+    res$GDD_Veg <- round(sum(pmax(veg_avg_temp - 10, 0), na.rm = TRUE), 2)
+    res$TotalRainfall_Veg <- round(sum(veg_precip, na.rm = TRUE), 2)
+    res$MeanTemp_Veg <- round(mean(veg_avg_temp, na.rm = TRUE), 2)
+    
+    rep_start <- min(n_days + 1, dtf_idx + 1)
+  } else {
+    rep_start <- 1
+  }
+  
+  if (has_dtm) {
+    dtm_idx <- min(n_days, round(dtm_mean))
+  } else {
+    dtm_idx <- n_days
+  }
+  
+  # Reproductive phase runs from rep_start to dtm_idx
+  if (has_dtf || has_dtm) {
+    if (rep_start <= dtm_idx) {
+      rep_indices <- rep_start:dtm_idx
+      rep_avg_temp <- avg_temp[rep_indices]
+      rep_precip <- precip[rep_indices]
+      rep_tmax <- tmax[rep_indices]
+      
+      res$GDD_Rep <- round(sum(pmax(rep_avg_temp - 10, 0), na.rm = TRUE), 2)
+      res$TotalRainfall_Rep <- round(sum(rep_precip, na.rm = TRUE), 2)
+      res$MeanTemp_Rep <- round(mean(rep_avg_temp, na.rm = TRUE), 2)
+      res$HeatStressDays_Rep <- sum(rep_tmax > 30, na.rm = TRUE)
+    } else {
+      res$GDD_Rep <- 0
+      res$TotalRainfall_Rep <- 0
+      res$MeanTemp_Rep <- as.numeric(NA)
+      res$HeatStressDays_Rep <- 0
+    }
+  }
+  
+  # Late phase runs from dtm_idx + 1 to n_days if dtm is earlier than harvest
+  if (has_dtm) {
+    if (dtm_idx < n_days) {
+      late_indices <- (dtm_idx + 1):n_days
+      late_avg_temp <- avg_temp[late_indices]
+      late_precip <- precip[late_indices]
+      
+      res$GDD_Late <- round(sum(pmax(late_avg_temp - 10, 0), na.rm = TRUE), 2)
+      res$TotalRainfall_Late <- round(sum(late_precip, na.rm = TRUE), 2)
+      res$MeanTemp_Late <- round(mean(late_avg_temp, na.rm = TRUE), 2)
+    } else {
+      res$GDD_Late <- 0
+      res$TotalRainfall_Late <- 0
+      res$MeanTemp_Late <- as.numeric(NA)
+    }
+  }
+  
+  res
 }
 
 #' Process environmental covariates table and calculate derived indices
 #' @param env_data Input data frame with Environment, Latitude, Longitude, PlantingDate, HarvestDate
+#' @param dtf_means Optional named numeric vector of mean days to flowering per environment
+#' @param dtm_means Optional named numeric vector of mean days to maturity per environment
 #' @param session Optional Shiny session object
 #' @return Processed data frame with computed environmental indices
 #' @export
-process_environmental_covariates <- function(env_data, session = NULL) {
+process_environmental_covariates <- function(env_data, dtf_means = NULL, dtm_means = NULL, session = NULL) {
   if (is.null(env_data) || nrow(env_data) == 0) return(env_data)
   
   col_names <- names(env_data)
@@ -368,19 +439,31 @@ process_environmental_covariates <- function(env_data, session = NULL) {
       )
     }
     
+    # Extract dtf and dtm for this specific environment
+    dtf_val <- if (!is.null(dtf_means) && env_name %in% names(dtf_means)) dtf_means[[env_name]] else NULL
+    dtm_val <- if (!is.null(dtm_means) && env_name %in% names(dtm_means)) dtm_means[[env_name]] else NULL
+    
+    # Clean/check values
+    if (!is.null(dtf_val) && is.na(dtf_val)) dtf_val <- NULL
+    if (!is.null(dtm_val) && is.na(dtm_val)) dtm_val <- NULL
+    
     daily_w <- fetch_nasa_weather(lat, lon, s_date, e_date)
-    indices_df <- calculate_enviromic_indices(daily_w)
+    indices_df <- calculate_enviromic_indices(daily_w, dtf_mean = dtf_val, dtm_mean = dtm_val)
     indices_df[[env_col]] <- env_name
     indices_list[[i]] <- indices_df
   }
   
   computed_indices <- dplyr::bind_rows(indices_list)
   
+  # Dynamically determine the calculated names
+  all_cols <- names(computed_indices)
+  calculated_names <- setdiff(all_cols, env_col)
+  
   original_extra <- env_data |> 
     dplyr::select(-dplyr::any_of(c(lat_col, lon_col, pdate_col, hdate_col)))
   
   original_extra <- original_extra |> 
-    dplyr::select(-dplyr::any_of(c("MeanTemp_C", "TotalRainfall_mm", "GDD", "MeanRH_pct", "TotalSolar_MJ")))
+    dplyr::select(-dplyr::any_of(calculated_names))
   
   geo_date_info <- data.frame(
     Environment = env_data[[env_col]],
@@ -396,7 +479,6 @@ process_environmental_covariates <- function(env_data, session = NULL) {
     dplyr::inner_join(geo_date_info, by = env_col) |>
     dplyr::inner_join(original_extra, by = env_col)
   
-  calculated_names <- c("MeanTemp_C", "TotalRainfall_mm", "GDD", "MeanRH_pct", "TotalSolar_MJ")
   std_names <- c(env_col, "Latitude", "Longitude", "PlantingDate", "HarvestDate", calculated_names)
   extra_names <- setdiff(names(res_df), std_names)
   

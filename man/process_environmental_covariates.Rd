@@ -4,10 +4,19 @@
 \alias{process_environmental_covariates}
 \title{Process environmental covariates table and calculate derived indices}
 \usage{
-process_environmental_covariates(env_data, session = NULL)
+process_environmental_covariates(
+  env_data,
+  dtf_means = NULL,
+  dtm_means = NULL,
+  session = NULL
+)
 }
 \arguments{
 \item{env_data}{Input data frame with Environment, Latitude, Longitude, PlantingDate, HarvestDate}
+
+\item{dtf_means}{Optional named numeric vector of mean days to flowering per environment}
+
+\item{dtm_means}{Optional named numeric vector of mean days to maturity per environment}
 
 \item{session}{Optional Shiny session object}
 }
