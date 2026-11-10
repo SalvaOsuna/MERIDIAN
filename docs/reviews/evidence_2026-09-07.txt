@@ -1,0 +1,161 @@
+MERIDIAN audit | 2026-09-07 17:15:48
+R version 4.4.1 (2024-06-14 ucrt)
+Working directory:  C:/Users/tlv329/OneDrive - University of Saskatchewan/UsasK/github/Shiny_MET 
+
+### 01 BLUPs change when only reference environment changes
+  Genotype BLUP_E1 BLUP_E5 Effect_E1 Effect_E5
+1      G01  12.890  49.060    -0.426    -0.426
+2      G02  11.094  47.264    -2.223    -2.223
+3      G03  11.183  47.354    -2.133    -2.133
+Mean BLUP shift: 36.17025 
+Observed overall mean: 30.57326 mean reported BLUP: 13.3165 
+
+### 02 H2 changes with equivalent replicate identifiers
+                      labels n_rep    H2
+1 1:3 reused within each env     3 0.832
+2      unique env-rep labels    15 0.858
+Maximum difference in fitted variance components: 0 
+
+### 03 Alpha lattice: equivalent block labels change fitted model
+                           labels residual_df residual_MS
+1 blocks restart within replicate         100   40.146369
+2        unique blocks within env          80    3.611358
+Model 1: y ~ gen + env + gen:env + env:rep + env:block 
+
+### 04 BLUEs crash when emmeans uses asymptotic intervals
+ERROR: non-numeric argument to mathematical function
+
+### 05 Missing GE cell breaks native AMMI
+ERROR: infinite or missing values in 'x'
+
+### 06 Pruning discards complete usable environments
+Input: 162 rows; retained: 72 rows
+Discarding E1 alone preserves: 144 rows
+Retained genotypes: G07,G08,G09,G10,G11,G12 
+
+### 07 Eberhart-Russell misses experimental-error correction
+metan result fields: data anova regression bo_variance b1_variance 
+  GEN        bi      S2di
+1 G01 0.9248529 10.538919
+2 G02 0.9054129  1.057425
+3 G03 1.1464499  8.866276
+# A tibble: 3 x 10
+  GEN      b0    b1 `t(b1=1)`[,1] pval_t[,1]   s2di `F(s2di=0)`    pval_f  RMSE    R2
+  <chr> <dbl> <dbl>         <dbl>      <dbl>  <dbl>       <dbl>     <dbl> <dbl> <dbl>
+1 G01    30.1 0.925         -1.81   0.0723    9.35        8.88  0.0000255 2.51  0.949
+2 G02    27.9 0.905         -2.28   0.0243   -0.129       0.891 0.448     0.797 0.994
+3 G03    28.0 1.15           3.54   0.000595  7.68        7.47  0.000134  2.31  0.972
+metan implementation relevant lines:
+            RMSE = NULL
+                RMSE[i] = sqrt(sum((x[i, ] - y[i, ])^2, na.rm = TRUE)/ncol(x))
+            return(list(R2 = R2, RMSE = RMSE))
+        nrep <- length(levels(data$REP))
+        S2di <- (dij/(en - 2)) - (S2e/nrep)
+                (nrep - 1) * (ge - 1))
+        poolerr <- modav$"Sum Sq"[5]/nrep
+        vbo <- sigma2/(en * nrep)
+        vb1 <- sigma2/(nrep * sumij2)
+            poolerr) * nrep
+            "ENV (linear)", " GEN x ENV (linear)", "Pooled deviation", 
+            `t(b1=1)` = tcal, pval_t = ptcal, s2di = as.numeric(S2di), 
+            `F(s2di=0)` = FVAL[7:(length(FVAL) - 1)], pval_f = PLINES, 
+            RMSE = gof$RMSE, R2 = gof$R2), bo_variance = vbo, 
+
+### 08 Additive imputation fails even for perfectly additive observations
+  gen env      y
+7   A  E3 176.25
+Known additive value: 210
+
+### 09 Dataset signature collision
+All trait values changed; signatures identical: TRUE 
+
+### 10 Validation accepts missing identifiers and infinite traits
+$valid
+[1] TRUE
+
+$errors
+character(0)
+
+$warnings
+[1] "Unbalanced data: number of genotypes varies across environments (1<U+2013>13)."
+
+
+### 11 Methods declare analyses even when no analyses exist
+Phenotypic records were analyzed in MERIDIAN using the Unknown design setup. A total of 12 genotypes across 5 environments were considered. Traits analyzed: y. Statistical analyses included fixed-effects ANOVA, mixed model (REML), BLUEs, BLUPs. Stability analyses included AMMI decomposition, GGE biplot, Wricke ecovalence, Shukla variance, Finlay-Wilkinson regression. No enviromics covariables were available. All figures were rendered directly from ggplot2 objects at publication resolution. 
+
+### 12 Finlay-Wilkinson without native library
+ERROR: could not find function "cpp_fw_regression"
+
+### 13 Check build tools
+                                                make                                                  g++ 
+          "C:\\PROGRA~1\\RTools\\usr\\bin\\make.exe" "C:\\PROGRA~1\\RTools\\X86_64~1.POS\\bin\\G__~1.EXE" 
+                                                 gcc 
+  "C:\\PROGRA~1\\RTools\\X86_64~1.POS\\bin\\gcc.exe" 
+Running "C:/PROGRA~1/R/R-44~1.1/bin/x64/Rcmd.exe" SHLIB foo.c
+[1] FALSE
+
+### 14 Duplicate native exported symbols
+$`src/RcppExports-salvador-usask-safeBackup-0001.cpp`
+ [1] "RcppExport SEXP _MERIDIAN_cpp_find_balanced_subset(SEXP genSEXP, SEXP envSEXP, SEXP n_gen_levelsSEXP, SEXP n_env_levelsSEXP) {"                                                                              
+ [2] "RcppExport SEXP _MERIDIAN_cpp_ge_means(SEXP genSEXP, SEXP envSEXP, SEXP traitSEXP, SEXP n_genSEXP, SEXP n_envSEXP) {"                                                                                        
+ [3] "RcppExport SEXP _MERIDIAN_cpp_ammi_stability(SEXP gen_ipca_scoresSEXP, SEXP axis_ssSEXP, SEXP axis_pctSEXP, SEXP n_axisSEXP) {"                                                                              
+ [4] "RcppExport SEXP _MERIDIAN_cpp_fw_regression(SEXP mean_valsSEXP, SEXP ei_valsSEXP, SEXP gen_idsSEXP, SEXP n_genSEXP) {"                                                                                       
+ [5] "RcppExport SEXP _MERIDIAN_cpp_impute_additive_gxe(SEXP ge_meansSEXP) {"                                                                                                                                      
+ [6] "RcppExport SEXP _MERIDIAN_cpp_er_statistics(SEXP ge_meansSEXP, SEXP env_indexSEXP) {"                                                                                                                        
+ [7] "RcppExport SEXP _MERIDIAN_cpp_group_numeric_summary(SEXP groupSEXP, SEXP valueSEXP, SEXP n_groupSEXP) {"                                                                                                     
+ [8] "RcppExport SEXP _MERIDIAN_cpp_detect_outliers(SEXP groupSEXP, SEXP valueSEXP, SEXP n_groupSEXP, SEXP methodSEXP, SEXP thresholdSEXP) {"                                                                      
+ [9] "RcppExport SEXP _MERIDIAN_cpp_spatial_cell_summary(SEXP cell_idSEXP, SEXP columnSEXP, SEXP rowSEXP, SEXP rawSEXP, SEXP fittedSEXP, SEXP residualSEXP, SEXP genotypeSEXP, SEXP weightSEXP, SEXP n_cellSEXP) {"
+[10] "RcppExport void R_init_MERIDIAN(DllInfo *dll) {"                                                                                                                                                             
+
+$`src/RcppExports.cpp`
+ [1] "RcppExport SEXP _MERIDIAN_cpp_find_balanced_subset(SEXP genSEXP, SEXP envSEXP, SEXP n_gen_levelsSEXP, SEXP n_env_levelsSEXP) {"                                                                              
+ [2] "RcppExport SEXP _MERIDIAN_cpp_ge_means(SEXP genSEXP, SEXP envSEXP, SEXP traitSEXP, SEXP n_genSEXP, SEXP n_envSEXP) {"                                                                                        
+ [3] "RcppExport SEXP _MERIDIAN_cpp_ammi_stability(SEXP gen_ipca_scoresSEXP, SEXP axis_ssSEXP, SEXP axis_pctSEXP, SEXP n_axisSEXP) {"                                                                              
+ [4] "RcppExport SEXP _MERIDIAN_cpp_fw_regression(SEXP mean_valsSEXP, SEXP ei_valsSEXP, SEXP gen_idsSEXP, SEXP n_genSEXP) {"                                                                                       
+ [5] "RcppExport SEXP _MERIDIAN_cpp_impute_additive_gxe(SEXP ge_meansSEXP) {"                                                                                                                                      
+ [6] "RcppExport SEXP _MERIDIAN_cpp_er_statistics(SEXP ge_meansSEXP, SEXP env_indexSEXP) {"                                                                                                                        
+ [7] "RcppExport SEXP _MERIDIAN_cpp_group_numeric_summary(SEXP groupSEXP, SEXP valueSEXP, SEXP n_groupSEXP) {"                                                                                                     
+ [8] "RcppExport SEXP _MERIDIAN_cpp_detect_outliers(SEXP groupSEXP, SEXP valueSEXP, SEXP n_groupSEXP, SEXP methodSEXP, SEXP thresholdSEXP) {"                                                                      
+ [9] "RcppExport SEXP _MERIDIAN_cpp_spatial_cell_summary(SEXP cell_idSEXP, SEXP columnSEXP, SEXP rowSEXP, SEXP rawSEXP, SEXP fittedSEXP, SEXP residualSEXP, SEXP genotypeSEXP, SEXP weightSEXP, SEXP n_cellSEXP) {"
+[10] "RcppExport void R_init_MERIDIAN(DllInfo *dll) {"                                                                                                                                                             
+
+
+### 15 All R source files parse
+36 R files; parse failures: 0 
+list()
+
+### Session
+R version 4.4.1 (2024-06-14 ucrt)
+Platform: x86_64-w64-mingw32/x64
+Running under: Windows 11 x64 (build 26100)
+
+Matrix products: default
+
+
+locale:
+[1] C
+system code page: 65001
+
+time zone: America/Regina
+tzcode source: internal
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] tibble_3.3.1 tidyr_1.3.2  dplyr_1.2.0 
+
+loaded via a namespace (and not attached):
+ [1] utf8_1.2.6          sandwich_3.1-1      generics_0.1.4      metan_1.19.0        lattice_0.22-9     
+ [6] digest_0.6.39       lme4_1.1-38         magrittr_2.0.3      grid_4.4.1          estimability_1.5.1 
+[11] RColorBrewer_1.1-3  mvtnorm_1.3-3       Matrix_1.7-4        processx_3.8.6      ggrepel_0.9.6      
+[16] pkgbuild_1.4.8      survival_3.8-6      ps_1.9.1            multcomp_1.4-29     GGally_2.4.0       
+[21] purrr_1.2.2         scales_1.4.0        TH.data_1.1-5       tweenr_2.0.3        numDeriv_2016.8-1.1
+[26] codetools_0.2-20    reformulas_0.4.4    Rdpack_2.6.6        cli_3.6.5           rlang_1.1.7        
+[31] polyclip_1.10-7     rbibutils_2.4.1     splines_4.4.1       withr_3.0.2         tools_4.4.1        
+[36] nloptr_2.2.1        coda_0.19-4.1       minqa_1.2.8         ggplot2_4.0.2       mathjaxr_2.0-0     
+[41] boot_1.3-32         ggstats_0.12.0      vctrs_0.7.1         R6_2.6.1            zoo_1.8-15         
+[46] lifecycle_1.0.5     emmeans_2.0.1       MASS_7.3-65         callr_3.7.6         pkgconfig_2.0.3    
+[51] lmerTest_3.2-0      pillar_1.11.1       gtable_0.3.6        glue_1.8.0          Rcpp_1.1.1         
+[56] ggforce_0.5.0       tidyselect_1.2.1    farver_2.1.2        xtable_1.8-4        nlme_3.1-168       
+[61] patchwork_1.3.2     compiler_4.4.1      S7_0.2.1           

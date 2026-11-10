@@ -7,8 +7,8 @@ app_ui <- function(request) {
 
   app_theme <- bslib::bs_theme(
     version  = 5,
-    base_font    = bslib::font_google("Inter"),
-    heading_font = bslib::font_google("Inter"),
+    base_font    = bslib::font_collection(bslib::font_google("Inter", local = FALSE), "Arial", "sans-serif"),
+    heading_font = bslib::font_collection(bslib::font_google("Inter", local = FALSE), "Arial", "sans-serif"),
     primary   = "#1f8f55",
     secondary = "#60736a",
     success   = "#2fb66d",

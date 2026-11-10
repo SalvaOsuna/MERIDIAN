@@ -1,0 +1,22 @@
+* installing *source* package 'MERIDIAN' ...
+** using staged installation
+** libs
+using C++ compiler: 'G__~1.EXE (GCC) 13.2.0'
+g++ -std=gnu++17  -I"C:/PROGRA~1/R/R-44~1.1/include" -DNDEBUG  -I'C:/Program Files/R/R-4.4.1/library/Rcpp/include'   -I"C:/Program Files/RTools/x86_64-w64-mingw32.static.posix/include"     -O2 -Wall  -mfpmath=sse -msse2 -mstackrealign  -c RcppExports.cpp -o RcppExports.o
+g++ -std=gnu++17  -I"C:/PROGRA~1/R/R-44~1.1/include" -DNDEBUG  -I'C:/Program Files/R/R-4.4.1/library/Rcpp/include'   -I"C:/Program Files/RTools/x86_64-w64-mingw32.static.posix/include"     -O2 -Wall  -mfpmath=sse -msse2 -mstackrealign  -c fast_pruning.cpp -o fast_pruning.o
+g++ -std=gnu++17 -shared -s -static-libgcc -o MERIDIAN.dll tmp.def RcppExports.o fast_pruning.o -LC:/Program Files/RTools/x86_64-w64-mingw32.static.posix/lib/x64 -LC:/Program Files/RTools/x86_64-w64-mingw32.static.posix/lib -LC:/PROGRA~1/R/R-44~1.1/bin/x64 -lR
+installing to C:/Users/tlv329/AppData/Local/Temp/RtmpGgiHkQ/MERIDIAN-clean-review-1a4c7f6917aa/MERIDIAN.Rcheck/00LOCK-MERIDIAN/00new/MERIDIAN/libs/x64
+** R
+Warning in parse(...) :
+  unable to translate 'IQR (1.5<U+00D7>)' to native encoding
+** inst
+** byte-compile and prepare package for lazy loading
+Warning in parse(n = -1, file = file, srcfile = NULL, keep.source = FALSE) :
+  unable to translate 'IQR (1.5<U+00D7>)' to native encoding
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (MERIDIAN)

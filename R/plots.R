@@ -3,6 +3,12 @@
 # Pure ggplot2/plotly functions for data visualization
 # =============================================================================
 
+# Thin axis labels only; all genotype cells remain in the plot and hover data.
+heatmap_axis_breaks <- function(x) {
+  if (length(x) <= 40L) return(x)
+  x[seq.int(1L, length(x), by = ceiling(length(x)/30L))]
+}
+
 
 #' Create boxplots for trait by grouping variable
 #' @param df Data frame

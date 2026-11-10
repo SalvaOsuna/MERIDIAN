@@ -250,82 +250,39 @@ detect_design <- function(df, gen_col, env_col, rep_col, block_col = NULL) {
 #' @param env_col Environment column name
 #' @param rep_col Replicate column name
 #' @param resp_vars Character vector of response variable names
+#' @param block_col Optional block column identifying units within replicate
 #' @return List of validation messages: errors (fatal), warnings (informational)
-validate_met_data <- function(df, gen_col, env_col, rep_col, resp_vars) {
-  errors   <- character(0)
-  warnings <- character(0)
-
-  # Required columns
-  if (is.null(gen_col) || !gen_col %in% names(df))
-    errors <- c(errors, "Genotype column is not mapped or not found in data.")
-  if (is.null(env_col) || !env_col %in% names(df))
-    errors <- c(errors, "Environment column is not mapped or not found in data.")
-  if (is.null(rep_col) || !rep_col %in% names(df))
-    errors <- c(errors, "Replicate column is not mapped or not found in data.")
-  if (is.null(resp_vars) || length(resp_vars) == 0)
-    errors <- c(errors, "No response variables (traits) selected.")
-
-  # If there are fatal errors, return early
-  if (length(errors) > 0) {
-    return(list(valid = FALSE, errors = errors, warnings = warnings))
+validate_met_data <- function(df, gen_col, env_col, rep_col, resp_vars, block_col = NULL) {
+  errors <- warnings <- character()
+  issues <- attr(df, "import_issues")
+  if (!is.null(issues) && nrow(issues)) {
+    counts <- table(issues$Column)
+    warnings <- paste0("Spreadsheet error cells imported as missing: ",
+      paste(paste0(names(counts), " (", as.integer(counts), ")"), collapse = ", "), ". Original file unchanged.")
   }
-
-  # Check trait columns are numeric
+  required <- c(gen_col, env_col, rep_col, block_col)
+  if (length(c(gen_col, env_col, rep_col)) != 3 || !all(required %in% names(df)))
+    errors <- c(errors, "Map existing genotype, environment and replicate columns.")
+  if (!length(resp_vars) || !all(resp_vars %in% names(df))) errors <- c(errors, "Select existing numeric response columns.")
+  if (anyDuplicated(c(required, resp_vars))) errors <- c(errors, "Column roles and response variables must be distinct.")
+  if (length(errors)) return(list(valid = FALSE, errors = errors, warnings = warnings))
+  for (key in required) {
+    if (any(is.na(df[[key]]) | !nzchar(trimws(as.character(df[[key]])))))
+      errors <- c(errors, paste("Missing or empty identifiers in", key))
+  }
+  if (anyDuplicated(df[required])) errors <- c(errors, "Duplicate experimental units: resolve repeated genotype/environment/replicate/block records before analysis.")
   for (trait in resp_vars) {
-    if (!is.numeric(df[[trait]])) {
-      errors <- c(errors, paste0("Trait '", trait, "' is not numeric."))
-    }
+    if (!is.numeric(df[[trait]])) { errors <- c(errors, paste("Non-numeric trait:", trait)); next }
+    if (any(is.infinite(df[[trait]]))) errors <- c(errors, paste("Infinite trait values:", trait))
+    good <- is.finite(df[[trait]])
+    if (length(unique(df[[gen_col]][good & !is.na(df[[gen_col]])])) < 2 ||
+        length(unique(df[[env_col]][good & !is.na(df[[env_col]])])) < 2)
+      errors <- c(errors, paste("At least two observed genotypes and environments are needed for", trait))
+    if (anyNA(df[[trait]])) warnings <- c(warnings, sprintf("%s: %d missing observations; treatment is reported separately for each analysis.", trait, sum(is.na(df[[trait]]))))
+    counts <- table(df[[gen_col]][good], df[[env_col]][good])
+    if (length(unique(as.vector(counts))) > 1) warnings <- c(warnings, paste("Unequal replication or missing genotype-environment cells for", trait))
   }
-
-  # Minimum dimensions
-  n_gen <- dplyr::n_distinct(df[[gen_col]])
-  n_env <- dplyr::n_distinct(df[[env_col]])
-  if (n_gen < 2)
-    errors <- c(errors, "At least 2 genotypes are required for MET analysis.")
-  if (n_env < 2)
-    errors <- c(errors, "At least 2 environments are required for MET analysis.")
-
-  # Missing values
-  for (trait in resp_vars) {
-    n_miss <- sum(is.na(df[[trait]]))
-    if (n_miss > 0) {
-      pct <- round(100 * n_miss / nrow(df), 1)
-      warnings <- c(warnings, paste0(
-        "Trait '", trait, "': ", n_miss, " missing values (", pct, "%)."
-      ))
-    }
-  }
-
-  # Duplicates
-  dup_check <- df |>
-    dplyr::group_by(
-      dplyr::across(dplyr::all_of(c(gen_col, env_col, rep_col)))
-    ) |>
-    dplyr::summarise(n = dplyr::n(), .groups = "drop") |>
-    dplyr::filter(n > 1)
-
-  if (nrow(dup_check) > 0) {
-    warnings <- c(warnings, paste0(
-      nrow(dup_check), " duplicate entries found (same genotype \u00D7 environment \u00D7 rep)."
-    ))
-  }
-
-  # Imbalance check
-  balance <- df |>
-    dplyr::group_by(.data[[env_col]]) |>
-    dplyr::summarise(n_gen = dplyr::n_distinct(.data[[gen_col]]), .groups = "drop")
-  if (length(unique(balance$n_gen)) > 1) {
-    warnings <- c(warnings, paste0(
-      "Unbalanced data: number of genotypes varies across environments (",
-      paste(range(balance$n_gen), collapse = "\u2013"), ")."
-    ))
-  }
-
-  list(
-    valid    = length(errors) == 0,
-    errors   = errors,
-    warnings = warnings
-  )
+  list(valid = !length(errors), errors = unique(errors), warnings = unique(warnings))
 }
 
 
@@ -372,7 +329,7 @@ safe_analysis <- function(expr, session) {
 #' @param traits Character vector of trait column names
 #' @return Tibble with Mean, SD, Min, Max, CV%, N per group x trait
 descriptive_summary <- function(df, group_col, traits) {
-  if (exists("cpp_group_numeric_summary", mode = "function")) {
+  if (native_kernel_available("cpp_group_numeric_summary")) {
     group_f <- as.factor(df[[group_col]])
     group_levels <- levels(group_f)
     results <- lapply(traits, function(trait) {
@@ -433,7 +390,7 @@ detect_outliers <- function(df, trait, group_col, method = "iqr", threshold = NU
     threshold <- if (method == "iqr") 1.5 else 3
   }
 
-  if (exists("cpp_detect_outliers", mode = "function")) {
+  if (native_kernel_available("cpp_detect_outliers")) {
     group_f <- as.factor(df[[group_col]])
     df$is_outlier <- as.logical(cpp_detect_outliers(
       as.integer(group_f),

@@ -1,0 +1,5 @@
+Sys.setenv(LC_ALL = "C", LANG = "C")
+.libPaths(c(normalizePath(".local-library", mustWork = FALSE), .libPaths()))
+pkgload::load_all(".", quiet = TRUE)
+options(shiny.launch.browser = FALSE, shiny.port = as.integer(Sys.getenv("MERIDIAN_VALIDATION_PORT", "3876")), shiny.host = "127.0.0.1")
+shiny::runApp(MERIDIAN::run_app())

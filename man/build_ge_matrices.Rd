@@ -4,7 +4,14 @@
 \alias{build_ge_matrices}
 \title{Build fast GxE mean matrix and additive interaction matrix}
 \usage{
-build_ge_matrices(df_std, gen_col, env_col, trait)
+build_ge_matrices(
+  df_std,
+  gen_col,
+  env_col,
+  trait,
+  rep_col = NULL,
+  block_col = NULL
+)
 }
 \arguments{
 \item{df_std}{Cleaned data frame}
@@ -14,6 +21,10 @@ build_ge_matrices(df_std, gen_col, env_col, trait)
 \item{env_col}{Environment column name}
 
 \item{trait}{Trait column name}
+
+\item{rep_col}{Optional replicate column for estimating plot error}
+
+\item{block_col}{Optional incomplete block column}
 }
 \value{
 List with ge_means, interaction, means, dims and labels

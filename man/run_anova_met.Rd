@@ -2,7 +2,7 @@
 % Please edit documentation in R/models.R
 \name{run_anova_met}
 \alias{run_anova_met}
-\title{Run two-way ANOVA for MET data (fixed effects)}
+\title{Run design-adjusted fixed-effects MET ANOVA}
 \usage{
 run_anova_met(
   df,
@@ -18,23 +18,21 @@ run_anova_met(
 \arguments{
 \item{df}{Data frame}
 
-\item{gen_col}{Genotype column name}
+\item{gen_col, env_col, rep_col}{Genotype, environment and replicate columns}
 
-\item{env_col}{Environment column name}
+\item{block_col}{Optional block column nested within replicate and environment}
 
-\item{rep_col}{Replicate column name}
-
-\item{block_col}{Optional block column name}
-
-\item{trait}{Trait column name}
+\item{trait}{Numeric trait column}
 
 \item{design_type}{Experimental design label}
 
-\item{augmented_checks}{Character vector of check genotypes (for augmented)}
+\item{augmented_checks}{Check genotypes for augmented designs}
 }
 \value{
-List with anova_table, model, type3_table
+Adjusted tests and observation counts. Model is an lm object on the
+general path, or a list of equivalent environment-specific lm fits on the
+optimized path for more than 1000 observations with estimable cell means.
 }
 \description{
-Run two-way ANOVA for MET data (fixed effects)
+Run design-adjusted fixed-effects MET ANOVA
 }

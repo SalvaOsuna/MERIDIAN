@@ -198,14 +198,15 @@ mod_eda_ui <- function(id) {
           width = 280,
           shiny::selectInput(ns("out_trait"), LABELS$m2_select_trait, choices = NULL),
           shiny::selectInput(ns("out_method"), LABELS$m2_outlier_method,
-            choices  = c("IQR (1.5\u00D7)" = "iqr", "Z-score (>3)" = "zscore"),
+            choices  = c("IQR (1.5x)" = "iqr", "Z-score (>3)" = "zscore"),
             selected = "iqr"
           ),
           shiny::tags$hr(),
-          shiny::actionButton(ns("remove_outliers"), LABELS$m2_remove_outliers,
+          shiny::actionButton(ns("remove_outliers"), "Exclude flagged values for this trait",
             icon  = shiny::icon("filter"),
             class = "btn-warning btn-sm w-100"
           ),
+          shiny::actionButton(ns("restore_values"), "Restore original values", class = "btn-outline-secondary btn-sm w-100 mt-2"),
           shiny::actionButton(ns("send_outlier_report"), "Send this plot to Reports",
             icon = shiny::icon("paper-plane"),
             class = "btn-success btn-sm w-100 mt-2"
@@ -285,7 +286,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
     # ---- Helper: Get data bundle ----
     db <- shiny::reactive({
       req(data_result$data_bundle())
-      data_result$data_bundle()
+      require_valid_bundle(data_result$data_bundle())
     })
 
     # ---- Update trait selectors when data loads ----
@@ -614,7 +615,10 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       p
     }
 
-    distribution_plot_obj <- shiny::eventReactive(input$run_distributions, {
+    distribution_plot_obj <- analysis_event(input$run_distributions,
+      list(make_dataset_signature(db()), input$dist_trait, input$dist_envs, input$dist_bins,
+        input$dist_fill, input$dist_alpha, input$dist_normal, input$dist_normal_linewidth,
+        input$dist_mean, input$dist_layout, input$dist_ncol, input$dist_scales, input$dist_strip), {
       req(db(), input$dist_trait)
       safe_analysis({
         build_distribution_plot(
@@ -634,7 +638,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
           notify = TRUE
         )
       }, session)
-    }, ignoreInit = TRUE)
+    })
 
     output$distribution_plot <- shiny::renderPlot({
       req(distribution_plot_obj())
@@ -697,7 +701,7 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
 
     # ---- Tab 3: G×E Heatmap ----
     build_ge_heatmap_gg <- function(current_db, trait, cluster_rows = TRUE, cluster_cols = TRUE) {
-      mat <- pivot_ge_means(current_db$data, current_db$gen_col, current_db$env_col, trait)
+      mat <- as.matrix(pivot_ge_means(current_db$data, current_db$gen_col, current_db$env_col, trait))
       if (isTRUE(cluster_rows) && nrow(mat) > 1) {
         mat <- mat[stats::hclust(stats::dist(mat))$order, , drop = FALSE]
       }
@@ -706,10 +710,14 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       }
       plot_df <- as.data.frame(as.table(mat), stringsAsFactors = FALSE)
       names(plot_df) <- c("Genotype", "Environment", "Value")
+      plot_df$Genotype <- factor(plot_df$Genotype, levels = rownames(mat))
+      plot_df$Environment <- factor(plot_df$Environment, levels = colnames(mat))
       ggplot2::ggplot(plot_df, ggplot2::aes(x = Environment, y = Genotype, fill = Value)) +
         ggplot2::geom_tile(color = "white", linewidth = 0.2) +
         scale_fill_meridian_sequential(na.value = "grey90") +
-        ggplot2::labs(title = paste0("GxE Means: ", trait), x = "Environment", y = "Genotype", fill = trait) +
+        ggplot2::scale_y_discrete(breaks = heatmap_axis_breaks) +
+        ggplot2::labs(title = paste0("GxE Means: ", trait), x = "Environment", y = "Genotype", fill = trait,
+          caption = if (nrow(mat) > 40L) paste("All", nrow(mat), "genotypes shown; selected axis labels.") else NULL) +
         theme_meridian_nature() +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
     }
@@ -834,6 +842,23 @@ mod_eda_server <- function(id, data_result, report_registry = NULL) {
       plotly::ggplotly(p, tooltip = "text") |>
         meridian_plotly_layout(margin = list(l = 70, r = 20, b = 100, t = 60)) |>
         plotly::config(responsive = TRUE)
+    })
+
+    shiny::observeEvent(input$remove_outliers, {
+      req(outlier_data(), data_result$exclude_values)
+      marked <- outlier_data()
+      keys <- c(db()$gen_col, db()$env_col, db()$rep_col, db()$block_col)
+      flagged <- marked[which(marked$is_outlier), keys, drop = FALSE]
+      tagged <- db()$data
+      tagged$.meridian_row_index <- seq_len(nrow(tagged))
+      rows <- dplyr::semi_join(tagged, flagged, by = keys)$.meridian_row_index
+      data_result$exclude_values(rows, input$out_trait)
+      shiny::showNotification(paste(length(rows), "flagged values replaced with NA for", input$out_trait))
+    })
+    shiny::observeEvent(input$restore_values, {
+      req(data_result$restore_values)
+      data_result$restore_values()
+      shiny::showNotification("Original trait values restored.")
     })
 
     shiny::observeEvent(input$send_outlier_report, {

@@ -1,0 +1,8 @@
+Sys.setenv(LC_ALL = "C", LANG = "C")
+options(warn = 1)
+.libPaths(c(normalizePath(".local-library", mustWork = FALSE), .libPaths()))
+Rcpp::compileAttributes(".")
+pkgload::load_all(".", quiet = TRUE)
+cat("\nDependencies: Pandoc:", report_pandoc_available(), "Chrome:", tryCatch(pagedown::find_chrome(), error = function(e) conditionMessage(e)), "\n")
+roxygen2::roxygenise(".")
+testthat::test_local(".", reporter = "summary", stop_on_failure = TRUE)

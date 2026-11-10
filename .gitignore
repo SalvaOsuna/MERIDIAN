@@ -23,7 +23,6 @@ desktop.ini
 
 # Private data
 data/*.private.*
-run_app_dev.R
 Shiny_MET.Rproj
 CRAN-SUBMISSION
 token.txt
@@ -37,3 +36,7 @@ inst/doc
 src/*.dll
 src/*.o
 src/*.so
+*safeBackup*
+.local-library/
+validation-output/
+__pycache__/

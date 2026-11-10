@@ -1,0 +1,8 @@
+* checking for file 'C:\Users\tlv329\AppData\Local\Temp\RtmpGgiHkQ\MERIDIAN-clean-review-1a4c7f6917aa/MERIDIAN/DESCRIPTION' ... OK
+* preparing 'MERIDIAN':
+* checking DESCRIPTION meta-information ... OK
+* cleaning src
+* checking for LF line-endings in source and make files and shell scripts
+* checking for empty or unneeded directories
+* building 'MERIDIAN_0.1.0.tar.gz'
+

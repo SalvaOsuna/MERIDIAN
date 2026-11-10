@@ -7,9 +7,11 @@
 #' @param path File path
 #' @param sep CSV separator (ignored for Excel)
 #' @param header Whether first row is header
-#' @return Data frame
-read_met_file <- function(path, sep = ",", header = TRUE) {
-  ext <- tolower(tools::file_ext(path))
+#' @param filename Original filename, used to recognize uploaded Excel files
+#' @return Data frame. Recognized spreadsheet error cells in otherwise numeric
+#' columns become NA and are recorded in the import_issues attribute.
+read_met_file <- function(path, sep = ",", header = TRUE, filename = path) {
+  ext <- tolower(tools::file_ext(filename))
 
   if (ext %in% c("xlsx", "xls")) {
     if (!requireNamespace("readxl", quietly = TRUE)) {
@@ -21,13 +23,31 @@ read_met_file <- function(path, sep = ",", header = TRUE) {
       path,
       delim       = sep,
       col_names   = header,
+      guess_max   = 1000000,
       show_col_types = FALSE,
       locale      = readr::locale(encoding = "UTF-8")
     )
   }
 
   # Ensure standard data.frame (not tibble-only behaviors)
-  as.data.frame(df)
+  df <- as.data.frame(df)
+  issues <- list()
+  spreadsheet_errors <- c("#VALUE!", "#DIV/0!", "#N/A", "#REF!", "#NUM!", "#NAME?", "#NULL!")
+  for (column in names(df)) {
+    if (!is.character(df[[column]])) next
+    values <- trimws(df[[column]])
+    bad <- !is.na(values) & toupper(values) %in% spreadsheet_errors
+    if (!any(bad)) next
+    numeric_values <- suppressWarnings(as.numeric(values))
+    # Do not coerce arbitrary text or identifiers into missing measurements.
+    other <- !is.na(values) & nzchar(values) & !bad
+    if (!any(other) || any(is.na(numeric_values[other]))) next
+    issues[[length(issues)+1L]] <- data.frame(Row = which(bad), Column = column,
+      Original = df[[column]][bad], Replacement = "NA", stringsAsFactors = FALSE)
+    df[[column]] <- numeric_values
+  }
+  if (length(issues)) attr(df, "import_issues") <- do.call(rbind, issues)
+  df
 }
 
 

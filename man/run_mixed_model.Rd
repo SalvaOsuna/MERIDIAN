@@ -2,26 +2,35 @@
 % Please edit documentation in R/models.R
 \name{run_mixed_model}
 \alias{run_mixed_model}
-\title{Fit mixed model with lme4 and extract variance components
-Model: trait ~ env + (1|gen) + (1|gen:env) + (1|env:rep)}
+\title{Fit a design-aware mixed MET model and generalized heritability}
 \usage{
-run_mixed_model(df, gen_col, env_col, rep_col, trait)
+run_mixed_model(
+  df,
+  gen_col,
+  env_col,
+  rep_col,
+  trait,
+  block_col = NULL,
+  design_type = "RCBD",
+  augmented_checks = NULL
+)
 }
 \arguments{
 \item{df}{Data frame}
 
-\item{gen_col}{Genotype column name}
+\item{gen_col, env_col, rep_col}{Genotype, environment and replicate columns}
 
-\item{env_col}{Environment column name}
+\item{trait}{Numeric trait column}
 
-\item{rep_col}{Replicate column name}
+\item{block_col}{Optional incomplete block column}
 
-\item{trait}{Trait column name}
+\item{design_type}{Experimental design label}
+
+\item{augmented_checks}{Replicated checks for augmented designs}
 }
 \value{
-List with var_components, model, heritability
+Model, variance components, prediction covariance and Cullis H2
 }
 \description{
-Fit mixed model with lme4 and extract variance components
-Model: trait ~ env + (1|gen) + (1|gen:env) + (1|env:rep)
+Fit a design-aware mixed MET model and generalized heritability
 }

@@ -2,24 +2,41 @@
 % Please edit documentation in R/models.R
 \name{compute_blups}
 \alias{compute_blups}
-\title{Compute BLUPs (genotype as random, environment as fixed)}
+\title{Compute equal-environment genotype BLUPs and prediction intervals}
 \usage{
-compute_blups(df, gen_col, env_col, rep_col, trait)
+compute_blups(
+  df,
+  gen_col,
+  env_col,
+  rep_col,
+  trait,
+  block_col = NULL,
+  design_type = "RCBD",
+  augmented_checks = NULL,
+  direction = "higher",
+  mixed_result = NULL
+)
 }
 \arguments{
 \item{df}{Data frame}
 
-\item{gen_col}{Genotype column name}
+\item{gen_col, env_col, rep_col}{Genotype, environment and replicate columns}
 
-\item{env_col}{Environment column name}
+\item{trait}{Numeric trait column}
 
-\item{rep_col}{Replicate column name}
+\item{block_col}{Optional incomplete block column}
 
-\item{trait}{Trait column name}
+\item{design_type}{Experimental design label}
+
+\item{augmented_checks}{Replicated checks for augmented designs}
+
+\item{direction}{Selection direction: higher or lower}
+
+\item{mixed_result}{Optional existing result from run_mixed_model}
 }
 \value{
-Data frame with Genotype, BLUP, SE, CI_lower, CI_upper
+Genotype predictions and approximate prediction intervals
 }
 \description{
-Compute BLUPs (genotype as random, environment as fixed)
+Compute equal-environment genotype BLUPs and prediction intervals
 }

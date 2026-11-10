@@ -10,20 +10,6 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// cpp_find_balanced_subset
-LogicalVector cpp_find_balanced_subset(IntegerVector gen, IntegerVector env, int n_gen_levels, int n_env_levels);
-RcppExport SEXP _MERIDIAN_cpp_find_balanced_subset(SEXP genSEXP, SEXP envSEXP, SEXP n_gen_levelsSEXP, SEXP n_env_levelsSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< IntegerVector >::type gen(genSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type env(envSEXP);
-    Rcpp::traits::input_parameter< int >::type n_gen_levels(n_gen_levelsSEXP);
-    Rcpp::traits::input_parameter< int >::type n_env_levels(n_env_levelsSEXP);
-    rcpp_result_gen = Rcpp::wrap(cpp_find_balanced_subset(gen, env, n_gen_levels, n_env_levels));
-    return rcpp_result_gen;
-END_RCPP
-}
 // cpp_ge_means
 NumericMatrix cpp_ge_means(IntegerVector gen, IntegerVector env, NumericVector trait, int n_gen, int n_env);
 RcppExport SEXP _MERIDIAN_cpp_ge_means(SEXP genSEXP, SEXP envSEXP, SEXP traitSEXP, SEXP n_genSEXP, SEXP n_envSEXP) {
@@ -64,17 +50,6 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector >::type gen_ids(gen_idsSEXP);
     Rcpp::traits::input_parameter< int >::type n_gen(n_genSEXP);
     rcpp_result_gen = Rcpp::wrap(cpp_fw_regression(mean_vals, ei_vals, gen_ids, n_gen));
-    return rcpp_result_gen;
-END_RCPP
-}
-// cpp_impute_additive_gxe
-List cpp_impute_additive_gxe(NumericMatrix ge_means);
-RcppExport SEXP _MERIDIAN_cpp_impute_additive_gxe(SEXP ge_meansSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type ge_means(ge_meansSEXP);
-    rcpp_result_gen = Rcpp::wrap(cpp_impute_additive_gxe(ge_means));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -139,11 +114,9 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_MERIDIAN_cpp_find_balanced_subset", (DL_FUNC) &_MERIDIAN_cpp_find_balanced_subset, 4},
     {"_MERIDIAN_cpp_ge_means", (DL_FUNC) &_MERIDIAN_cpp_ge_means, 5},
     {"_MERIDIAN_cpp_ammi_stability", (DL_FUNC) &_MERIDIAN_cpp_ammi_stability, 4},
     {"_MERIDIAN_cpp_fw_regression", (DL_FUNC) &_MERIDIAN_cpp_fw_regression, 4},
-    {"_MERIDIAN_cpp_impute_additive_gxe", (DL_FUNC) &_MERIDIAN_cpp_impute_additive_gxe, 1},
     {"_MERIDIAN_cpp_er_statistics", (DL_FUNC) &_MERIDIAN_cpp_er_statistics, 2},
     {"_MERIDIAN_cpp_group_numeric_summary", (DL_FUNC) &_MERIDIAN_cpp_group_numeric_summary, 3},
     {"_MERIDIAN_cpp_detect_outliers", (DL_FUNC) &_MERIDIAN_cpp_detect_outliers, 5},

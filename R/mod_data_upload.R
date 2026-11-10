@@ -285,12 +285,13 @@ mod_data_upload_server <- function(id) {
     ns <- session$ns
 
     # ---- Reactive: Raw uploaded data ----
-    raw_data <- shiny::reactive({
+    source_data <- shiny::reactive({
       # Check for uploaded file or example data flag
       if (!is.null(input$file_upload)) {
         tryCatch({
           read_met_file(
             path   = input$file_upload$datapath,
+            filename = input$file_upload$name,
             sep    = input$csv_sep,
             header = input$header
           )
@@ -322,12 +323,17 @@ mod_data_upload_server <- function(id) {
       }
     })
 
+    data_edits <- shiny::reactiveVal(NULL)
+    shiny::observeEvent(source_data(), data_edits(NULL), ignoreNULL = FALSE)
+    raw_data <- shiny::reactive(data_edits() %||% source_data())
+
     # ---- Reactive: Raw environmental data ----
     raw_env_data <- shiny::reactive({
       if (!is.null(input$file_env_upload)) {
         tryCatch({
           read_met_file(
             path   = input$file_env_upload$datapath,
+            filename = input$file_env_upload$name,
             sep    = input$csv_sep_env,
             header = input$header
           )
@@ -339,7 +345,7 @@ mod_data_upload_server <- function(id) {
           )
           NULL
         })
-      } else if (isTRUE(example_loaded())) {
+      } else if (isTRUE(example_loaded()) && is.null(input$file_upload)) {
         tryCatch({
           read_met_file(
             path   = app_sys("extdata", "example_envdata.csv"),
@@ -366,7 +372,9 @@ mod_data_upload_server <- function(id) {
     processed_env_data <- shiny::reactive({
       raw_env <- raw_env_data()
       if (is.null(raw_env)) return(NULL)
-      
+      # The bundled example includes covariates so it works without NASA access.
+      if (isTRUE(example_loaded()) && is.null(input$file_env_upload)) return(raw_env)
+
       v_env <- validate_environmental_data(raw_env)
       if (!v_env$valid) {
         shiny::showNotification(
@@ -376,23 +384,23 @@ mod_data_upload_server <- function(id) {
         )
         return(NULL)
       }
-      
+
       if (length(v_env$warnings) > 0) {
         lapply(v_env$warnings, function(w) {
           shiny::showNotification(w, type = "warning", duration = 8)
         })
       }
-      
+
       col_names <- names(raw_env)
       lat_col  <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
       lon_col  <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
       pdate_col <- col_names[grep("plant", col_names, ignore.case = TRUE)][1]
       hdate_col <- col_names[grep("harvest", col_names, ignore.case = TRUE)][1]
-      
+
       if (is.na(lat_col) || is.na(lon_col) || is.na(pdate_col) || is.na(hdate_col)) {
         return(raw_env)
       }
-      
+
       res <- tryCatch({
         shiny::withProgress(
           message = "Fetching NASA POWER daily weather...",
@@ -402,61 +410,61 @@ mod_data_upload_server <- function(id) {
             dtm_means <- NULL
             pheno_df <- raw_data()
             pheno_env_col <- input$col_env
-            
+
             if (!is.null(pheno_df) && !is.null(pheno_env_col) && pheno_env_col %in% names(pheno_df)) {
               flowering_col <- input$col_pheno_flowering
               maturity_col <- input$col_pheno_maturity
-              
+
               if (!is.null(flowering_col) && flowering_col != "" && flowering_col %in% names(pheno_df)) {
                 dtf_vals <- suppressWarnings(as.numeric(pheno_df[[flowering_col]]))
                 if (any(!is.na(dtf_vals))) {
-                  dtf_agg <- aggregate(
-                    dtf_vals, 
-                    by = list(Env = pheno_df[[pheno_env_col]]), 
-                    FUN = mean, 
+                  dtf_agg <- stats::aggregate(
+                    dtf_vals,
+                    by = list(Env = pheno_df[[pheno_env_col]]),
+                    FUN = mean,
                     na.rm = TRUE
                   )
                   dtf_means <- stats::setNames(dtf_agg$x, as.character(dtf_agg$Env))
                 }
               }
-              
+
               if (!is.null(maturity_col) && maturity_col != "" && maturity_col %in% names(pheno_df)) {
                 dtm_vals <- suppressWarnings(as.numeric(pheno_df[[maturity_col]]))
                 if (any(!is.na(dtm_vals))) {
-                  dtm_agg <- aggregate(
-                    dtm_vals, 
-                    by = list(Env = pheno_df[[pheno_env_col]]), 
-                    FUN = mean, 
+                  dtm_agg <- stats::aggregate(
+                    dtm_vals,
+                    by = list(Env = pheno_df[[pheno_env_col]]),
+                    FUN = mean,
                     na.rm = TRUE
                   )
                   dtm_means <- stats::setNames(dtm_agg$x, as.character(dtm_agg$Env))
                 }
               }
             }
-            
+
             process_environmental_covariates(
-              raw_env, 
-              dtf_means = dtf_means, 
-              dtm_means = dtm_means, 
+              raw_env,
+              dtf_means = dtf_means,
+              dtm_means = dtm_means,
               session = session
             )
           }
         )
       }, error = function(e) {
         shiny::showNotification(
-          paste("NASA POWER weather retrieval is currently unavailable: ", e$message),
-          type = "error",
+          paste("NASA POWER weather retrieval is currently unavailable. Using the uploaded environmental data:", e$message),
+          type = "warning",
           duration = 10
         )
-        NULL
+        raw_env
       })
-      
+
       res
     })
 
-    shiny::observeEvent(raw_data(), {
-      req(raw_data())
-      df <- raw_data()
+    shiny::observeEvent(source_data(), {
+      req(source_data())
+      df <- source_data()
       col_names <- names(df)
       detected <- auto_detect_columns(col_names)
 
@@ -493,7 +501,7 @@ mod_data_upload_server <- function(id) {
         choices  = choices_with_none,
         selected = detected$row %||% ""
       )
-      
+
       shiny::updateSelectInput(session, "col_col",
         choices  = choices_with_none,
         selected = detected$col %||% ""
@@ -504,7 +512,7 @@ mod_data_upload_server <- function(id) {
         choices  = choices_with_none,
         selected = detected$flowering %||% ""
       )
-      
+
       shiny::updateSelectInput(session, "col_pheno_maturity",
         choices  = choices_with_none,
         selected = detected$maturity %||% ""
@@ -588,7 +596,7 @@ mod_data_upload_server <- function(id) {
       traits    <- input$col_traits
 
       # Validate
-      validation <- validate_met_data(df, gen_col, env_col, rep_col, traits)
+      validation <- validate_met_data(df, gen_col, env_col, rep_col, traits, block_col)
 
       # Detect design
       detected_design <- detect_design(df, gen_col, env_col, rep_col, block_col)
@@ -863,7 +871,14 @@ mod_data_upload_server <- function(id) {
     # Return reactive data bundle + load_example function
     list(
       data_bundle  = data_bundle,
-      load_example = load_example
+      load_example = load_example,
+      exclude_values = function(rows, trait) {
+        d <- raw_data()
+        if (!trait %in% names(d) || !is.numeric(d[[trait]])) stop("Select a numeric trait.")
+        if (length(rows)) { d[[trait]][rows] <- NA_real_; data_edits(d) }
+        invisible(NULL)
+      },
+      restore_values = function() data_edits(NULL)
     )
   })
 }
@@ -874,24 +889,24 @@ mod_data_upload_server <- function(id) {
 validate_environmental_data <- function(env_df) {
   errors <- character(0)
   warnings <- character(0)
-  
+
   if (is.null(env_df) || nrow(env_df) == 0) {
     return(list(valid = FALSE, errors = "Environmental data is empty.", warnings = warnings))
   }
-  
+
   col_names <- names(env_df)
   env_col  <- col_names[grep("^(env|site|loc)", col_names, ignore.case = TRUE)][1]
   lat_col  <- col_names[grep("^lat", col_names, ignore.case = TRUE)][1]
   lon_col  <- col_names[grep("^lon", col_names, ignore.case = TRUE)][1]
   pdate_col <- col_names[grep("plant", col_names, ignore.case = TRUE)][1]
   hdate_col <- col_names[grep("harvest", col_names, ignore.case = TRUE)][1]
-  
+
   if (is.na(env_col)) {
     errors <- c(errors, "An 'Environment' column is required.")
   }
-  
+
   has_gps_dates <- !is.na(lat_col) && !is.na(lon_col) && !is.na(pdate_col) && !is.na(hdate_col)
-  
+
   if (!has_gps_dates) {
     num_cols <- col_names[sapply(env_df, is.numeric)]
     num_cols <- setdiff(num_cols, c(env_col, lat_col, lon_col))
@@ -909,10 +924,10 @@ validate_environmental_data <- function(env_df) {
     if (any(is.na(lons)) || any(lons < -180) || any(lons > 180)) {
       errors <- c(errors, "Longitude values must be numeric and between -180 and 180.")
     }
-    
+
     p_dates <- tryCatch(parse_date_robustly(env_df[[pdate_col]]), error = function(e) NULL)
     h_dates <- tryCatch(parse_date_robustly(env_df[[hdate_col]]), error = function(e) NULL)
-    
+
     if (is.null(p_dates) || any(is.na(p_dates))) {
       errors <- c(errors, "PlantingDate column has invalid or unparseable dates.")
     }
@@ -932,22 +947,22 @@ validate_environmental_data <- function(env_df) {
           if (mean_dur < 30 || mean_dur > 200) mean_dur <- 120
         }
       }
-      
+
       missing_envs <- env_df[[env_col]][is.na(h_dates)]
       warnings <- c(warnings, sprintf(
-        "Some environments (%s) have missing HarvestDate values. They will be dynamically estimated using a crop cycle of %d days from planting.", 
-        paste(missing_envs, collapse = ", "), 
+        "Some environments (%s) have missing HarvestDate values. They will be dynamically estimated using a crop cycle of %d days from planting.",
+        paste(missing_envs, collapse = ", "),
         mean_dur
       ))
     }
-    
+
     if (!is.null(p_dates) && !is.null(h_dates) && any(!is.na(p_dates)) && any(!is.na(h_dates))) {
       if (any(h_dates <= p_dates, na.rm = TRUE)) {
         errors <- c(errors, "HarvestDate must be strictly after PlantingDate.")
       }
     }
   }
-  
+
   list(
     valid = length(errors) == 0,
     errors = errors,

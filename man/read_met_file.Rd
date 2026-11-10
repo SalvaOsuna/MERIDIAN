@@ -4,7 +4,7 @@
 \alias{read_met_file}
 \title{Read a MET data file (CSV or Excel)}
 \usage{
-read_met_file(path, sep = ",", header = TRUE)
+read_met_file(path, sep = ",", header = TRUE, filename = path)
 }
 \arguments{
 \item{path}{File path}
@@ -12,9 +12,12 @@ read_met_file(path, sep = ",", header = TRUE)
 \item{sep}{CSV separator (ignored for Excel)}
 
 \item{header}{Whether first row is header}
+
+\item{filename}{Original filename, used to recognize uploaded Excel files}
 }
 \value{
-Data frame
+Data frame. Recognized spreadsheet error cells in otherwise numeric
+columns become NA and are recorded in the import_issues attribute.
 }
 \description{
 Read a MET data file (CSV or Excel)

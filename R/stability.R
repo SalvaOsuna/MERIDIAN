@@ -12,73 +12,36 @@
 #' @param trait Trait column name
 #' @return Data frame with cleaned factor columns
 prepare_metan_data <- function(df, gen_col, env_col, rep_col, trait = NULL) {
-  df_std <- df
-
-  # Drop rows with NA trait values
-  if (!is.null(trait) && trait %in% names(df_std)) {
-    df_std <- df_std[!is.na(df_std[[trait]]), , drop = FALSE]
-
-    # Step 1: keep cells with the modal number of reps
-    cell_counts <- table(df_std[[gen_col]], df_std[[env_col]])
-    expected_reps <- as.integer(names(which.max(table(cell_counts[cell_counts > 0]))))
-
-    bad_cells <- which(cell_counts > 0 & cell_counts != expected_reps, arr.ind = TRUE)
-    if (nrow(bad_cells) > 0) {
-      bad_gen <- rownames(cell_counts)[bad_cells[, 1]]
-      bad_env <- colnames(cell_counts)[bad_cells[, 2]]
-      bad_pairs <- paste(bad_gen, bad_env)
-      cur_pairs <- paste(df_std[[gen_col]], df_std[[env_col]])
-      df_std <- df_std[!cur_pairs %in% bad_pairs, , drop = FALSE]
-    }
-
-    # Step 2: iteratively prune to fully crossed design using C++ routine
-    gen_fct <- as.factor(df_std[[gen_col]])
-    env_fct <- as.factor(df_std[[env_col]])
-    gen_int <- as.integer(gen_fct)
-    env_int <- as.integer(env_fct)
-
-    n_gen_levels <- nlevels(gen_fct)
-    n_env_levels <- nlevels(env_fct)
-
-    keep_rows <- if (exists("cpp_find_balanced_subset", mode = "function")) {
-      cpp_find_balanced_subset(gen_int, env_int, n_gen_levels, n_env_levels)
-    } else {
-      keep_gen <- rep(TRUE, n_gen_levels)
-      keep_env <- rep(TRUE, n_env_levels)
-      keep <- rep(TRUE, nrow(df_std))
-      changed <- TRUE
-      while (changed) {
-        changed <- FALSE
-        active_envs <- which(keep_env)
-        active_gens <- which(keep_gen)
-        present <- table(
-          factor(gen_int[keep], levels = seq_len(n_gen_levels)),
-          factor(env_int[keep], levels = seq_len(n_env_levels))
-        ) > 0
-        gen_env_counts <- rowSums(present)
-        env_gen_counts <- colSums(present)
-
-        drop_gen <- active_gens[gen_env_counts[active_gens] < length(active_envs)]
-        drop_env <- active_envs[env_gen_counts[active_envs] < length(active_gens)]
-        if (length(drop_gen) > 0 || length(drop_env) > 0) {
-          keep_gen[drop_gen] <- FALSE
-          keep_env[drop_env] <- FALSE
-          keep <- !is.na(gen_int) & !is.na(env_int) & keep_gen[gen_int] & keep_env[env_int]
-          changed <- TRUE
-        }
-      }
-      keep
-    }
-    df_std <- df_std[keep_rows, , drop = FALSE]
-
-    df_std[[gen_col]] <- droplevels(as.factor(df_std[[gen_col]]))
-    df_std[[env_col]] <- droplevels(as.factor(df_std[[env_col]]))
+  if (is.null(trait)) stop("Select a trait before preparing stability data.")
+  if (!is.numeric(df[[trait]]) || any(is.infinite(df[[trait]]))) stop("Trait values must be numeric and finite.")
+  keys <- c(gen_col, env_col, rep_col)
+  if (any(vapply(df[keys], function(x) any(is.na(x) | !nzchar(trimws(as.character(x)))), logical(1))))
+    stop("Experimental identifiers cannot be missing or empty.")
+  out <- droplevels(df[!is.na(df[[trait]]), , drop = FALSE])
+  original <- out
+  # Remove one level at a time, retaining all replicate counts and checks.
+  repeat {
+    counts <- table(out[[gen_col]], out[[env_col]])
+    if (any(dim(counts) < 2)) stop("No complete stability subset with at least two genotypes and environments remains.")
+    if (all(counts > 0)) break
+    gm <- rowMeans(counts == 0); em <- colMeans(counts == 0)
+    if (nrow(counts) <= 2) gm[] <- -Inf
+    if (ncol(counts) <= 2) em[] <- -Inf
+    if (all(!is.finite(c(gm, em)))) stop("Insufficient connected observations for complete-cell stability indices.")
+    if (max(em) >= max(gm)) out <- out[as.character(out[[env_col]]) != names(which.max(em)), , drop = FALSE]
+    else out <- out[as.character(out[[gen_col]]) != names(which.max(gm)), , drop = FALSE]
+    out <- droplevels(out)
   }
-
-  df_std[[gen_col]] <- as.factor(df_std[[gen_col]])
-  df_std[[env_col]] <- as.factor(df_std[[env_col]])
-  df_std[[rep_col]] <- as.factor(df_std[[rep_col]])
-  df_std
+  for (nm in keys) out[[nm]] <- droplevels(factor(out[[nm]]))
+  excluded <- data.frame(Type = c(rep("Genotype", length(setdiff(unique(original[[gen_col]]), unique(out[[gen_col]])))),
+                                  rep("Environment", length(setdiff(unique(original[[env_col]]), unique(out[[env_col]]))))),
+                         Level = c(as.character(setdiff(unique(original[[gen_col]]), unique(out[[gen_col]]))),
+                                   as.character(setdiff(unique(original[[env_col]]), unique(out[[env_col]])))))
+  attr(out, "preprocessing") <- list(input_rows = nrow(df), observed_rows = nrow(original), retained_rows = nrow(out),
+                                    missing_trait_rows = sum(is.na(df[[trait]])), excluded = excluded,
+                                    method = "Greedy complete-cell subset; unequal replication retained")
+  if (nrow(out) < nrow(original)) warning(sprintf("Classical stability indices retain %d of %d observed records. Review the exclusions table; AMMI/GGE use all observed levels.", nrow(out), nrow(original)), call. = FALSE)
+  out
 }
 
 
@@ -90,70 +53,28 @@ prepare_metan_data <- function(df, gen_col, env_col, rep_col, trait = NULL) {
 #' @param trait Trait column name
 #' @return List with imputed GGE input data and imputed-cell count
 prepare_gge_data <- function(df, gen_col, env_col, trait) {
-  df_std <- df[!is.na(df[[trait]]), , drop = FALSE]
-  df_std[[gen_col]] <- as.factor(df_std[[gen_col]])
-  df_std[[env_col]] <- as.factor(df_std[[env_col]])
-
-  gen_levels <- levels(df_std[[gen_col]])
-  env_levels <- levels(df_std[[env_col]])
-  n_gen <- length(gen_levels)
-  n_env <- length(env_levels)
-
-  if (n_gen < 2 || n_env < 2) {
-    stop("GGE requires at least 2 genotypes and 2 environments.")
+  if (!is.numeric(df[[trait]]) || any(is.infinite(df[[trait]]))) stop("Trait values must be numeric and finite.")
+  if (anyNA(df[c(gen_col, env_col)])) stop("Genotype and environment identifiers cannot be missing.")
+  dat <- data.frame(GEN = factor(df[[gen_col]]), ENV = factor(df[[env_col]]), Y = df[[trait]])
+  dat <- droplevels(dat[!is.na(dat$Y), , drop = FALSE])
+  if (nlevels(dat$GEN) < 2 || nlevels(dat$ENV) < 2) stop("At least two observed genotypes and environments are required.")
+  means <- stats::aggregate(Y ~ GEN + ENV, dat, mean)
+  grid <- expand.grid(GEN = levels(dat$GEN), ENV = levels(dat$ENV), KEEP.OUT.ATTRS = FALSE)
+  grid <- merge(grid, means, by = c("GEN", "ENV"), all.x = TRUE, sort = FALSE)
+  grid$GEN <- factor(grid$GEN, levels = levels(dat$GEN)); grid$ENV <- factor(grid$ENV, levels = levels(dat$ENV))
+  grid <- grid[order(grid$ENV, grid$GEN), ]
+  missing <- is.na(grid$Y)
+  if (any(missing)) {
+    additive <- stats::lm(Y ~ GEN + ENV, means)
+    if (additive$rank < ncol(stats::model.matrix(additive))) stop("Disconnected genotype-environment network: additive missing-cell predictions are not estimable.")
+    grid$Y[missing] <- stats::predict(additive, grid[missing, , drop = FALSE])
   }
-
-  gen_int <- as.integer(df_std[[gen_col]])
-  env_int <- as.integer(df_std[[env_col]])
-  y <- as.numeric(df_std[[trait]])
-
-  ge_means <- if (exists("cpp_ge_means", mode = "function")) {
-    cpp_ge_means(gen_int, env_int, y, n_gen, n_env)
-  } else {
-    tapply(y, list(df_std[[gen_col]], df_std[[env_col]]), mean, na.rm = TRUE)
-  }
-  ge_means <- as.matrix(ge_means)
-  dimnames(ge_means) <- list(gen_levels, env_levels)
-
-  # Impute missing cells with additive expectation: mu + g + e
-  miss_idx <- which(is.na(ge_means), arr.ind = TRUE)
-  if (nrow(miss_idx) > 0) {
-    if (exists("cpp_impute_additive_gxe", mode = "function")) {
-      imputed <- cpp_impute_additive_gxe(ge_means)
-      ge_means <- as.matrix(imputed$matrix)
-    } else {
-      grand_mean <- mean(ge_means, na.rm = TRUE)
-      gen_means <- rowMeans(ge_means, na.rm = TRUE)
-      env_means <- colMeans(ge_means, na.rm = TRUE)
-
-      # Fallbacks when a full row/column is missing
-      gen_means[is.na(gen_means)] <- grand_mean
-      env_means[is.na(env_means)] <- grand_mean
-
-      for (k in seq_len(nrow(miss_idx))) {
-        i <- miss_idx[k, 1]
-        j <- miss_idx[k, 2]
-        ge_means[i, j] <- gen_means[i] + env_means[j] - grand_mean
-      }
-    }
-    dimnames(ge_means) <- list(gen_levels, env_levels)
-  }
-
-  out <- expand.grid(
-    GEN_TMP = gen_levels,
-    ENV_TMP = env_levels,
-    KEEP.OUT.ATTRS = FALSE,
-    stringsAsFactors = FALSE
-  )
-  out$TRAIT_TMP <- as.numeric(ge_means)
-  names(out)[1] <- gen_col
-  names(out)[2] <- env_col
-  names(out)[3] <- trait
-
-  list(
-    data = out,
-    n_imputed = nrow(miss_idx)
-  )
+  imputed <- grid[missing, , drop = FALSE]
+  names(grid) <- c(gen_col, env_col, trait)
+  names(imputed) <- c(gen_col, env_col, trait)
+  list(data = grid, n_imputed = sum(missing), imputed_cells = imputed,
+       matrix = matrix(grid[[trait]], nrow = nlevels(dat$GEN), dimnames = list(levels(dat$GEN), levels(dat$ENV))),
+       method = if (any(missing)) "Least-squares additive imputation of missing cell means" else "Observed cell means")
 }
 
 
@@ -162,10 +83,14 @@ prepare_gge_data <- function(df, gen_col, env_col, trait) {
 #' @param gen_col Genotype column name
 #' @param env_col Environment column name
 #' @param trait Trait column name
+#' @param rep_col Optional replicate column for estimating plot error
+#' @param block_col Optional incomplete block column
 #' @return List with ge_means, interaction, means, dims and labels
-build_ge_matrices <- function(df_std, gen_col, env_col, trait) {
-  gen_f <- as.factor(df_std[[gen_col]])
-  env_f <- as.factor(df_std[[env_col]])
+build_ge_matrices <- function(df_std, gen_col, env_col, trait, rep_col = NULL, block_col = NULL) {
+  if (!is.numeric(df_std[[trait]]) || any(is.infinite(df_std[[trait]]))) stop("Trait values must be numeric and finite.")
+  df_std <- droplevels(df_std[!is.na(df_std[[trait]]), , drop = FALSE])
+  gen_f <- droplevels(as.factor(df_std[[gen_col]]))
+  env_f <- droplevels(as.factor(df_std[[env_col]]))
   y <- as.numeric(df_std[[trait]])
 
   n_gen <- nlevels(gen_f)
@@ -174,7 +99,7 @@ build_ge_matrices <- function(df_std, gen_col, env_col, trait) {
   gen_int <- as.integer(gen_f)
   env_int <- as.integer(env_f)
 
-  ge_means <- if (exists("cpp_ge_means", mode = "function")) {
+  ge_means <- if (native_kernel_available("cpp_ge_means")) {
     cpp_ge_means(gen_int, env_int, y, n_gen, n_env)
   } else {
     tapply(y, list(gen_f, env_f), mean, na.rm = TRUE)
@@ -193,7 +118,15 @@ build_ge_matrices <- function(df_std, gen_col, env_col, trait) {
 
   interaction <- sweep(sweep(ge_means, 1, gen_means, "-"), 2, env_means, "-") + grand_mean
 
+  counts <- table(gen_f, env_f)
+  error_models <- if (!is.null(rep_col)) {
+    d <- prepare_model_data(df_std, gen_col, env_col, rep_col, trait, block_col)
+    fit_met_environment_models(d)
+  } else list(stats::lm(y ~ gen_f * env_f))
+  error_df <- sum(vapply(error_models, stats::df.residual, numeric(1)))
+  mse <- if (error_df > 0) sum(vapply(error_models, stats::deviance, numeric(1))) / error_df else NA_real_
   list(
+    cell_counts = unclass(counts), residual_ms = mse, residual_df = error_df,
     ge_means = ge_means,
     interaction = interaction,
     grand_mean = grand_mean,
@@ -252,7 +185,7 @@ run_gge <- function(df, gen_col, env_col, rep_col, trait) {
     resp  = !!rlang::sym(trait)
   )
 
-  list(model = model, n_imputed = gge_input$n_imputed)
+  list(model = model, n_imputed = gge_input$n_imputed, imputed_cells = gge_input$imputed_cells, method = gge_input$method)
 }
 
 
@@ -263,13 +196,13 @@ compute_er_table_fast <- function(ge) {
   ei <- ge$env_means - ge$grand_mean
   ss_ei <- sum(ei^2)
 
-  if (exists("cpp_er_statistics", mode = "function")) {
+  if (native_kernel_available("cpp_er_statistics")) {
     er <- cpp_er_statistics(ge$ge_means, ei)
     bi <- as.numeric(er$slope)
     intercept <- as.numeric(er$intercept)
     s2di <- as.numeric(er$S2di)
     r2 <- as.numeric(er$R2)
-  } else if (exists("cpp_fw_regression", mode = "function")) {
+  } else if (native_kernel_available("cpp_fw_regression")) {
       mean_vals <- as.numeric(ge$ge_means)
       ei_vals <- rep(ei, each = ge$n_gen)
       gen_ids <- rep(seq_len(ge$n_gen), times = ge$n_env)
@@ -296,7 +229,15 @@ compute_er_table_fast <- function(ge) {
     r2 <- ifelse(sst > .Machine$double.eps, pmax(0, 1 - sse / sst), NA_real_)
   }
 
+  deviation_ms <- s2di
+  correction <- rep(NA_real_, ge$n_gen)
+  if (ge$n_env > 2 && ss_ei > .Machine$double.eps && is.finite(ge$residual_ms)) {
+    leverage <- 1 / ge$n_env + ei^2 / ss_ei
+    correction <- rowSums(sweep(ge$residual_ms / ge$cell_counts, 2, 1 - leverage, "*")) / (ge$n_env - 2)
+  }
+  s2di <- deviation_ms - correction
   data.frame(
+    Deviation_MS = deviation_ms, Error_correction = correction,
     GEN = ge$gen_levels,
     Y = as.numeric(intercept),
     bi = as.numeric(bi),
@@ -373,7 +314,7 @@ compute_ammi_metrics_fast <- function(ge) {
   gen_ipca <- sv$u[, 1:n_axis, drop = FALSE] %*%
     diag(sqrt(sv$d[1:n_axis]), nrow = n_axis)
 
-  metrics <- if (exists("cpp_ammi_stability", mode = "function")) {
+  metrics <- if (native_kernel_available("cpp_ammi_stability")) {
     cpp_ammi_stability(
       gen_ipca_scores = gen_ipca,
       axis_ss = axis_ss[1:n_axis],
@@ -495,34 +436,38 @@ run_gge_fast <- function(df_std, gen_col, env_col, trait) {
     gen   = !!rlang::sym(gen_col),
     resp  = !!rlang::sym(trait)
   )
-  list(model = model, n_imputed = gge_input$n_imputed)
+  list(model = model, n_imputed = gge_input$n_imputed, imputed_cells = gge_input$imputed_cells, method = gge_input$method)
 }
 
 
 run_eberhart_russell_fast <- function(df_std, gen_col, env_col, rep_col, trait) {
-  ge <- build_ge_matrices(df_std, gen_col, env_col, trait)
+  ge <- build_ge_matrices(df_std, gen_col, env_col, trait, rep_col)
   params <- compute_er_table_fast(ge)
   list(model = NULL, params = params)
 }
 
 
 compute_wricke_fast <- function(df_std, gen_col, env_col, rep_col, trait) {
-  ge <- build_ge_matrices(df_std, gen_col, env_col, trait)
+  ge <- build_ge_matrices(df_std, gen_col, env_col, trait, rep_col)
   params <- compute_wricke_table_fast(ge)
   list(model = NULL, params = params)
 }
 
 
 compute_shukla_fast <- function(df_std, gen_col, env_col, rep_col, trait) {
-  ge <- build_ge_matrices(df_std, gen_col, env_col, trait)
+  ge <- build_ge_matrices(df_std, gen_col, env_col, trait, rep_col)
   params <- compute_shukla_table_fast(ge)
   list(model = NULL, params = params)
 }
 
 
 run_all_stability_fast <- function(df_std, gen_col, env_col, rep_col, trait) {
-  ge <- build_ge_matrices(df_std, gen_col, env_col, trait)
+  ge <- build_ge_matrices(df_std, gen_col, env_col, trait, rep_col)
 
+  combine_stability_from_ge(ge)
+}
+
+combine_stability_from_ge <- function(ge) {
   er <- compute_er_table_fast(ge)
   wr <- compute_wricke_table_fast(ge)
   sh <- compute_shukla_table_fast(ge, wi = wr$Wi)

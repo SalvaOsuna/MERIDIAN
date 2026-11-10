@@ -2,6 +2,8 @@
 #'
 #' @keywords internal
 #' @importFrom grDevices chull
+#' @importFrom htmltools htmlEscape
+#' @importFrom knitr kable
 #' @importFrom graphics Axis plot.new text
 #' @importFrom grid arrow unit
 #' @importFrom dplyr %>% all_of arrange bind_rows everything filter group_by left_join mutate n rename select slice_min starts_with summarise
@@ -28,7 +30,7 @@ utils::globalVariables(c(
   "Env2", "Environment", "Fitted", "GEN", "Genotype", "IPCA1", "IPCA2",
   "Latitude", "Longitude", "MEAN", "MEGA_ENV", "N_Missing", "PC1", "PC2",
   "Pct", "Pct_SS", "Percent", "REP", "Raw", "Residual", "Row", "SE",
-  "Source", "TRAIT", "Value", "Variance", "WAAS", "Weight", "avg_rep",
+  "Source", "SumSq", "TRAIT", "Value", "Variance", "WAAS", "Weight", "avg_rep",
   "env_effect", "env_mean", "fitted_additive", "gen_effect", "gen_mean",
   "hover_text", "intercept", "ipca", "is_outlier", "label", "mean_val",
   "n_rep", "point_size", "slope", "type", "value", "x", "x0", "x1", "y",

@@ -1,0 +1,5 @@
+Sys.setenv(LC_ALL = "C", LANG = "C")
+dir.create(".local-library", showWarnings = FALSE)
+.libPaths(c(normalizePath(".local-library"), .libPaths()))
+install.packages("openxlsx", lib = ".local-library", repos = "https://cloud.r-project.org", type = "source")
+stopifnot(requireNamespace("openxlsx", quietly = TRUE))

@@ -4,7 +4,7 @@
 \alias{validate_met_data}
 \title{Validate MET dataset structure and content}
 \usage{
-validate_met_data(df, gen_col, env_col, rep_col, resp_vars)
+validate_met_data(df, gen_col, env_col, rep_col, resp_vars, block_col = NULL)
 }
 \arguments{
 \item{df}{Data frame}
@@ -16,6 +16,8 @@ validate_met_data(df, gen_col, env_col, rep_col, resp_vars)
 \item{rep_col}{Replicate column name}
 
 \item{resp_vars}{Character vector of response variable names}
+
+\item{block_col}{Optional block column identifying units within replicate}
 }
 \value{
 List of validation messages: errors (fatal), warnings (informational)

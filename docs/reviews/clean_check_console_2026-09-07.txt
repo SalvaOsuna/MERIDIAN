@@ -1,0 +1,92 @@
+* using log directory 'C:/Users/tlv329/AppData/Local/Temp/RtmpGgiHkQ/MERIDIAN-clean-review-1a4c7f6917aa/MERIDIAN.Rcheck'
+* using R version 4.4.1 (2024-06-14 ucrt)
+* using platform: x86_64-w64-mingw32
+* R was compiled by
+    gcc.exe (GCC) 13.2.0
+    GNU Fortran (GCC) 13.2.0
+* running under: Windows 11 x64 (build 26100)
+* using session charset: ASCII
+* using options '--no-manual --no-vignettes'
+* checking for file 'MERIDIAN/DESCRIPTION' ... OK
+* this is package 'MERIDIAN' version '0.1.0'
+* package encoding: UTF-8
+* checking package namespace information ... OK
+* checking package dependencies ... NOTE
+Packages suggested but not available for checking:
+  'kableExtra', 'openxlsx', 'shinytest2'
+* checking if this is a source package ... OK
+* checking if there is a namespace ... OK
+* checking for executable files ... OK
+* checking for hidden files and directories ... OK
+* checking for portable file names ... OK
+* checking whether package 'MERIDIAN' can be installed ... OK
+* used C++ compiler: 'G__~1.EXE (GCC) 13.2.0'
+* checking installed package size ... OK
+* checking package directory ... OK
+* checking DESCRIPTION meta-information ... WARNING
+Invalid license file pointers: LICENSE
+* checking top-level files ... OK
+* checking for left-over files ... OK
+* checking index information ... OK
+* checking package subdirectories ... OK
+* checking code files for non-ASCII characters ... OK
+* checking R files for syntax errors ... WARNING
+Warning in file 'R/mod_eda.R':
+  unable to translate 'IQR (1.5<U+00D7>)' to native encoding
+* checking whether the package can be loaded ... OK
+* checking whether the package can be loaded with stated dependencies ... OK
+* checking whether the package can be unloaded cleanly ... OK
+* checking whether the namespace can be loaded with stated dependencies ... OK
+* checking whether the namespace can be unloaded cleanly ... OK
+* checking loading without being on the library search path ... OK
+* checking dependencies in R code ... OK
+* checking S3 generic/method consistency ... OK
+* checking replacement functions ... OK
+* checking foreign function calls ... OK
+* checking R code for possible problems ... OK
+* checking Rd files ... OK
+* checking Rd metadata ... OK
+* checking Rd cross-references ... OK
+* checking for missing documentation entries ... OK
+* checking for code/documentation mismatches ... WARNING
+Functions or methods with usage in Rd file 'calculate_enviromic_indices.Rd' but not in code:
+  'calculate_enviromic_indices'
+
+Functions or methods with usage in Rd file 'fetch_nasa_weather.Rd' but not in code:
+  'fetch_nasa_weather'
+
+Functions or methods with usage in Rd file 'parse_date_robustly.Rd' but not in code:
+  'parse_date_robustly'
+
+Functions or methods with usage in Rd file 'process_environmental_covariates.Rd' but not in code:
+  'process_environmental_covariates'
+
+Functions or methods with usage in Rd file 'validate_environmental_data.Rd' but not in code:
+  'validate_environmental_data'
+
+Codoc mismatches from Rd file 'plot_ge_heatmap.Rd':
+plot_ge_heatmap
+  Code: function(df, gen_col, env_col, trait, cluster_rows = TRUE,
+                 cluster_cols = TRUE, palette = "meridian")
+  Docs: function(df, gen_col, env_col, trait, cluster_rows = TRUE,
+                 cluster_cols = TRUE, palette = "RdYlGn")
+  Mismatches in argument default values:
+    Name: 'palette' Code: "meridian" Docs: "RdYlGn"
+
+* checking Rd \usage sections ... OK
+* checking Rd contents ... OK
+* checking for unstated dependencies in examples ... OK
+* checking line endings in C/C++/Fortran sources/headers ... OK
+* checking compiled code ... OK
+* checking examples ... NONE
+* checking for unstated dependencies in 'tests' ... OK
+* checking tests ...
+  Running 'testthat.R'
+ OK
+* DONE
+
+Status: 3 WARNINGs, 1 NOTE
+See
+  'C:/Users/tlv329/AppData/Local/Temp/RtmpGgiHkQ/MERIDIAN-clean-review-1a4c7f6917aa/MERIDIAN.Rcheck/00check.log'
+for details.
+

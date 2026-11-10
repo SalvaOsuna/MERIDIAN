@@ -17,6 +17,11 @@ mod_anova_ui <- function(id) {
       title = shiny::tagList(shiny::icon("calculator"), " ", LABELS$m3_title),
 
       shiny::selectInput(ns("trait"), LABELS$m2_select_trait, choices = NULL),
+      shiny::selectInput(ns("direction"), "Selection objective", c("Higher is better" = "higher", "Lower is better" = "lower")),
+      shiny::uiOutput(ns("analysis_status")),
+      shiny::actionButton(ns("send_blues_table_report"), "Send BLUEs table to Reports", class = "btn-sm w-100"),
+      shiny::actionButton(ns("send_blups_table_report"), "Send BLUPs table to Reports", class = "btn-sm w-100"),
+      shiny::actionButton(ns("send_mixed_table_report"), "Send variance table to Reports", class = "btn-sm w-100"),
 
       shiny::tags$hr(),
 
@@ -178,7 +183,7 @@ mod_anova_ui <- function(id) {
             )
           ),
           bslib::card(
-            bslib::card_header("BLUPs with 95% CI"),
+            bslib::card_header("BLUPs with approximate 95% prediction intervals"),
             shiny::div(
               class = "px-3 pt-2",
               shiny::actionButton(ns("send_blups_plot_report"), "Send this plot to Reports",
@@ -258,14 +263,14 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
     build_ss_barplot_gg <- function(res) {
       tbl <- res$anova$anova_table
       tbl <- tbl[tbl$Source != "Residuals", , drop = FALSE]
-      ggplot2::ggplot(tbl, ggplot2::aes(x = Source, y = Pct_SS, fill = Source)) +
+      ggplot2::ggplot(tbl, ggplot2::aes(x = Source, y = SumSq, fill = Source)) +
         ggplot2::geom_col(show.legend = FALSE, alpha = 0.85) +
-        ggplot2::geom_text(ggplot2::aes(label = paste0(Pct_SS, "%")), vjust = -0.3, size = 2.1) +
+        ggplot2::geom_text(ggplot2::aes(label = round(SumSq, 3)), vjust = -0.3, size = 2.1, show.legend = FALSE) +
         scale_fill_meridian_discrete() +
         ggplot2::labs(
-          title = paste("Partitioning of Sum of Squares (%):", res$trait),
+          title = paste("Adjusted sums of squares:", res$trait),
           x = NULL,
-          y = "% of Total SS"
+          y = "Partial sum of squares (not additive)"
         ) +
         theme_meridian_nature() +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
@@ -274,7 +279,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
     # ---- Data bundle helper ----
     db <- shiny::reactive({
       req(data_result$data_bundle())
-      data_result$data_bundle()
+      require_valid_bundle(data_result$data_bundle())
     })
 
     # ---- Update trait selector ----
@@ -286,7 +291,7 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
     })
 
     # ---- Run analysis on button click ----
-    anova_results <- shiny::eventReactive(input$run_anova, {
+    fitted_results <- analysis_event(input$run_anova, list(make_dataset_signature(db()), input$trait), {
       req(db(), input$trait)
       shiny::withProgress(message = "Running ANOVA & Mixed Models...", value = 0, {
 
@@ -302,21 +307,21 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
         shiny::incProgress(0.3, detail = "Mixed model (REML)")
         mixed_res <- safe_analysis(
           run_mixed_model(db()$data, db()$gen_col, db()$env_col,
-                          db()$rep_col, input$trait),
+                          db()$rep_col, input$trait, block_col = db()$block_col, design_type = db()$design$design, augmented_checks = db()$augmented_checks),
           session
         )
 
         shiny::incProgress(0.2, detail = "Computing BLUEs")
         blues_res <- safe_analysis(
           compute_blues(db()$data, db()$gen_col, db()$env_col,
-                        db()$rep_col, input$trait),
+                        db()$rep_col, input$trait, block_col = db()$block_col, design_type = db()$design$design, augmented_checks = db()$augmented_checks),
           session
         )
 
         shiny::incProgress(0.2, detail = "Computing BLUPs")
         blups_res <- safe_analysis(
           compute_blups(db()$data, db()$gen_col, db()$env_col,
-                        db()$rep_col, input$trait),
+                          db()$rep_col, input$trait, block_col = db()$block_col, design_type = db()$design$design, augmented_checks = db()$augmented_checks, mixed_result = mixed_res),
           session
         )
 
@@ -332,6 +337,28 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
       })
     })
 
+    anova_results <- shiny::reactive({
+      res <- fitted_results()
+      if (is.null(res)) return(NULL)
+      lower <- identical(input$direction, "lower")
+      for (name in c("blues", "blups")) if (!is.null(res[[name]])) {
+        column <- if (name == "blues") "BLUE" else "BLUP"
+        table <- res[[name]]
+        table <- table[order(table[[column]], decreasing = !lower), , drop = FALSE]
+        table$Rank <- rank(if (lower) table[[column]] else -table[[column]], ties.method = "min")
+        res[[name]] <- table
+      }
+      res
+    })
+
+    output$analysis_status <- shiny::renderUI({
+      if (is.null(anova_results())) shiny::tags$p("Run Analysis for the current data, trait and settings.", class = "text-muted")
+      else shiny::tagList(
+        shiny::tags$p(anova_results()$anova$method, class = "text-muted"),
+        if (isTRUE(anova_results()$mixed$singular)) shiny::tags$p(
+          "One or more random-effect variances were estimated at zero. Review the variance components.", class = "text-warning")
+      )
+    })
     # ---- Tab 1: ANOVA Table ----
     output$anova_summary_boxes <- shiny::renderUI({
       req(anova_results(), anova_results()$anova)
@@ -389,17 +416,17 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
       tbl <- tbl[tbl$Source != "Residuals", ]
 
       plotly::plot_ly(
-        data = tbl, x = ~Source, y = ~Pct_SS,
+        data = tbl, x = ~Source, y = ~SumSq,
         type = "bar",
         marker = list(color = meridian_nature_discrete(nrow(tbl))),
-        text = ~paste0(Pct_SS, "%"),
+        text = ~round(SumSq, 3),
         textposition = "auto",
-        hovertemplate = "%{x}<br>%{y:.1f}% of total SS<extra></extra>"
+        hovertemplate = "%{x}<br>%{y:.3f} adjusted SS<extra></extra>"
       ) |>
         meridian_plotly_layout(
-          title = paste("Partitioning of Sum of Squares (%):", anova_results()$trait),
+          title = paste("Adjusted sums of squares:", anova_results()$trait),
           xaxis = list(title = ""),
-          yaxis = list(title = "% of Total SS"),
+          yaxis = list(title = "Partial sum of squares (not additive)"),
           margin = list(l = 70, r = 20, b = 80, t = 55)
         )
     })
@@ -413,20 +440,20 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
         width = 1 / 3,
         fill  = FALSE,
         bslib::value_box(
-          title = "Broad-sense H\u00B2",
-          value = res$H2,
+          title = "Generalized H\u00B2 (Cullis)",
+          value = if (is.finite(res$H2)) round(res$H2, 3) else "N/A",
           showcase = shiny::icon("seedling"),
-          theme = if (res$H2 >= 0.5) "success" else if (res$H2 >= 0.3) "warning" else "danger"
+          theme = if (!is.finite(res$H2)) "secondary" else if (res$H2 >= 0.5) "success" else if (res$H2 >= 0.3) "warning" else "danger"
         ),
         bslib::value_box(
-          title = "Selection Accuracy",
-          value = res$accuracy,
+          title = "Square root of generalized H2",
+          value = if (is.finite(res$accuracy)) round(res$accuracy, 3) else "N/A",
           showcase = shiny::icon("bullseye"),
           theme = "info"
         ),
         bslib::value_box(
           title = "Environments x Reps",
-          value = paste0(res$n_env, " x ", res$n_rep),
+          value = paste0(res$n_env, " x ", paste(unique(res$rep_range), collapse = "-")),
           showcase = shiny::icon("globe"),
           theme = "primary"
         )
@@ -541,19 +568,19 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
     # ---- Downloads ----
     output$dl_blues_csv <- shiny::downloadHandler(
       filename = function() paste0("blues_", input$trait, ".csv"),
-      content  = function(file) readr::write_csv(anova_results()$blues, file)
+      content = function(file) { req(anova_results()$blues); readr::write_csv(anova_results()$blues, file) }
     )
     output$dl_blues_xlsx <- shiny::downloadHandler(
       filename = function() paste0("blues_", input$trait, ".xlsx"),
-      content  = function(file) openxlsx::write.xlsx(anova_results()$blues, file)
+      content = function(file) { req(anova_results()$blues); openxlsx::write.xlsx(anova_results()$blues, file) }
     )
     output$dl_blups_csv <- shiny::downloadHandler(
       filename = function() paste0("blups_", input$trait, ".csv"),
-      content  = function(file) readr::write_csv(anova_results()$blups, file)
+      content = function(file) { req(anova_results()$blups); readr::write_csv(anova_results()$blups, file) }
     )
     output$dl_blups_xlsx <- shiny::downloadHandler(
       filename = function() paste0("blups_", input$trait, ".xlsx"),
-      content  = function(file) openxlsx::write.xlsx(anova_results()$blups, file)
+      content = function(file) { req(anova_results()$blups); openxlsx::write.xlsx(anova_results()$blups, file) }
     )
 
     shiny::observeEvent(input$send_anova_table_report, {
@@ -570,7 +597,8 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
         table_builder = function() {
           as.data.frame(res_snapshot$anova$anova_table)
         },
-        metadata = list(table_family = "anova", dataset_signature = sig)
+        metadata = list(table_family = "anova", dataset_signature = sig,
+          model_formula = anova_results()$anova$formula, analysis_method = anova_results()$anova$method)
       )
       shiny::showNotification("ANOVA table sent to Reports.", type = "message")
     })
@@ -651,6 +679,16 @@ mod_anova_server <- function(id, data_result, report_registry = NULL) {
       shiny::showNotification("BLUPs plot sent to Reports.", type = "message")
     })
 
+    for (kind in c("blues", "blups", "mixed")) local({
+      name <- kind
+      shiny::observeEvent(input[[paste0("send_", name, "_table_report")]], {
+        res <- anova_results(); req(res, res[[name]], report_registry)
+        tbl <- if (name == "mixed") res$mixed$var_table else res[[name]]
+        register_report_table(report_registry, make_report_item_id("ANOVA", "table", res$trait, name),
+          paste(toupper(name), "table -", res$trait), "ANOVA & Variance Components", res$trait,
+          frozen_builder(tbl), list(dataset_signature = make_dataset_signature(db()), model_formula = res$mixed$formula))
+      })
+    })
     # ---- Return results for downstream modules ----
     return(list(
       anova_results = anova_results

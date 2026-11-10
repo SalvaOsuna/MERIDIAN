@@ -26,9 +26,9 @@
 
 ### Module 3 - ANOVA & Variance Components
 
-- Two-way ANOVA for genotype, environment, and GxE interactions
+- Design-adjusted marginal ANOVA for genotype and environment, with a partial GxE test
 - Variance components estimation using linear mixed models (`lme4`)
-- Broad-sense heritability estimation
+- Cullis generalized heritability from pairwise prediction-error variances
 - BLUEs and BLUPs tables and plots
 - Report export for ANOVA tables, variance partition plots, BLUEs, and BLUPs
 
@@ -43,7 +43,7 @@
 
 ### Module 5 - Adaptation & Enviromics
 
-- Native mega-environment clustering
+- Exploratory grouping of environments by the observed winning genotype, including ties and coverage
 - Reaction norm plots
 - Environmental typology via PCA
 - Covariate-phenotype correlation heatmaps
@@ -65,7 +65,7 @@
 ### Module 7 - Reports & Export
 
 - Central user-driven Report Registry for plots and tables explicitly sent from analysis modules
-- Lightweight report items with metadata and reproducible builder functions instead of duplicated datasets or rendered widgets
+- Frozen results with dataset identity, analysis metadata and registration time
 - Registered plot and table libraries with preview, removal, and export controls
 - Plot export studio with typography, label, theme, resolution, and white-background download controls
 - Patchwork figure composer with custom layouts, row/column controls, guide and axis collection, panel tags, global annotations, shared themes, and ZIP panel export
@@ -83,7 +83,7 @@ MERIDIAN uses a session-level Report Registry to connect the analysis modules wi
 5. Combine two or more registered ggplot-compatible plots in the Patchwork composer.
 6. Export individual plots, composed figures, tables, or a full report.
 
-The registry stores lightweight report items with module, trait, item type, metadata, timestamp, dataset signature, and a zero-argument builder function. It avoids storing large duplicated datasets and does not pass plotly/htmlwidget objects into the figure composer.
+The registry stores immutable snapshots of the selected tables and static plots. Recalculating an analysis cannot silently change a saved item. Changes to data values, column mappings, design or environmental covariates invalidate live analyses and clear the registry. Changes to trait or model settings require rerunning the affected analysis. Downloads always apply the current export settings, even when the preview has not been refreshed.
 
 ## Installation
 
@@ -91,7 +91,33 @@ The registry stores lightweight report items with module, trait, item type, meta
 
 - R >= 4.3.0
 - RStudio recommended
-- Rtools recommended on Windows for C++ acceleration
+- Rtools is required to install this package from source on Windows
+- Pandoc for HTML reports (the RStudio-bundled copy is detected automatically)
+- Optional `pagedown` and Chrome/Edge for PDF reports; no LaTeX installation is needed
+
+#### Linux system libraries
+
+Installing from GitHub compiles MERIDIAN and some of its dependencies. On Ubuntu
+or Debian, install the build tools and development libraries in a terminal first:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential r-base-dev cmake libuv1-dev \
+  libcurl4-openssl-dev libssl-dev libxml2-dev libfontconfig-dev libfreetype-dev \
+  libharfbuzz-dev libfribidi-dev libpng-dev libjpeg-dev libtiff-dev libwebp-dev libx11-dev
+```
+
+Pandoc is also needed for HTML reports; use the copy bundled with RStudio or
+install it with `sudo apt-get install pandoc`. For the requirements specific to
+your platform and current dependency versions, run:
+
+```r
+pak::pkg_sysreqs("SalvaOsuna/MERIDIAN")
+```
+
+If installation stops with `Configuration failed because libuv was not found`
+while building `fs`, install `libuv1-dev` and retry the installation. A failed
+dependency installation prevents `MERIDIAN::run_app()` from being available.
 
 ### Setup From GitHub
 
@@ -102,6 +128,18 @@ pak::pak("SalvaOsuna/MERIDIAN")
 MERIDIAN::run_app()
 ```
 
+To update an existing installation, restart R in RStudio, then run:
+
+```r
+pak::pkg_install("SalvaOsuna/MERIDIAN", upgrade = TRUE)
+MERIDIAN::run_app()
+```
+
+The bundled example works without internet access. Uploaded environmental data
+with coordinates and planting/harvest dates can retrieve daily weather from
+NASA POWER; if retrieval fails, the original uploaded covariates remain available.
+The interface uses a system font fallback when Google Fonts cannot be reached.
+
 ### Setup For Local Development
 
 ```r
@@ -109,9 +147,15 @@ MERIDIAN::run_app()
 install.packages(c("devtools", "usethis"))
 devtools::install_deps(dependencies = TRUE)
 devtools::document()
-devtools::load_all()
+source("run_app_dev.R")
+```
 
-run_app()
+If the folder was copied from another operating system, clear old compiled files
+before loading the development version:
+
+```r
+pkgbuild::clean_dll(".")
+source("run_app_dev.R")
 ```
 
 Dependencies are declared in `DESCRIPTION`. When adding a runtime dependency, use `usethis::use_package("package_name")`; for development-only tooling, use `usethis::use_package("package_name", type = "Suggests")`.
@@ -142,9 +186,34 @@ An example dataset is included in `inst/extdata` and can be loaded directly from
 
 ## Performance
 
-MERIDIAN includes optional C++ acceleration through `Rcpp` for large MET datasets. The C++ kernels live in `src/` and are linked through `Rcpp` attributes during package documentation/build. Current kernels support balanced subset pruning, GxE means, additive GxE imputation, grouped summaries, grouped outlier detection, spatial cell aggregation, AMMI metrics, Finlay-Wilkinson regression, and Eberhart-Russell diagnostics.
+MERIDIAN includes C++ kernels for GxE aggregation, grouped summaries, outlier detection, spatial aggregation and stability metrics. Package installation requires compilation; the statistical helpers also have tested R implementations when native symbols are unavailable. Missing-cell imputation and complete-cell subset selection use the reviewed R algorithms.
 
-If C++ compilation is unavailable, the app warns the user and falls back to R implementations so the workflow remains usable.
+Mixed models use lme4's fitting engine; the package's custom C++ kernels do not replace REML optimization. Large fixed-effect ANOVAs use equivalent fits within each environment, with a general-model fallback when cell means are not estimable. Recent analyses are cached within each session (two per module); changing the selection direction only reorders predictions.
+
+On a simulated 100-genotype × 4-environment × 20-replicate dataset with nine traits and 1% missing values, one-trait ANOVA fell from 9.38 to 0.68 seconds, and G×E aggregation plus plot-error estimation from 1.55 to 0.25 seconds on the development machine. These are indicative single-run timings, not guaranteed runtimes. See `docs/reviews/performance_2026-09-08.md` for scope and validation.
+
+## Statistical scope
+
+- Identifiers must be complete, and each genotype/environment/replicate/block record must identify a unique experimental unit. Traits must be numeric with finite observed values. Missing trait values are excluded separately for each analysis.
+- Block identifiers are nested within replicate and environment. Augmented designs require replicated check genotypes. Models need identifiable design contrasts and enough replication to separate GxE from plot error.
+- ANOVA treats genotype, environment and design effects as fixed. Its marginal/partial sums of squares are not additive percentages. Non-estimable contrasts are reported explicitly.
+- BLUPs treat genotype and GxE as random and environment as fixed. Predictions average environments equally; approximate prediction intervals include fixed-effect estimation uncertainty. BLUEs include random environment, GxE and design terms. The models assume independent GxE effects and homogeneous plot-error variance.
+- AMMI/GGE retain all observed genotype and environment levels. Missing cell means use least-squares additive predictions only when the network is connected; exported processing tables identify imputations. AMMI ANOVA uses observed plot data, never imputed means. Without plot-error degrees of freedom, AMMI is descriptive.
+- Classical stability indices use a disclosed complete-cell subset, retaining unequal replication. Eberhart-Russell deviation variance subtracts the plot-error contribution. The combined table uses all available AMMI axes; the AMMI tab uses the number of axes selected by the user.
+- Observed winners are exploratory, with a higher/lower selection objective; they do not establish repeatable mega-environments.
+- Across-environment spatial averages are descriptive averages of separate fits, with an SE under independence. They are not a two-stage MET model. Fixed genotype effects cannot be separated from spatial trends in layouts with perfectly confounded genotype positions, including the bundled example; the app diagnoses this case.
+- Excluding flagged outliers replaces values with NA only for the chosen trait. Original values can be restored in the same session.
+
+## Validation
+
+From the project root:
+
+```r
+source("tools/validate_app.R")
+source("tools/check_package.R")
+```
+
+The tests cover statistical invariance, native/R agreement, missing cells, invalid data, Shiny state, spatial predictions, Excel round trips, image file signatures and report content. Browser checks are in `tools/browser_validation.cjs` and `tools/browser_tabs.cjs`; start `tools/launch_validation_app.R`, then run these with Node and Playwright. Outputs are written to the ignored `validation-output/` directory.
 
 ## Deployment
 
@@ -174,7 +243,7 @@ rsconnect::deployApp(appDir = system.file("app", package = "MERIDIAN"))
 - **Visualization:** ggplot2, plotly, heatmaply, patchwork
 - **Data handling:** dplyr, tidyr, readr, readxl
 - **Statistical analysis:** metan, lme4, emmeans, SpATS
-- **Reports and export:** rmarkdown, knitr, kableExtra, openxlsx, svglite
+- **Reports and export:** rmarkdown, knitr, openxlsx, svglite, pagedown
 - **Performance integrations:** Rcpp
 
 ## Author

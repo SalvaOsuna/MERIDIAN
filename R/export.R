@@ -41,6 +41,65 @@ default_plot_cfg <- function() {
   )
 }
 
+customize_registered_plot <- function(p, cfg) {
+  cfg <- utils::modifyList(default_plot_cfg(), cfg)
+  if (inherits(p, "patchwork")) {
+    for (i in seq_len(length(p))) p[[i]] <- customize_registered_plot(p[[i]], cfg)
+    return(p)
+  }
+  layers <- lapply(p$layers, function(original) {
+    layer <- ggplot2::ggproto(NULL, original)
+    mapping <- if (isTRUE(layer$inherit.aes)) utils::modifyList(as.list(p$mapping), as.list(layer$mapping)) else as.list(layer$mapping)
+    dat <- if (is.data.frame(layer$data)) layer$data else p$data
+    environment_layer <- any(c("ENV", "env_mean", "Environment") %in% names(dat)) && !any(c("GEN", "Genotype") %in% names(dat))
+    color <- if (environment_layer) cfg$env_color else cfg$geno_color
+    if (inherits(layer$geom, "GeomPoint")) {
+      layer$aes_params$size <- cfg$point_size
+      layer$aes_params$alpha <- cfg$point_alpha
+      if (is.null(mapping$colour)) layer$aes_params$colour <- color
+    }
+    if (any(vapply(c("GeomLine", "GeomPath", "GeomSegment", "GeomAbline"), function(cl) inherits(layer$geom, cl), logical(1)))) {
+      layer$aes_params$linewidth <- cfg$line_width
+      if (!is.null(layer$geom_params$arrow)) layer$geom_params$arrow <- grid::arrow(length = grid::unit(cfg$arrow_size, "cm"))
+      if (is.null(mapping$colour) && environment_layer) layer$aes_params$colour <- color
+    }
+    is_label <- inherits(layer$geom, "GeomText") || inherits(layer$geom, "GeomTextRepel") || inherits(layer$geom, "GeomLabelRepel") || inherits(layer$geom, "GeomLabel")
+    if (is_label) {
+      if (!isTRUE(cfg$show_labels)) return(NULL)
+      layer$aes_params$size <- cfg$label_size
+      layer$aes_params$fontface <- cfg$label_face
+      layer$aes_params$family <- cfg$font_family
+      layer$aes_params$colour <- cfg$label_color
+      # Exclusions remove annotations only, never the plotted observations.
+      if (length(cfg$exclude_labels) && is.data.frame(dat) && !is.null(mapping$label)) {
+        labels <- rlang::eval_tidy(mapping$label, data = dat)
+        layer$data <- dat[!(as.character(labels) %in% cfg$exclude_labels), , drop = FALSE]
+      }
+      if (inherits(layer$geom, "GeomTextRepel") || inherits(layer$geom, "GeomLabelRepel")) {
+        layer$geom_params$max.overlaps <- cfg$max_overlaps
+        layer$geom_params$force <- cfg$label_force
+        layer$geom_params$min.segment.length <- cfg$min_seg_len
+        layer$aes_params$segment.colour <- cfg$segment_color
+        layer$aes_params$segment.linetype <- cfg$segment_linetype
+        if (!isTRUE(cfg$use_repel)) {
+          layer$geom <- ggplot2::GeomText
+          layer$geom_params <- list(na.rm = TRUE, check_overlap = TRUE)
+        }
+      }
+    }
+    layer
+  })
+  p$layers <- Filter(Negate(is.null), layers)
+  # Preserve discrete group colours; recolour continuous signed heatmaps only.
+  fill <- p$scales$get_scales("fill")
+  if (!is.null(fill) && inherits(fill, "ScaleContinuous") && !is.null(fill$palette)) {
+    p$scales <- p$scales$clone()
+    p$scales$scales <- Filter(function(s) !"fill" %in% s$aesthetics, p$scales$scales)
+    p <- p + scale_fill_meridian_diverging(low = cfg$neg_fill, high = cfg$pos_fill, midpoint = 0)
+  }
+  apply_common_theme_controls(p, cfg)
+}
+
 parse_label_exclusions <- function(x) {
   if (is.null(x) || !nzchar(trimws(x))) return(character(0))
   out <- trimws(unlist(strsplit(x, ",")))
@@ -67,6 +126,7 @@ base_theme_from_name <- function(name, base_size = 12, base_family = "sans") {
 }
 
 apply_common_theme_controls <- function(p, cfg) {
+  cfg <- utils::modifyList(default_plot_cfg(), cfg)
   th <- base_theme_from_name(cfg$theme_name, cfg$base_size, cfg$font_family)
   p +
     th +
@@ -162,7 +222,7 @@ write_table_excel_with_metadata <- function(df, file, table_name, metadata) {
   openxlsx::addStyle(wb, "Data", header_style, rows = 1, cols = seq_len(ncol(df)), gridExpand = TRUE)
   if (nrow(df) > 0) {
     odd_rows <- seq(2, nrow(df) + 1, by = 2)
-    even_rows <- seq(3, nrow(df) + 1, by = 2)
+    even_rows <- if (nrow(df) >= 2) seq(3, nrow(df) + 1, by = 2) else integer()
     if (length(odd_rows) > 0) openxlsx::addStyle(wb, "Data", odd_style, rows = odd_rows, cols = seq_len(ncol(df)), gridExpand = TRUE)
     if (length(even_rows) > 0) openxlsx::addStyle(wb, "Data", even_style, rows = even_rows, cols = seq_len(ncol(df)), gridExpand = TRUE)
   }
@@ -189,7 +249,12 @@ save_ggplot_by_format <- function(plot_obj, file, format, width, height, dpi) {
         device = "tiff", compression = "lzw", bg = "white")
     }
   } else {
-    ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi, device = "png", bg = "white")
+    if (requireNamespace("ragg", quietly = TRUE)) {
+      ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi, device = ragg::agg_png, bg = "white")
+    } else {
+      ggplot2::ggsave(file, plot = plot_obj, width = width, height = height, dpi = dpi, device = "png", bg = "white",
+        type = if (capabilities("cairo")) "cairo" else getOption("bitmapType", "Xlib"))
+    }
   }
 }
 

@@ -1,0 +1,13 @@
+Sys.setenv(LC_ALL = "C", LANG = "C")
+.libPaths(c(normalizePath(".local-library", mustWork = FALSE), .libPaths()))
+Sys.setenv(R_LIBS = paste(.libPaths(), collapse = .Platform$path.sep))
+Rcpp::compileAttributes(".")
+roxygen2::roxygenise(".")
+dir.create("validation-output", showWarnings = FALSE)
+archive <- pkgbuild::build(".", dest_path = "validation-output", vignettes = FALSE, manual = FALSE)
+check_dir <- tempfile("check-", tmpdir = "validation-output")
+result <- rcmdcheck::rcmdcheck(archive, args = c("--no-manual"),
+  check_dir = check_dir, error_on = "never")
+writeLines(normalizePath(check_dir, winslash = "/"), "validation-output/latest-check.txt")
+saveRDS(result, "validation-output/check-result.rds")
+if (length(result$errors) || length(result$warnings)) quit(status = 1)

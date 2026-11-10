@@ -12,7 +12,7 @@ plot_ammi1 <- function(ammi, axis = 1, label_size = 2.1,
                        show_lines = TRUE, interactive = FALSE) {
 
   ipca_col <- paste0("IPCA", axis)
-  pct      <- ammi$variance_explained$Percent[axis]
+  pct      <- round(ammi$variance_explained$Percent[axis], 2)
   trait    <- ammi$params$trait
   pal <- meridian_nature_palette()
 
@@ -103,8 +103,8 @@ plot_ammi2 <- function(ammi, axis_x = 1, axis_y = 2, label_size = 2.1,
 
   ipcax <- paste0("IPCA", axis_x)
   ipcay <- paste0("IPCA", axis_y)
-  pct_x <- ammi$variance_explained$Percent[axis_x]
-  pct_y <- ammi$variance_explained$Percent[axis_y]
+  pct_x <- round(ammi$variance_explained$Percent[axis_x], 2)
+  pct_y <- round(ammi$variance_explained$Percent[axis_y], 2)
   trait <- ammi$params$trait
   pal <- meridian_nature_palette()
 
@@ -203,7 +203,7 @@ plot_ammi_variance <- function(ammi, n_show = NULL) {
     geom_col(fill = pal[["signal_blue"]], alpha = 0.9) +
     geom_line(aes(y = Cumulative, group = 1), color = pal[["accent_red"]], linewidth = 0.45) +
     geom_point(aes(y = Cumulative), color = pal[["accent_red"]], size = 1.4) +
-    geom_text(aes(label = paste0(Percent, "%")), vjust = -0.5, size = 2.1) +
+    geom_text(aes(label = paste0(round(Percent, 2), "%")), vjust = -0.5, size = 2.1, show.legend = FALSE) +
     scale_y_continuous(limits = c(0, 105), breaks = seq(0, 100, 20)) +
     labs(
       title = "GxE Variance Explained by IPCA Axis",
@@ -217,20 +217,25 @@ plot_ammi_variance <- function(ammi, n_show = NULL) {
 
 plot_ge_heatmap_ammi <- function(ammi, interactive = FALSE) {
 
-  df <- ammi$interaction_long %>%
-    mutate(GEN = reorder(GEN, -gen_effect),
-           ENV = reorder(ENV, -env_effect))
+  # Marginal effects live in their own tables, not in interaction_long.
+  df <- ammi$interaction_long
+  df$GEN <- factor(df$GEN, levels = ammi$gen_means$GEN[order(ammi$gen_means$gen_effect)])
+  df$ENV <- factor(df$ENV, levels = ammi$env_means$ENV[order(-ammi$env_means$env_effect)])
 
   p <- ggplot(df, aes(x = ENV, y = GEN, fill = interaction)) +
     geom_tile(color = "white", linewidth = 0.2) +
     scale_fill_meridian_diverging(midpoint = 0, name = "GxE\ninteraction") +
-    geom_text(aes(label = round(interaction, 1)), size = 1.8) +
+    ggplot2::scale_y_discrete(breaks = heatmap_axis_breaks) +
     labs(
       title = "GxE Interaction (residuals from additive model)",
       x = "Environment", y = "Genotype"
     ) +
     theme_meridian_nature() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  if (nlevels(df$GEN) <= 40L) p <- p +
+    geom_text(aes(label = round(interaction, 1)), size = 1.8, show.legend = FALSE)
+  else p <- p + labs(caption = paste("All", nlevels(df$GEN), "genotypes shown; selected axis labels."))
 
   if (interactive) plotly::ggplotly(p) else p
 }

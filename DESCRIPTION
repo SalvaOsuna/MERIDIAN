@@ -1,6 +1,6 @@
 Package: MERIDIAN
 Title: Multi-Environment Research Integration: Data Intelligence and Agronomic Networks
-Version: 0.1.0
+Version: 0.1.2
 Authors@R: person("Salva", "Osuna", email = "salvadorosunacaballero@gmail.com",
     role = c("aut", "cre"))
 Description: An interactive Shiny application for comprehensive analysis of
@@ -31,33 +31,35 @@ Imports:
     metan,
     lme4,
     emmeans,
+    Matrix,
+    htmltools,
+    digest,
+    openxlsx,
+    readxl,
+    rmarkdown,
+    knitr,
+    patchwork,
+    svglite,
+    zip,
     SpATS,
     rlang,
     Rcpp,
-    nasapower,
-    readxl
+    nasapower
 LinkingTo:
     Rcpp
 Suggests:
-    digest,
     ggpubr,
-    kableExtra,
-    knitr,
-    openxlsx,
     pagedown,
-    patchwork,
     ragg,
     RColorBrewer,
-    rmarkdown,
     heatmaply,
-    shinytest2,
-    svglite,
+    jsonlite,
     testthat (>= 3.0.0),
     thematic,
     viridisLite,
-    zip,
+    withr,
     usethis,
     devtools
 Config/testthat/edition: 3
 NeedsCompilation: yes
-Config/roxygen2/version: 8.0.0
+Config/roxygen2/version: 8.1.1

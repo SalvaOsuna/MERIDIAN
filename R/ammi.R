@@ -1,214 +1,61 @@
 #' Run AMMI Analysis natively (no metan dependency)
 #'
-#' @param data     data.frame en formato largo
-#' @param gen      string: nombre de la columna de genotipo
-#' @param env      string: nombre de la columna de ambiente
-#' @param rep      string: nombre de la columna de repetición (o NULL si no hay)
-#' @param trait    string: nombre de la columna del rasgo fenotípico
-#' @param n_axis   integer: número de ejes IPCA a retener (default = 2)
+#' @param data     Data frame in long format
+#' @param gen      Genotype column name
+#' @param env      Environment column name
+#' @param rep      Replicate column name, or NULL when unavailable
+#' @param trait    Phenotypic trait column name
+#' @param n_axis   Number of IPCA axes to retain (default = 2)
 #'
-#' @return lista con todos los objetos necesarios para plotear y reportar
+#' @param block_col Optional block column nested in replicate and environment
+#' @param design_type Experimental design label
+#' @param augmented_checks Replicated check genotypes for augmented designs
+#' @return List of results for plotting and reporting
 
-run_ammi <- function(data, gen, env, rep = NULL, trait, n_axis = 2) {
-  
-  # ── 0. Preparar y validar datos ──────────────────────────────────────────
-  df <- data %>%
-    rename(
-      GEN   = all_of(gen),
-      ENV   = all_of(env),
-      TRAIT = all_of(trait)
-    ) %>%
-    filter(!is.na(TRAIT)) %>%
-    mutate(
-      GEN = as.factor(GEN),
-      ENV = as.factor(ENV)
-    )
-  
-  if (!is.null(rep)) {
-    df <- df %>% rename(REP = all_of(rep)) %>% mutate(REP = as.factor(REP))
-  }
-  
-  n_gen <- nlevels(df$GEN)
-  n_env <- nlevels(df$ENV)
-  
-  # Limitar ejes al máximo posible
-  n_axis <- min(n_axis, min(n_gen, n_env) - 1)
-  
-  # ── 1. Medias por celda GEN×ENV ───────────────────────────────────────────
-  # Si hay repeticiones, promediar primero para obtener una observación por celda
-  cell_means <- df %>%
-    group_by(GEN, ENV) %>%
-    summarise(mean_val = mean(TRAIT, na.rm = TRUE), .groups = "drop")
-  
-  # ── 2. ANOVA aditivo para obtener efectos principales ────────────────────
-  # Medias marginales
-  grand_mean <- mean(cell_means$mean_val, na.rm = TRUE)
-  
-  gen_means <- cell_means %>%
-    group_by(GEN) %>%
-    summarise(gen_mean = mean(mean_val, na.rm = TRUE)) %>%
-    mutate(gen_effect = gen_mean - grand_mean)  # α_i
-  
-  env_means <- cell_means %>%
-    group_by(ENV) %>%
-    summarise(env_mean = mean(mean_val, na.rm = TRUE)) %>%
-    mutate(env_effect = env_mean - grand_mean)  # β_j
-  
-  # ── 3. Matriz de interacción G×E ─────────────────────────────────────────
-  # e_ij = Y_ij - μ - α_i - β_j
-  # donde Y_ij = media de celda, μ = gran media, α_i = efecto genotipo, β_j = efecto ambiente
-  
-  interaction_long <- cell_means %>%
-    left_join(gen_means %>% select(GEN, gen_effect), by = "GEN") %>%
-    left_join(env_means %>% select(ENV, env_effect), by = "ENV") %>%
-    mutate(
-      fitted_additive = grand_mean + gen_effect + env_effect,
-      interaction     = mean_val - fitted_additive
-    )
-  
-  # Convertir a matriz (filas = genotipos, columnas = ambientes)
-  interaction_matrix <- interaction_long %>%
-    select(GEN, ENV, interaction) %>%
-    pivot_wider(names_from = ENV, values_from = interaction) %>%
-    column_to_rownames("GEN") %>%
-    as.matrix()
-  
-  # ── 4. SVD de la matriz de interacción ───────────────────────────────────
-  # interaction_matrix = U %*% diag(D) %*% t(V)
-  # U = eigenvectores de genotipos (left singular vectors)
-  # V = eigenvectores de ambientes (right singular vectors)
-  # D = valores singulares (singular values)
-  
-  svd_result <- svd(interaction_matrix)
-  
-  singular_values <- svd_result$d
-  U <- svd_result$u  # dimensiones: n_gen × n_axis
-  V <- svd_result$v  # dimensiones: n_env × n_axis
-  
-  rownames(U) <- rownames(interaction_matrix)
-  rownames(V) <- colnames(interaction_matrix)
-  
-  # ── 5. Scores de genotipos y ambientes ───────────────────────────────────
-  # Convención "simétrica": multiplicar por raíz del valor singular
-  # Esto da la misma escala a genotipos y ambientes en el biplot
-  
-  gen_scores <- as.data.frame(U[, 1:n_axis, drop = FALSE] %*% 
-                                diag(sqrt(singular_values[1:n_axis]), 
-                                     nrow = n_axis))
-  colnames(gen_scores) <- paste0("IPCA", 1:n_axis)
-  gen_scores$GEN <- rownames(U)
-  
-  env_scores <- as.data.frame(V[, 1:n_axis, drop = FALSE] %*% 
-                                diag(sqrt(singular_values[1:n_axis]), 
-                                     nrow = n_axis))
-  colnames(env_scores) <- paste0("IPCA", 1:n_axis)
-  env_scores$ENV <- rownames(V)
-  
-  # Unir con medias marginales
-  gen_scores <- gen_scores %>%
-    left_join(gen_means, by = "GEN")
-  
-  env_scores <- env_scores %>%
-    left_join(env_means, by = "ENV")
-  
-  # ── 6. Varianza explicada por cada eje ───────────────────────────────────
-  total_ss    <- sum(singular_values^2)
-  axis_ss     <- singular_values^2
-  axis_pct    <- round(100 * axis_ss / total_ss, 2)
-  axis_cum    <- cumsum(axis_pct)
-  
-  variance_explained <- data.frame(
-    Axis        = paste0("IPCA", seq_along(singular_values)),
-    SS          = axis_ss,
-    Percent     = axis_pct,
-    Cumulative  = axis_cum
-  )
-  
-  # ── 7. Métricas de estabilidad (C++ accelerated) ────────────────────────────
-  
-  stability <- gen_scores %>% select(GEN, gen_mean, starts_with("IPCA"))
-  
-  # Build matrix of IPCA scores for C++ function
-  ipca_cols   <- paste0("IPCA", 1:n_axis)
-  ipca_matrix <- as.matrix(stability[, ipca_cols, drop = FALSE])
-  
-  # Call C++ kernel for ASV, WAAS, SIPC when available.
-  cpp_metrics <- if (exists("cpp_ammi_stability", mode = "function")) {
-    cpp_ammi_stability(ipca_matrix, axis_ss, axis_pct, n_axis)
-  } else {
-    ss_ratio <- if (n_axis >= 2 && axis_ss[2] > 0) axis_ss[1] / axis_ss[2] else NA_real_
-    asv <- rep(NA_real_, nrow(ipca_matrix))
-    if (n_axis >= 2 && !is.na(ss_ratio)) {
-      asv <- sqrt((ss_ratio * ipca_matrix[, 1])^2 + ipca_matrix[, 2]^2)
-    }
-    w_sum <- sum(axis_pct[seq_len(n_axis)])
-    waas <- if (w_sum > 0) {
-      rowSums(abs(ipca_matrix) * matrix(axis_pct[seq_len(n_axis)], nrow = nrow(ipca_matrix), ncol = n_axis, byrow = TRUE)) / w_sum
-    } else {
-      rep(NA_real_, nrow(ipca_matrix))
-    }
-    data.frame(
-      ASV = asv,
-      WAAS = waas,
-      SIPC = rowSums(abs(ipca_matrix))
-    )
-  }
-  
-  stability$ASV  <- round(cpp_metrics$ASV, 4)
-  stability$WAAS <- round(cpp_metrics$WAAS, 4)
-  stability$SIPC <- round(cpp_metrics$SIPC, 4)
-  
-  stability <- stability %>% arrange(WAAS)
-  
-  # ── 8. ANOVA tabla formal ─────────────────────────────────────────────────
-  # Para el ANOVA completo (con reps), usar lm si hay repeticiones
-  
-  if (!is.null(rep)) {
-    formula_full <- stats::reformulate(
-      termlabels = c("GEN", "ENV", "GEN:ENV"),
-      response = "TRAIT"
-    )
-    model_full   <- lm(formula_full, data = df)
-    anova_table  <- as.data.frame(anova(model_full))
-    anova_table$Source <- rownames(anova_table)
-    anova_table  <- anova_table %>% select(Source, everything())
-    rownames(anova_table) <- NULL
-  } else {
-    anova_table <- NULL  # sin reps no hay estimación del error
-  }
-  
-  # ── 9. Output final ───────────────────────────────────────────────────────
-  list(
-    # Datos base
-    grand_mean         = grand_mean,
-    gen_means          = gen_means,       # data.frame: GEN, gen_mean, gen_effect
-    env_means          = env_means,       # data.frame: ENV, env_mean, env_effect
-    cell_means         = cell_means,      # data.frame: GEN, ENV, mean_val
-    interaction_long   = interaction_long,# data.frame: GEN, ENV, interaction, fitted_additive
-    interaction_matrix = interaction_matrix, # matrix: G×E
-    
-    # SVD
-    singular_values    = singular_values,
-    U                  = U,
-    V                  = V,
-    
-    # Scores listos para ggplot
-    gen_scores         = gen_scores,      # data.frame: GEN, IPCA1, IPCA2..., gen_mean, gen_effect
-    env_scores         = env_scores,      # data.frame: ENV, IPCA1, IPCA2..., env_mean, env_effect
-    
-    # Varianza
-    variance_explained = variance_explained, # data.frame: Axis, SS, Percent, Cumulative
-    
-    # Estabilidad
-    stability          = stability,       # data.frame: GEN, gen_mean, IPCA1..., ASV, WAAS, SIPC
-    
-    # ANOVA
-    anova_table        = anova_table,
-    
-    # Parámetros usados
-    params = list(
-      gen = gen, env = env, rep = rep, trait = trait,
-      n_axis = n_axis, n_gen = n_gen, n_env = n_env
-    )
-  )
+run_ammi <- function(data, gen, env, rep = NULL, trait, n_axis = 2, block_col = NULL,
+                     design_type = "RCBD", augmented_checks = NULL) {
+  input <- prepare_gge_data(data, gen, env, trait)
+  M <- input$matrix
+  n_gen <- nrow(M); n_env <- ncol(M)
+  if (length(n_axis) != 1 || !is.finite(n_axis) || n_axis < 1) stop("Select at least one AMMI axis.")
+  n_axis <- min(as.integer(n_axis), min(n_gen, n_env) - 1L)
+  grand_mean <- mean(M)
+  gen_means <- data.frame(GEN = rownames(M), gen_mean = rowMeans(M), gen_effect = rowMeans(M) - grand_mean)
+  env_means <- data.frame(ENV = colnames(M), env_mean = colMeans(M), env_effect = colMeans(M) - grand_mean)
+  interaction_matrix <- sweep(sweep(M, 1, rowMeans(M)), 2, colMeans(M)) + grand_mean
+  if (max(abs(interaction_matrix)) < 1e-10 * max(1, max(abs(M)))) interaction_matrix[] <- 0
+  sv <- svd(interaction_matrix)
+  rownames(sv$u) <- rownames(M); rownames(sv$v) <- colnames(M)
+  axes <- seq_len(n_axis)
+  gen_scores <- as.data.frame(sweep(sv$u[, axes, drop = FALSE], 2, sqrt(sv$d[axes]), "*"))
+  env_scores <- as.data.frame(sweep(sv$v[, axes, drop = FALSE], 2, sqrt(sv$d[axes]), "*"))
+  names(gen_scores) <- names(env_scores) <- paste0("IPCA", axes)
+  ipca_matrix <- as.matrix(gen_scores)
+  gen_scores <- cbind(gen_scores, gen_means); env_scores <- cbind(env_scores, env_means)
+  ss <- sv$d^2
+  pct <- if (sum(ss) > 0) 100 * ss / sum(ss) else rep(0, length(ss))
+  ratio <- if (n_axis >= 2 && ss[2] > 1e-12 * max(ss)) ss[1]/ss[2] else NA_real_
+  stability <- gen_scores
+  stability$ASV <- if (is.finite(ratio)) sqrt((ratio * ipca_matrix[, 1])^2 + ipca_matrix[, 2]^2) else if (sum(ss) == 0) 0 else NA_real_
+  stability$WAAS <- if (sum(pct[axes]) > 0) as.vector(abs(ipca_matrix) %*% pct[axes] / sum(pct[axes])) else 0
+  stability$SIPC <- rowSums(abs(ipca_matrix))
+  stability <- stability[order(stability$WAAS), ]
+  cell_means <- input$data; names(cell_means) <- c("GEN", "ENV", "mean_val")
+  interaction_long <- cell_means
+  interaction_long$fitted_additive <- rep(rowMeans(M), times = n_env) + rep(colMeans(M), each = n_gen) - grand_mean
+  interaction_long$interaction <- as.vector(interaction_matrix)
+  av <- if (!is.null(rep)) tryCatch(
+    run_anova_met(data, gen, env, rep, block_col, trait, design_type, augmented_checks),
+    error = function(e) {
+      if (!grepl("No residual degrees of freedom", conditionMessage(e), fixed = TRUE)) stop(e)
+      warning("AMMI decomposition is descriptive: no residual degrees of freedom are available for an ANOVA.", call. = FALSE)
+      NULL
+    }) else NULL
+  list(grand_mean = grand_mean, gen_means = gen_means, env_means = env_means,
+       cell_means = cell_means, interaction_long = interaction_long, interaction_matrix = interaction_matrix,
+       singular_values = sv$d, U = sv$u, V = sv$v, gen_scores = gen_scores, env_scores = env_scores,
+       variance_explained = data.frame(Axis = paste0("IPCA", seq_along(ss)), SS = ss, Percent = pct, Cumulative = cumsum(pct)),
+       stability = stability, anova_table = av$anova_table, n_imputed = input$n_imputed,
+       imputed_cells = input$imputed_cells, method = input$method, anova_method = av$method,
+       params = list(gen = gen, env = env, rep = rep, trait = trait, n_axis = n_axis, n_gen = n_gen, n_env = n_env))
 }

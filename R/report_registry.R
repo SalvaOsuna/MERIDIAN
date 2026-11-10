@@ -7,22 +7,13 @@ make_report_item_id <- function(module, item_type, trait, name) {
   parts <- c(module, item_type, trait %||% "global", name)
   parts <- tolower(gsub("[^A-Za-z0-9]+", "_", parts))
   parts <- gsub("^_+|_+$", "", parts)
-  paste(parts[nzchar(parts)], collapse = "__")
+  paste0(paste(parts[nzchar(parts)], collapse = "__"), "__", substr(digest::digest(list(module, item_type, trait, name)), 1, 8))
 }
 
 make_dataset_signature <- function(db) {
   if (is.null(db) || is.null(db$data)) return(NULL)
-  payload <- list(
-    nrow = nrow(db$data),
-    ncol = ncol(db$data),
-    names = names(db$data),
-    traits = db$traits %||% character(0)
-  )
-  if (requireNamespace("digest", quietly = TRUE)) {
-    digest::digest(payload)
-  } else {
-    paste(c(payload$nrow, payload$ncol, payload$names, payload$traits), collapse = "|")
-  }
+  payload <- db[intersect(c("data", "gen_col", "env_col", "rep_col", "block_col", "row_col", "col_col", "traits", "design", "augmented_checks", "env_data"), names(db))]
+  digest::digest(payload, algo = "xxhash64", serialize = TRUE)
 }
 
 register_report_plot <- function(registry, id, label, module, trait, plot_builder, metadata = list()) {
@@ -32,7 +23,7 @@ register_report_plot <- function(registry, id, label, module, trait, plot_builde
     type = "plot",
     module = module,
     trait = trait %||% "Global",
-    builder = plot_builder,
+    builder = frozen_builder(shiny::isolate(plot_builder())),
     metadata = metadata %||% list(),
     created_at = Sys.time(),
     input_snapshot = metadata$input_snapshot %||% list()
@@ -49,7 +40,7 @@ register_report_table <- function(registry, id, label, module, trait, table_buil
     type = "table",
     module = module,
     trait = trait %||% "Global",
-    builder = table_builder,
+    builder = frozen_builder(as.data.frame(shiny::isolate(table_builder()))),
     metadata = metadata %||% list(),
     created_at = Sys.time(),
     input_snapshot = metadata$input_snapshot %||% list()

@@ -4,23 +4,39 @@
 \alias{run_ammi}
 \title{Run AMMI Analysis natively (no metan dependency)}
 \usage{
-run_ammi(data, gen, env, rep = NULL, trait, n_axis = 2)
+run_ammi(
+  data,
+  gen,
+  env,
+  rep = NULL,
+  trait,
+  n_axis = 2,
+  block_col = NULL,
+  design_type = "RCBD",
+  augmented_checks = NULL
+)
 }
 \arguments{
-\item{data}{data.frame en formato largo}
+\item{data}{Data frame in long format}
 
-\item{gen}{string: nombre de la columna de genotipo}
+\item{gen}{Genotype column name}
 
-\item{env}{string: nombre de la columna de ambiente}
+\item{env}{Environment column name}
 
-\item{rep}{string: nombre de la columna de repetición (o NULL si no hay)}
+\item{rep}{Replicate column name, or NULL when unavailable}
 
-\item{trait}{string: nombre de la columna del rasgo fenotípico}
+\item{trait}{Phenotypic trait column name}
 
-\item{n_axis}{integer: número de ejes IPCA a retener (default = 2)}
+\item{n_axis}{Number of IPCA axes to retain (default = 2)}
+
+\item{block_col}{Optional block column nested in replicate and environment}
+
+\item{design_type}{Experimental design label}
+
+\item{augmented_checks}{Replicated check genotypes for augmented designs}
 }
 \value{
-lista con todos los objetos necesarios para plotear y reportar
+List of results for plotting and reporting
 }
 \description{
 Run AMMI Analysis natively (no metan dependency)

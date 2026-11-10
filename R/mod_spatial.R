@@ -13,7 +13,7 @@ mod_spatial_ui <- function(id) {
       title = shiny::tagList(shiny::icon("map"), LABELS$m7_title),
 
       shiny::selectInput(ns("trait"), LABELS$m7_select_trait, choices = NULL),
-      
+
       shiny::tags$hr(),
       shiny::tags$h6("Single Environment Analysis"),
       shiny::selectInput(ns("env"), LABELS$m7_select_env, choices = NULL),
@@ -28,7 +28,7 @@ mod_spatial_ui <- function(id) {
         shiny::numericInput(ns("nseg_row"), LABELS$m7_nseg_row, value = 10, min = 2),
         shiny::numericInput(ns("nseg_col"), LABELS$m7_nseg_col, value = 10, min = 2)
       ),
-      
+
       shiny::tags$hr(),
       shiny::tags$h6("Plot Options"),
       shiny::selectInput(ns("plot_panel"), "Display",
@@ -67,11 +67,11 @@ mod_spatial_ui <- function(id) {
       ),
 
       shiny::actionButton(ns("run_spats"), "Fit SpATS (Single Env)", class = "btn-primary w-100 mb-2", icon = shiny::icon("play")),
-      
+
       shiny::tags$hr(),
       shiny::tags$h6("Across Environments Analysis"),
-      shiny::p(style = "font-size: 0.85rem; color: #666;", 
-               "Calculates adjusted means for all environments to obtain an across-environment BLUE/BLUP summary."),
+      shiny::p(style = "font-size: 0.85rem; color: #666;",
+               "Descriptive averages of single-environment predictions. SE assumes independent fits; this is not a two-stage MET model."),
       shiny::actionButton(ns("run_spats_all"), "Calculate Across Environments", class = "btn-success w-100", icon = shiny::icon("globe"))
     ),
 
@@ -158,11 +158,11 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
 
     # ---- Update UI choices based on data ----
     shiny::observe({
-      db <- data_result$data_bundle()
+      db <- require_valid_bundle(data_result$data_bundle())
       req(db)
 
       shiny::updateSelectInput(session, "trait", choices = db$traits)
-      
+
       envs <- unique(db$data[[db$env_col]])
       shiny::updateSelectInput(session, "env", choices = envs)
 
@@ -170,7 +170,7 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       excluded_terms <- c(db$gen_col, db$env_col, db$row_col, db$col_col, db$traits)
       candidates <- unique(candidates[!is.na(candidates) & nzchar(candidates)])
       candidates <- setdiff(candidates[candidates %in% names(db$data)], excluded_terms)
-      
+
       shiny::updateSelectInput(session, "fixed_terms", choices = candidates)
       shiny::updateSelectInput(session, "random_terms", choices = candidates)
     })
@@ -179,15 +179,15 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
     shiny::observeEvent(c(input$env, data_result$data_bundle()), {
       db <- data_result$data_bundle()
       req(db, input$env)
-      
+
       if (!is.null(db$row_col) && db$row_col != "" && !is.null(db$col_col) && db$col_col != "") {
         env_data <- db$data[db$data[[db$env_col]] == input$env, ]
         n_row <- length(unique(env_data[[db$row_col]]))
         n_col <- length(unique(env_data[[db$col_col]]))
-        
+
         # SpATS default recommendation: nseg = number of coordinates (or max 10/20)
-        shiny::updateNumericInput(session, "nseg_row", value = max(10, n_row))
-        shiny::updateNumericInput(session, "nseg_col", value = max(10, n_col))
+        shiny::updateNumericInput(session, "nseg_row", value = min(20, max(4, n_row)))
+        shiny::updateNumericInput(session, "nseg_col", value = min(20, max(4, n_col)))
       }
     })
 
@@ -273,6 +273,12 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       fixed_form <- make_fixed_form()
       dropped_fixed <- character(0)
 
+      # Block identifiers may restart in each replicate.
+      source_db <- data_result$data_bundle()
+      rep_name <- source_db$rep_col; block_name <- source_db$block_col
+      if (!is.null(block_name) && block_name %in% c(fixed_terms, random_terms) && rep_name %in% names(env_data)) {
+        env_data[[block_name]] <- interaction(env_data[[rep_name]], env_data[[block_name]], drop = TRUE)
+      }
       # Random terms
       random_form <- NULL
       if (length(random_terms) > 0) {
@@ -326,6 +332,9 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
           if (grepl("not of full rank", msg1, ignore.case = TRUE) && length(fixed_terms) > 0) {
             return(retry_without_confounded_fixed(e1))
           }
+          if (grepl("not of full rank", msg1, ignore.case = TRUE) && !isTRUE(gen_random)) {
+            stop("Fixed genotype effects are confounded with spatial trends in this layout. Verify the recorded plot coordinates or use a model supported by the field design, such as random genotype effects.", call. = FALSE)
+          }
           stop(e1)
         }
       )
@@ -333,7 +342,7 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       attr(mod, "meridian_meta") <- list(
         requested_fixed = fixed_terms_req,
         requested_random = random_terms_req,
-        used_fixed = unique(unname(fixed_labels)),
+        used_fixed = unique(unname(fixed_labels[setdiff(names(fixed_labels), dropped_fixed)])),
         used_random = random_terms,
         nested_rewrites = unique(nested_rewrites),
         dropped_fixed = unique(dropped_fixed),
@@ -343,8 +352,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
     }
 
     # ---- Fit Single Env SpATS Model ----
-    spats_model <- shiny::eventReactive(input$run_spats, {
-      db <- data_result$data_bundle()
+    spats_model <- analysis_event(input$run_spats, list(make_dataset_signature(data_result$data_bundle()), input$trait, input$env, input$fixed_terms, input$random_terms, input$nseg_row, input$nseg_col, input$gen_random), {
+      db <- require_valid_bundle(data_result$data_bundle())
       req(db)
 
       if (is.null(db$row_col) || is.null(db$col_col) || db$row_col == "" || db$col_col == "") {
@@ -399,6 +408,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
             )
           }
         }
+        attr(mod, "analysis_identity") <- list(trait = input$trait, environment = input$env, genotype = db$gen_col,
+          dataset_signature = make_dataset_signature(db))
         mod
       }, session)
     })
@@ -420,8 +431,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
     output$spats_summary_boxes <- shiny::renderUI({
       mod <- spats_model()
       req(mod)
-      
-      h2 <- SpATS::getHeritability(mod)
+
+      h2 <- if (isTRUE(mod$model$geno$as.random)) SpATS::getHeritability(mod) else NA_real_
       if (is.null(h2) || length(h2) == 0) h2 <- NA
 
       eff_dim <- sum(mod$eff.dim)
@@ -456,21 +467,21 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       req(mod)
 
       vc <- mod$var.comp
-      
+
       df <- data.frame(
         Component = names(vc),
         Variance = as.numeric(vc),
         stringsAsFactors = FALSE
       )
-      
+
       if (!is.null(mod$psi) && length(mod$psi) > 0) {
         df <- rbind(df, data.frame(Component = "Residuals", Variance = as.numeric(mod$psi[1])))
       }
-      
+
       total <- sum(df$Variance, na.rm = TRUE)
       df$Pct <- round(100 * df$Variance / total, 2)
       df$Variance <- round(df$Variance, 4)
-      
+
       # Clean up names for better readability
       df$Component <- gsub("f\\(", "Spatial(", df$Component)
       df
@@ -531,13 +542,13 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
     adjusted_means <- shiny::reactive({
       mod <- spats_model()
       req(mod)
-      
+
       db <- data_result$data_bundle()
-      preds <- get_genotype_predictions(mod, db$gen_col)
-      
+      preds <- get_genotype_predictions(mod, attr(mod, "analysis_identity")$genotype)
+
       df <- data.frame(
         Genotype = preds$Genotype,
-        Environment = input$env,
+        Environment = attr(mod, "analysis_identity")$environment,
         Adjusted_Mean = round(preds$Adjusted_Mean, 4),
         SE = round(preds$SE, 4)
       )
@@ -564,8 +575,8 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
     )
 
     # ---- Across Environments Analysis ----
-    across_env_results <- shiny::eventReactive(input$run_spats_all, {
-      db <- data_result$data_bundle()
+    across_env_results <- analysis_event(input$run_spats_all, list(make_dataset_signature(data_result$data_bundle()), input$trait, input$fixed_terms, input$random_terms, input$gen_random), {
+      db <- require_valid_bundle(data_result$data_bundle())
       req(db)
 
       if (is.null(db$row_col) || is.null(db$col_col) || db$row_col == "" || db$col_col == "") {
@@ -581,13 +592,13 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         for (i in seq_along(envs)) {
           env_name <- envs[i]
           shiny::incProgress(1/length(envs), detail = paste("Environment:", env_name))
-          
+
           env_data <- db$data[db$data[[db$env_col]] == env_name, ]
-          
+
           # Dynamic nseg for this env if default was requested, or use the UI value
           n_row <- length(unique(env_data[[db$row_col]]))
           n_col <- length(unique(env_data[[db$col_col]]))
-          
+
           # Fit model safely
           mod <- tryCatch({
             fit_spats(
@@ -598,15 +609,15 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
               gen_col = db$gen_col,
               fixed_terms = input$fixed_terms,
               random_terms = input$random_terms,
-              nseg_row = max(10, n_row), # Use env specific nseg for batch process
-              nseg_col = max(10, n_col),
+              nseg_row = min(20, max(4, n_row)), # Use env specific nseg for batch process
+              nseg_col = min(20, max(4, n_col)),
               gen_random = input$gen_random
             )
           }, error = function(e) {
             shiny::showNotification(paste("Error in", env_name, ":", e$message), type = "warning")
             NULL
           })
-          
+
           if (!is.null(mod)) {
             meta <- attr(mod, "meridian_meta")
             if (!is.null(meta$dropped_fixed) && length(meta$dropped_fixed) > 0) {
@@ -640,12 +651,12 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
           duration = 10
         )
       }
-      
+
       req(length(all_preds) > 0)
-      
+
       # Combine all single environment predictions
       combined_df <- do.call(rbind, all_preds)
-      
+
       # Calculate across environment means (simple average of adjusted means)
       # For a strict two-stage analysis, one would run a meta-analysis or mixed model on the adjusted means.
       # Here we provide the grand mean across environments for each genotype based on SpATS adjusted means.
@@ -653,12 +664,12 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
         dplyr::group_by(Genotype) |>
         dplyr::summarise(
           Across_Env_Mean = round(mean(Adjusted_Mean, na.rm = TRUE), 4),
-          Mean_SE = round(mean(SE, na.rm = TRUE), 4), # Simple average of standard errors (or could pool variances)
+          SE_Descriptive_Mean = sqrt(sum(SE^2)) / dplyr::n(),
           N_Envs = dplyr::n(),
           .groups = "drop"
         ) |>
         dplyr::arrange(dplyr::desc(Across_Env_Mean))
-        
+
       list(combined = combined_df, across = across_df)
     })
 
@@ -727,7 +738,7 @@ mod_spatial_server <- function(id, data_result, report_registry = NULL) {
       obs$Residual[obs$Weight == 0] <- NA_real_
       obs$Genotype[obs$Weight == 0] <- NA_real_
 
-      if (exists("cpp_spatial_cell_summary", mode = "function")) {
+      if (native_kernel_available("cpp_spatial_cell_summary")) {
         cell_f <- interaction(obs$Column, obs$Row, drop = TRUE, lex.order = TRUE)
         obs <- as.data.frame(cpp_spatial_cell_summary(
           as.integer(cell_f),

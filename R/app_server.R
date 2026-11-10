@@ -78,7 +78,7 @@ app_server <- function(input, output, session) {
       )
     }
     previous_dataset_signature(sig)
-  }, ignoreInit = TRUE)
+  }, ignoreInit = FALSE)
 
   shiny::observeEvent(input$btn_load_example, {
     shiny::removeModal()

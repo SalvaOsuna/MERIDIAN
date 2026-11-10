@@ -1,0 +1,14 @@
+### AMMI ANOVA ignores replicates within environment
+AMMI sources: GEN, ENV, GEN:ENV, Residuals 
+AMMI residual MS: 48.84899 RCBD residual MS: 0.9951 
+
+### BLUE model lacks GxE; precision of genotype contrasts
+Median contrast SE, implemented formula: 1.593628 with GxE: 3.4191 
+
+### ANOVA sequential SS absorbs environment imbalance in genotype term
+Same fixed model space, genotype entered first SS: 7144.324 genotype after environment SS: 11.79528 
+Implemented genotype P: 1.176068e-48 genotype after environment P: 0.28211 
+
+### Report template fails to match actual registry labels
+ANOVA table - GrainYield matched by ^ANOVA Table: FALSE 
+Selected custom/composed plots are rendered only when their labels match template patterns.

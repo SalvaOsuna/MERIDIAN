@@ -1,0 +1,125 @@
+const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const fs = require('fs');
+const path = require('path');
+const out = path.resolve('validation-output/browser');
+fs.mkdirSync(out, {recursive: true});
+(async () => {
+  const browser = await chromium.launch({channel: process.env.BROWSER_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined), headless: true});
+  const context = await browser.newContext({viewport: {width: 1600, height: 1100}, acceptDownloads: true});
+  const page = await context.newPage();
+  page.setDefaultTimeout(60000);
+  page.on('pageerror', e => console.log('BROWSER ERROR:', e.message));
+  page.on('console', m => { if (m.type() === 'error') console.log('CONSOLE ERROR:', m.text()); });
+  page.on('response', r => { if(r.status() >= 400) console.log('HTTP', r.status(), r.url()); });
+  const tab = async (value) => page.locator(`a[data-value="${value}"]`).click();
+  const idle = async () => {
+    await page.waitForFunction(() => window.Shiny && !document.documentElement.classList.contains('shiny-busy') && !document.querySelector('.shiny-output-error:not(.shiny-output-error-validation)'));
+  };
+  const select = async (id,value) => {
+    await page.locator('#'+id).evaluate((el,v)=>{ if(el.selectize) el.selectize.setValue(v); else { window.jQuery(el).val(v).trigger('change'); } },value);
+    await idle();
+  };
+  const errors = async () => {
+    const messages = await page.locator('.shiny-output-error:visible,.shiny-notification-error:visible').allTextContents();
+    console.log('Visible errors:',messages);
+    if(messages.length) throw Error(messages.join('; '));
+  };
+  const download = async (id, filename) => {
+    const pending = page.waitForEvent('download');
+    await page.locator('#'+id).click();
+    const file = await pending;
+    await file.saveAs(path.join(out, filename || file.suggestedFilename()));
+    console.log('DOWNLOAD', filename || file.suggestedFilename(), fs.statSync(path.join(out, filename || file.suggestedFilename())).size);
+  };
+  await page.goto('http://127.0.0.1:3876');
+  await page.locator('#btn_load_example').click();
+  await page.waitForFunction(() => document.querySelector('#data-col_gen')?.value === 'Genotype');
+  await page.waitForFunction(() => document.querySelector('#data-design_type')?.textContent === 'RCBD');
+  await idle();
+  await page.screenshot({path: path.join(out, '01-data.png'), fullPage: true});
+  console.log('DATA LOADED'); await errors();
+  await tab('tab_anova'); await page.locator('#anova-run_anova').click();
+  await page.waitForFunction(()=>document.querySelector('#anova-anova_table')?.textContent.includes('Genotype (G)'));
+  await idle(); await errors(); console.log('ANOVA OK');
+  await page.screenshot({path:path.join(out,'02-anova.png'),fullPage:true});
+  await page.locator('#anova-send_anova_table_report').click();
+  await page.locator('#anova-send_ss_barplot_report').click();
+  await page.locator('#anova-send_blups_table_report').click();
+  await tab('tab_stability'); await page.locator('#stability-run_stability').click();
+  await page.waitForFunction(()=>document.querySelector('#stability-plot_ammi1 .plot-container'));
+  await idle(); await errors(); console.log('STABILITY OK');
+  await page.locator('#stability-send_ammi1_report').click();
+  await page.locator('#stability-send_processing_report').click();
+  await page.screenshot({path:path.join(out,'03-stability.png'),fullPage:true});
+  await tab('tab_adaptation'); await page.locator('#adaptation-run_adaptation').click();
+  await page.waitForFunction(()=>document.querySelector('#adaptation-plot_fw .plot-container'));
+  await idle(); await errors(); console.log('ADAPTATION OK');
+  await page.locator('#adaptation-send_fw_report').click();
+  await page.locator('#adaptation-send_adaptation_tables').click();
+  await page.locator('#adaptation-send_enviromics_outputs').click();
+  await tab('tab_spatial'); await page.locator('#spatial-run_spats').click();
+  await page.waitForFunction(()=>document.querySelector('#spatial-spats_plot img'));
+  await idle(); await errors(); console.log('SPATIAL OK');
+  await page.locator('#spatial-send_spats_trend_report').click();
+  await page.screenshot({path:path.join(out,'04-spatial.png'),fullPage:true});
+  await page.getByRole('tab',{name:'Within Environment Means',exact:true}).click();
+  await page.locator('#spatial-send_means_table_report').click();
+  await download('spatial-download_means','spatial-means.csv');
+  await tab('tab_reports'); await idle();
+  await download('reports-dl_table_csv','selected-table.csv');
+  await download('reports-dl_table_xlsx','selected-table.xlsx');
+  await page.getByRole('tab',{name:'Registered Plots',exact:true}).click();
+  await page.locator('#reports-plot_update_preview').click();
+  await page.waitForFunction(()=>document.querySelector('#reports-plot_export_preview img'));
+  for(const fmt of ['PNG','SVG','TIFF','PDF']) {
+    await select('reports-plt_format',fmt); await download('reports-dl_plot_file','selected-plot.'+fmt.toLowerCase());
+  }
+  await page.screenshot({path:path.join(out,'05-plot-export.png'),fullPage:true});
+  await page.getByRole('tab',{name:'Figure Composer',exact:true}).click();
+  await page.locator('#reports-comp_selected_ids input').first().waitFor();
+  const panels = await page.locator('#reports-comp_selected_ids input').all();
+  for (const panel of panels) await panel.check();
+  await page.locator('#reports-comp_refresh').click();
+  await page.waitForFunction(()=>document.querySelector('#reports-composer_preview img'));
+  await errors();
+  await download('reports-dl_comp_figure','composed.svg');
+  await download('reports-dl_comp_panels_zip','panels.zip');
+  await page.screenshot({path:path.join(out,'06-composer.png'),fullPage:true});
+  await page.getByRole('tab',{name:'Generate Report',exact:true}).click();
+  for (const item of await page.locator('#reports-report_plot_ids input,#reports-report_table_ids input').all()) await item.check();
+  await page.locator('#reports-report_include_composed').check();
+  for (const fmt of ['HTML','PDF']) {
+    await page.locator(`input[name="reports-report_format"][value="${fmt}"]`).check();
+    const pending = page.waitForEvent('download',{timeout:120000});
+    await page.locator('#reports-generate_report').click();
+    const file = await pending;
+    await file.saveAs(path.join(out,'example-report.'+fmt.toLowerCase()));
+    console.log('REPORT',fmt,fs.statSync(path.join(out,'example-report.'+fmt.toLowerCase())).size);
+    await errors();
+  }
+  // A change of trait must clear live results while preserving registered snapshots.
+  await tab('tab_anova'); await select('anova-trait','PlantHeight');
+  await page.waitForFunction(()=>document.querySelector('#anova-analysis_status')?.textContent.includes('Run Analysis'));
+  await page.locator('#anova-run_anova').click();
+  await page.waitForFunction(()=>document.querySelector('#anova-anova_table')?.textContent.includes('Genotype (G)') && !document.documentElement.classList.contains('shiny-busy'));
+  await errors(); console.log('TRAIT SWITCH OK');
+  await tab('tab_spatial'); await select('spatial-env','ENV2');
+  await page.getByRole('tab',{name:'Spatial Trend (Single Env)',exact:true}).click();
+  await page.waitForFunction(()=>!document.querySelector('#spatial-spats_plot img'));
+  await page.locator('#spatial-run_spats_all').click();
+  await page.getByRole('tab',{name:'Across Environment Means',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#spatial-means_all_table')?.textContent.includes('G01'));
+  await download('spatial-download_means_all','spatial-across.csv');
+  await errors(); console.log('ACROSS ENVIRONMENTS OK');
+  // Same-sized replacement data must invalidate results and clear the registry.
+  const changed = fs.readFileSync('inst/extdata/example_phenotypic.csv','utf8').replace('5.96','6.96');
+  fs.writeFileSync(path.join(out,'changed-phenotypic.csv'),changed);
+  await tab('tab_upload');
+  await page.locator('#data-file_upload').setInputFiles(path.join(out,'changed-phenotypic.csv'));
+  await page.waitForFunction(()=>document.querySelector('#data-data_table')?.textContent.includes('6.96'));
+  await tab('tab_reports');
+  await page.getByRole('tab',{name:'Registered Plots',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#reports-registered_plots_ui')?.textContent.includes('No registered plots'));
+  await errors(); console.log('REPLACEMENT DATA OK');
+  await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

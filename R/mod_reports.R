@@ -59,9 +59,9 @@ plot_export_controls_ui <- function(ns, prefix = "plt") {
     shiny::numericInput(ns(paste0(prefix, "_dpi")), "DPI", value = 600, min = 72, step = 10),
     bslib::layout_columns(
       col_widths = c(4, 4, 4),
-      shiny::actionButton(ns(paste0(prefix, "_dpi150")), "150"),
-      shiny::actionButton(ns(paste0(prefix, "_dpi300")), "300"),
-      shiny::actionButton(ns(paste0(prefix, "_dpi600")), "600")
+      shiny::actionButton(ns(paste0(prefix, "_dpi150")), "150", style = "white-space:nowrap; padding:0.4rem 0.6rem"),
+      shiny::actionButton(ns(paste0(prefix, "_dpi300")), "300", style = "white-space:nowrap; padding:0.4rem 0.6rem"),
+      shiny::actionButton(ns(paste0(prefix, "_dpi600")), "600", style = "white-space:nowrap; padding:0.4rem 0.6rem")
     ),
     shiny::selectInput(ns(paste0(prefix, "_format")), "Format", choices = c("SVG", "PDF", "TIFF", "PNG"), selected = "SVG")
   )
@@ -204,13 +204,8 @@ mod_reports_ui <- function(id) {
           width = 360,
           shiny::checkboxGroupInput(
             ns("report_sections"), "Include Sections",
-            choices = c(
-              "Executive Summary", "Data Description", "Exploratory Analysis",
-              "ANOVA & Variance Components", "Stability Analysis",
-              "Enviromics", "Adapted Genotypes per Environment",
-              "Methods Description", "Appendix"
-            ),
-            selected = c("Executive Summary", "Data Description", "ANOVA & Variance Components", "Stability Analysis", "Methods Description")
+            choices = c("Data Description", "Methods Description"),
+            selected = c("Data Description", "Methods Description")
           ),
           shiny::checkboxGroupInput(ns("report_plot_ids"), "Include Registered Plots", choices = NULL),
           shiny::checkboxGroupInput(ns("report_table_ids"), "Include Registered Tables", choices = NULL),
@@ -271,7 +266,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
     observeEvent(input$plt_dpi600, shiny::updateNumericInput(session, "plt_dpi", value = 600))
 
     plot_cfg <- shiny::reactive({
-      list(
+      utils::modifyList(default_plot_cfg(), list(
         theme_name = input$plt_theme_name,
         font_family = input$plt_font_family,
         base_size = input$plt_base_size,
@@ -306,351 +301,8 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
         legend_position = input$plt_legend_position,
         show_plot_title = isTRUE(input$plt_show_plot_title),
         show_axis_titles = isTRUE(input$plt_show_axis_titles)
-      )
+      ))
     })
-
-    tables_avail <- shiny::reactive({
-      collect_available_tables(db(), anova_res = anova_res(), stab_res = stab_res(), adapt_res = adapt_res())
-    })
-
-    observe({
-      tr <- c("All", db()$traits %||% character(0))
-      shiny::updateSelectInput(session, "table_trait_filter", choices = tr, selected = input$table_trait_filter %||% "All")
-    })
-
-    tables_filtered <- shiny::reactive({
-      t_all <- tables_avail()
-      tf <- input$table_trait_filter %||% "All"
-      if (identical(tf, "All")) return(t_all)
-      keep <- vapply(names(t_all), function(nm) grepl(paste0("-\\s*", tf, "$"), nm), logical(1))
-      t_all[keep]
-    })
-
-    observe({
-      nm <- names(tables_filtered())
-      cur <- isolate(input$table_select)
-      sel <- if (!is.null(cur) && cur %in% nm) cur else (nm[1] %||% "")
-      shiny::updateSelectInput(session, "table_select", choices = nm, selected = sel)
-    })
-
-    output$table_export_preview <- DT::renderDataTable({
-      req(input$table_select)
-      tbl <- tables_filtered()[[input$table_select]]
-      req(!is.null(tbl))
-      DT::datatable(tbl, options = list(pageLength = 20, scrollX = TRUE), rownames = FALSE)
-    })
-
-    output$dl_table_csv <- shiny::downloadHandler(
-      filename = function() paste0(gsub("[^A-Za-z0-9_\\-]+", "_", input$table_select), ".csv"),
-      content = function(file) {
-        tbl <- tables_filtered()[[input$table_select]]
-        utils::write.csv(tbl, file, row.names = FALSE)
-      }
-    )
-
-    output$dl_table_xlsx <- shiny::downloadHandler(
-      filename = function() paste0(gsub("[^A-Za-z0-9_\\-]+", "_", input$table_select), ".xlsx"),
-      content = function(file) {
-        tbl <- tables_filtered()[[input$table_select]]
-        metadata <- list(
-          analysis_date = as.character(Sys.time()),
-          selected_table = input$table_select,
-          traits = paste(db()$traits %||% character(0), collapse = ", "),
-          n_genotypes = dplyr::n_distinct(db()$data[[db()$gen_col]]),
-          n_environments = dplyr::n_distinct(db()$data[[db()$env_col]]),
-          design = db()$design$design %||% "Unknown"
-        )
-        write_table_excel_with_metadata(tbl, file, input$table_select, metadata)
-      }
-    )
-
-    if (FALSE) observeEvent(list(db(), anova_res(), stab_res(), adapt_res()), {
-      new_plots <- collect_plot_registry_entries(
-        db(),
-        anova_res = anova_res(),
-        stab_res = stab_res(),
-        adapt_res = adapt_res()
-      )
-      if (length(new_plots) > 0) {
-        for (k in names(new_plots)) {
-          plot_registry[[k]] <- new_plots[[k]]
-        }
-      }
-    }, ignoreInit = FALSE)
-
-    registry_keys <- shiny::reactive({
-      names(shiny::reactiveValuesToList(plot_registry))
-    })
-
-    registry_modules <- shiny::reactive({
-      keys <- registry_keys()
-      if (length(keys) == 0) return(character(0))
-      unique(vapply(strsplit(keys, "__", fixed = TRUE), function(x) x[1], character(1)))
-    })
-
-    observe({
-      mods <- registry_modules()
-      cur <- isolate(input$plot_module)
-      sel <- if (!is.null(cur) && cur %in% mods) cur else (mods[1] %||% "")
-      shiny::updateSelectInput(session, "plot_module", choices = mods, selected = sel)
-    })
-
-    module_traits <- shiny::reactive({
-      req(input$plot_module)
-      keys <- registry_keys()
-      if (length(keys) == 0) return(character(0))
-      parts <- strsplit(keys, "__", fixed = TRUE)
-      traits <- vapply(parts, function(x) if (length(x) >= 2 && x[1] == input$plot_module) x[2] else NA_character_, character(1))
-      unique(stats::na.omit(traits))
-    })
-
-    observe({
-      tr <- module_traits()
-      cur <- isolate(input$plot_trait)
-      sel <- if (!is.null(cur) && cur %in% tr) cur else (tr[1] %||% "")
-      shiny::updateSelectInput(session, "plot_trait", choices = tr, selected = sel)
-    })
-
-    selected_plot_key <- shiny::reactive({
-      req(input$plot_module, input$plot_trait)
-      paste(input$plot_module, input$plot_trait, sep = "__")
-    })
-
-    selected_plot <- shiny::reactive({
-      key <- selected_plot_key()
-      obj <- plot_registry[[key]]
-      if (is.null(obj)) return(NULL)
-      obj
-    })
-
-    assert_plot_matches_trait <- function(p, trait, key) {
-      if (!inherits(p, "gg")) stop("Retrieved object is not a ggplot for key: ", key)
-      key_attr <- attr(p, "meridian_key")
-      tr_attr <- attr(p, "meridian_trait")
-      if (!is.null(key_attr) && !identical(key_attr, key)) {
-        stop("Registry mismatch for selected key ", key, ". Please regenerate this trait and try again.")
-      }
-      if (!is.null(tr_attr) && !identical(as.character(tr_attr), as.character(trait))) {
-        stop("Registry mismatch for selected key ", key, ". Please regenerate this trait and try again.")
-      }
-      TRUE
-    }
-
-    output$plot_export_preview <- shiny::renderPlot({
-      key <- selected_plot_key()
-      p <- selected_plot()
-      if (is.null(p)) {
-        graphics::plot.new()
-        graphics::text(0.5, 0.5, "This plot has not been generated yet.\nPlease run the analysis for this trait first.")
-        return(invisible(NULL))
-      }
-      validate(need(inherits(p, "gg"), paste0("Invalid plot object at key: ", key)))
-      ok <- tryCatch(assert_plot_matches_trait(p, input$plot_trait, key), error = function(e) e)
-      if (inherits(ok, "error")) {
-        graphics::plot.new()
-        graphics::text(0.5, 0.5, conditionMessage(ok))
-        return(invisible(NULL))
-      }
-      print(apply_common_theme_controls(p, plot_cfg()))
-    }, res = 96)
-
-    output$dl_plot_file <- shiny::downloadHandler(
-      filename = function() {
-        ext <- tolower(input$plt_format %||% "png")
-        paste0(gsub("[^A-Za-z0-9_\\-]+", "_", selected_plot_key()), ".", ext)
-      },
-      content = function(file) {
-        key <- selected_plot_key()
-        p <- selected_plot()
-        if (is.null(p)) stop("This plot has not been generated yet. Please run the analysis for this trait first.")
-        assert_plot_matches_trait(p, input$plot_trait, key)
-        save_ggplot_by_format(
-          plot_obj = apply_common_theme_controls(p, plot_cfg()),
-          file = file,
-          format = input$plt_format,
-          width = input$plt_width,
-          height = input$plt_height,
-          dpi = input$plt_dpi
-        )
-      }
-    )
-
-    # ---- Legacy Figure Composer (disabled; registry composer below is authoritative) ----
-    if (FALSE) {
-    output$composer_library_ui <- shiny::renderUI({
-      ids <- registry_keys()
-      if (length(ids) == 0) return(shiny::tags$div("No plots available yet. Run analyses first."))
-      rows <- split(seq_along(ids), ceiling(seq_along(ids) / 3))
-      shiny::tagList(lapply(rows, function(ixs) {
-        bslib::layout_column_wrap(
-          width = 1/3,
-          fill = FALSE,
-          lapply(ixs, function(i) {
-            id <- ids[i]
-            p <- plot_registry[[id]]
-            lbl <- paste0(
-              id,
-              if (inherits(p, "gg")) {
-                t <- p$labels$title %||% ""
-                if (nzchar(t)) paste0(" | ", t) else ""
-              } else ""
-            )
-            bslib::card(
-              bslib::card_header(lbl),
-              shiny::plotOutput(ns(paste0("thumb_", i)), height = "180px"),
-              shiny::checkboxInput(ns(paste0("sel_", i)), "Include", value = FALSE)
-            )
-          })
-        )
-      }))
-    })
-
-    observe({
-      ids <- registry_keys()
-      for (i in seq_along(ids)) {
-        local({
-          ii <- i
-          output[[paste0("thumb_", ii)]] <- shiny::renderPlot({
-            tryCatch({
-              op <- graphics::par(no.readonly = TRUE)
-              on.exit(graphics::par(op), add = TRUE)
-              graphics::par(mar = c(2, 2, 2, 1))
-              p <- plot_registry[[ids[ii]]]
-              validate(need(inherits(p, "gg"), paste0("Invalid plot object for key: ", ids[ii])))
-              print(p)
-            }, error = function(e) {
-              graphics::plot.new()
-              graphics::text(
-                x = 0.5, y = 0.5,
-                labels = "Preview unavailable",
-                cex = 0.9
-              )
-            })
-          })
-        })
-      }
-    })
-
-    selected_comp_ids <- shiny::reactive({
-      ids <- registry_keys()
-      keep <- vapply(seq_along(ids), function(i) isTRUE(input[[paste0("sel_", i)]]), logical(1))
-      ids[keep]
-    })
-
-    comp_cfg <- shiny::reactive({
-      list(
-        ncol = input$comp_ncol,
-        width_ratios = input$comp_width_ratios,
-        height_ratios = input$comp_height_ratios,
-        operator = input$comp_operator,
-        collect_guides = isTRUE(input$comp_collect_guides),
-        auto_labels = isTRUE(input$comp_auto_labels),
-        label_style = input$comp_label_style,
-        label_size = input$comp_label_size,
-        label_face = input$comp_label_face,
-        label_color = input$comp_label_color,
-        label_position = input$comp_label_pos,
-        title = input$comp_title,
-        subtitle = input$comp_subtitle,
-        caption = input$comp_caption,
-        shared_theme = isTRUE(input$comp_shared_theme),
-        shared_font_family = input$comp_shared_font,
-        shared_base_size = input$comp_shared_base
-      )
-    })
-
-    comp_refresh_tick <- shiny::reactiveVal(0L)
-    observeEvent(input$comp_refresh, comp_refresh_tick(comp_refresh_tick() + 1L))
-
-    composed_plot <- shiny::reactive({
-      comp_refresh_tick()
-      ids <- selected_comp_ids()
-      req(length(ids) >= 2)
-      built <- lapply(ids, function(id) {
-        p <- plot_registry[[id]]
-        if (!inherits(p, "gg")) stop("Invalid plot object for key: ", id)
-        apply_common_theme_controls(p, plot_cfg())
-      })
-      names(built) <- ids
-      compose_patchwork_figure(built, ids, comp_cfg())
-    })
-
-    output$composer_preview <- shiny::renderPlot({
-      req(composed_plot())
-      tryCatch({
-        w <- session$clientData[[paste0("output_", ns("composer_preview"), "_width")]] %||% 0
-        h <- session$clientData[[paste0("output_", ns("composer_preview"), "_height")]] %||% 0
-        if (w < 120 || h < 120) {
-          graphics::plot.new()
-          graphics::text(0.5, 0.5, "Preview initializing...")
-          return(invisible(NULL))
-        }
-        op <- graphics::par(no.readonly = TRUE)
-        on.exit(graphics::par(op), add = TRUE)
-        graphics::par(mar = c(0.5, 0.5, 1.5, 0.5))
-        print(composed_plot())
-      }, error = function(e) {
-        graphics::plot.new()
-        graphics::text(
-          x = 0.5, y = 0.5,
-          labels = paste("Preview error:", conditionMessage(e)),
-          cex = 1
-        )
-      })
-    }, width = function() {
-      w <- session$clientData[[paste0("output_", ns("composer_preview"), "_width")]] %||% 900
-      max(400, as.numeric(w))
-    }, height = function() {
-      h <- session$clientData[[paste0("output_", ns("composer_preview"), "_height")]] %||% 600
-      max(300, as.numeric(h))
-    }, res = 96)
-
-    output$comp_warning_ui <- shiny::renderUI({
-      ids <- selected_comp_ids()
-      if (length(ids) < 2) return(shiny::tags$div(class = "alert alert-info", "Select at least two plots to compose."))
-      built <- lapply(ids, function(id) plot_registry[[id]])
-      warns <- check_composer_warnings(built)
-      if (length(warns) == 0) return(NULL)
-      shiny::tagList(lapply(warns, function(w) shiny::tags$div(class = "alert alert-warning", w)))
-    })
-
-    output$dl_comp_figure <- shiny::downloadHandler(
-      filename = function() {
-        ext <- tolower(input$comp_format %||% "png")
-        paste0("composed_figure.", ext)
-      },
-      content = function(file) {
-        save_ggplot_by_format(
-          plot_obj = composed_plot(),
-          file = file,
-          format = input$comp_format,
-          width = input$comp_width,
-          height = input$comp_height,
-          dpi = input$comp_dpi
-        )
-      }
-    )
-
-    output$dl_comp_panels_zip <- shiny::downloadHandler(
-      filename = function() "figure_panels.zip",
-      content = function(file) {
-        ids <- selected_comp_ids()
-        req(length(ids) >= 1)
-        built <- lapply(ids, function(id) {
-          p <- plot_registry[[id]]
-          if (!inherits(p, "gg")) stop("Invalid plot object for key: ", id)
-          apply_common_theme_controls(p, plot_cfg())
-        })
-        names(built) <- ids
-        export_panels_zip(
-          plot_list = built,
-          selected_ids = ids,
-          cfg = list(format = input$comp_format, width = input$comp_width, height = input$comp_height, dpi = input$comp_dpi),
-          zip_file = file
-        )
-      }
-    )
-    }
 
     # ---- User-driven Report Registry ----
     registry_items <- shiny::reactive(get_report_registry_items(plot_registry))
@@ -699,7 +351,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       assert_report_item_dataset(item, current_dataset_signature())
       p <- item$builder()
       if (!inherits(p, "gg")) stop("Registered plot did not return a ggplot object.")
-      if (isTRUE(customize)) p <- apply_common_theme_controls(p, plot_cfg())
+      if (isTRUE(customize)) p <- customize_registered_plot(p, plot_cfg())
       p
     }
     build_registry_table <- function(id) {
@@ -759,8 +411,15 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
 
     preview_plot <- shiny::reactiveVal(NULL)
     preview_error <- shiny::reactiveVal(NULL)
+    preview_key <- shiny::reactiveVal(NULL)
+    composed_key <- shiny::reactiveVal(NULL)
     composed_preview <- shiny::reactiveVal(NULL)
     composed_error <- shiny::reactiveVal(NULL)
+
+    shiny::observeEvent(registry_items(), {
+      preview_plot(NULL); preview_key(NULL)
+      composed_preview(NULL); composed_key(NULL)
+    }, ignoreInit = TRUE)
 
     observeEvent(input$remove_plot_item, {
       req(input$plot_select)
@@ -807,6 +466,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       tryCatch({
         req(input$plot_select)
         preview_plot(build_registry_plot(input$plot_select, customize = TRUE))
+        preview_key(digest::digest(list(input$plot_select, plot_cfg(), current_dataset_signature())))
       }, error = function(e) {
         preview_plot(NULL)
         preview_error(conditionMessage(e))
@@ -830,7 +490,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       },
       content = function(file) {
         p <- preview_plot()
-        if (is.null(p)) p <- build_registry_plot(input$plot_select, customize = TRUE)
+        if (is.null(p) || !identical(preview_key(), digest::digest(list(input$plot_select, plot_cfg(), current_dataset_signature())))) p <- build_registry_plot(input$plot_select, customize = TRUE)
         save_ggplot_by_format(
           plot_obj = p,
           file = file,
@@ -901,6 +561,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
         built <- lapply(ids, function(id) build_registry_plot(id, customize = TRUE))
         names(built) <- ids
         composed_preview(compose_patchwork_figure(built, ids, comp_cfg()))
+        composed_key(digest::digest(list(ids, comp_cfg(), plot_cfg(), current_dataset_signature())))
       }, error = function(e) {
         composed_preview(NULL)
         composed_error(conditionMessage(e))
@@ -939,7 +600,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       },
       content = function(file) {
         p <- composed_preview()
-        if (is.null(p)) {
+        if (is.null(p) || !identical(composed_key(), digest::digest(list(selected_comp_ids(), comp_cfg(), plot_cfg(), current_dataset_signature())))) {
           ids <- selected_comp_ids()
           built <- lapply(ids, function(id) build_registry_plot(id, customize = TRUE))
           names(built) <- ids
@@ -978,12 +639,16 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       out
     })
 
+    shiny::observeEvent(current_dataset_signature(), {
+      preview_plot(NULL); preview_key(NULL); composed_preview(NULL); composed_key(NULL)
+    }, ignoreInit = TRUE)
     # ---- Report generation ----
     report_file <- shiny::reactiveVal(NULL)
     report_meta <- shiny::reactiveVal(list(
       filename = "MERIDIAN_Report.html",
       content_type = "text/html"
     ))
+    shiny::observeEvent(current_dataset_signature(), { report_file(NULL) }, ignoreInit = TRUE)
     report_error <- shiny::reactiveVal("")
     report_status <- shiny::reactiveVal("No report generated yet.")
 
@@ -1009,6 +674,7 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
         file.copy(report_file(), file, overwrite = TRUE)
       }
     )
+    shiny::outputOptions(output, "download_report_auto", suspendWhenHidden = FALSE)
 
     observeEvent(input$generate_report, {
       report_error("")
@@ -1032,15 +698,18 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
         table_ids <- input$report_table_ids %||% character(0)
         tbls <- lapply(table_ids, build_registry_table)
         names(tbls) <- vapply(registry_table_items()[table_ids], function(x) x$label, character(1))
-        if (isTRUE(input$report_include_composed) && !is.null(composed_preview())) {
-          plot_objs[["Composed figure"]] <- composed_preview()
+        if (isTRUE(input$report_include_composed)) {
+          ids <- selected_comp_ids()
+          if (length(ids) < 2) stop("Select at least two plots in Figure Composer before including a composed figure.")
+          panels <- lapply(ids, function(id) build_registry_plot(id, customize = TRUE)); names(panels) <- ids
+          plot_objs[["Composed figure"]] <- compose_patchwork_figure(panels, ids, comp_cfg())
         }
-        methods_text <- build_methods_text(db(), anova_res = anova_res(), stab_res = stab_res(), adapt_res = adapt_res())
+        methods_text <- build_methods_text(db(), items = c(plot_items, registry_table_items()[table_ids]))
 
         report_status("Building document...")
         fmt <- input$report_format %||% "HTML"
         ext <- if (identical(fmt, "PDF")) ".pdf" else ".html"
-        out <- file.path(tempdir(), paste0("MERIDIAN_Report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ext))
+        out <- file.path(tempdir(), basename(tempfile("MERIDIAN_Report_", fileext = ext)))
 
         params <- list(
           report_title = input$report_title,
@@ -1073,6 +742,8 @@ mod_reports_server <- function(id, data_result, anova_result = NULL, stab_result
       }, error = function(e) {
         report_error(conditionMessage(e))
         report_status("Report generation failed.")
+        removeModal()
+        shiny::showNotification(conditionMessage(e), type = "error", duration = NULL)
       })
     })
 

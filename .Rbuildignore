@@ -2,3 +2,17 @@
 ^\.Rproj\.user$
 ^\.positai$
 ^\.claude$
+safeBackup
+^docs$
+^run_app_dev\.R$
+^tools$
+^\.gitignore$
+^\.github$
+^\.Rhistory$
+^\.RData$
+^\.local-library$
+^validation-output$
+^.*\.Rhistory$
+^token\.txt$
+^CRAN-SUBMISSION$
+^__pycache__$

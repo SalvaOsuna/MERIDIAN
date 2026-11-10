@@ -5,7 +5,7 @@
 \title{Run Mega-Environment Analysis (Which-won-where)
 Natively computes winning genotypes per environment and groups them.}
 \usage{
-run_mega_envs(df, gen_col, env_col, trait)
+run_mega_envs(df, gen_col, env_col, trait, direction = "higher")
 }
 \arguments{
 \item{df}{Data frame}
@@ -15,6 +15,8 @@ run_mega_envs(df, gen_col, env_col, trait)
 \item{env_col}{Environment column name}
 
 \item{trait}{Trait column name}
+
+\item{direction}{Selection objective: higher or lower}
 }
 \value{
 List with env_strat dataframe

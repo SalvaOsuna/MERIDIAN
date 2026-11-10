@@ -2,24 +2,38 @@
 % Please edit documentation in R/models.R
 \name{compute_blues}
 \alias{compute_blues}
-\title{Compute BLUEs (genotype as fixed, environment as random)}
+\title{Compute design-adjusted genotype BLUEs with G x E}
 \usage{
-compute_blues(df, gen_col, env_col, rep_col, trait)
+compute_blues(
+  df,
+  gen_col,
+  env_col,
+  rep_col,
+  trait,
+  block_col = NULL,
+  design_type = "RCBD",
+  augmented_checks = NULL,
+  direction = "higher"
+)
 }
 \arguments{
 \item{df}{Data frame}
 
-\item{gen_col}{Genotype column name}
+\item{gen_col, env_col, rep_col}{Genotype, environment and replicate columns}
 
-\item{env_col}{Environment column name}
+\item{trait}{Numeric trait column}
 
-\item{rep_col}{Replicate column name}
+\item{block_col}{Optional incomplete block column}
 
-\item{trait}{Trait column name}
+\item{design_type}{Experimental design label}
+
+\item{augmented_checks}{Replicated checks for augmented designs}
+
+\item{direction}{Selection direction: higher or lower}
 }
 \value{
-Data frame with Genotype, BLUE, SE, CI_lower, CI_upper
+Genotype estimates and confidence intervals
 }
 \description{
-Compute BLUEs (genotype as fixed, environment as random)
+Compute design-adjusted genotype BLUEs with G x E
 }

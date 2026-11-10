@@ -16,8 +16,8 @@ map_tag_levels <- function(style) {
     "A/B/C" = "A",
     "a/b/c" = "a",
     "1/2/3" = "1",
-    "(A)/(B)/(C)" = list(c("(", "A", ")")),
-    "(a)/(b)/(c)" = list(c("(", "a", ")")),
+    "(A)/(B)/(C)" = "A",
+    "(a)/(b)/(c)" = "a",
     "A"
   )
 }
@@ -62,8 +62,8 @@ compose_patchwork_figure <- function(plot_list, selected_ids, cfg) {
   }
 
   composed <- composed + patchwork::plot_layout(
-    ncol = if (nzchar(design)) NULL else ncol,
-    nrow = if (nzchar(design)) NULL else nrow,
+    ncol = if (nzchar(design) || op == "|") NULL else if (op == "/") 1 else ncol,
+    nrow = if (nzchar(design) || op == "/") NULL else if (op == "|") 1 else nrow,
     byrow = byrow,
     widths = widths,
     heights = heights,
@@ -77,8 +77,8 @@ compose_patchwork_figure <- function(plot_list, selected_ids, cfg) {
     tag_pos <- if ((cfg$label_position %||% "top-left") == "top-right") c(1, 1) else c(0, 1)
     composed <- composed + patchwork::plot_annotation(
       tag_levels = tag_levels,
-      tag_prefix = cfg$tag_prefix %||% "",
-      tag_suffix = cfg$tag_suffix %||% "",
+      tag_prefix = paste0(cfg$tag_prefix %||% "", if (startsWith(cfg$label_style %||% "A", "(")) "(" else ""),
+      tag_suffix = paste0(if (startsWith(cfg$label_style %||% "A", "(")) ")" else "", cfg$tag_suffix %||% ""),
       tag_sep = cfg$tag_sep %||% ""
     ) &
       ggplot2::theme(
@@ -150,7 +150,7 @@ check_composer_warnings <- function(plot_objs) {
 
 export_panels_zip <- function(plot_list, selected_ids, cfg, zip_file) {
   dir.create(dirname(zip_file), recursive = TRUE, showWarnings = FALSE)
-  tmp_dir <- file.path(tempdir(), paste0("meridian_panels_", as.integer(Sys.time())))
+  tmp_dir <- tempfile("meridian_panels_")
   dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
 
   ext <- tolower(cfg$format %||% "png")
@@ -170,5 +170,5 @@ export_panels_zip <- function(plot_list, selected_ids, cfg, zip_file) {
     files <- c(files, f)
   }
   if (length(files) == 0) stop("No panel files generated.")
-  zip::zipr(zip_file, files = files, recurse = FALSE)
+  zip::zipr(zip_file, files = basename(files), root = tmp_dir, recurse = FALSE)
 }

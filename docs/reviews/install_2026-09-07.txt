@@ -1,0 +1,27 @@
+During startup - Warning messages:
+1: Setting LC_COLLATE=C.UTF-8 failed 
+2: Setting LC_CTYPE=C.UTF-8 failed 
+3: Setting LC_MONETARY=C.UTF-8 failed 
+4: Setting LC_TIME=C.UTF-8 failed 
+* installing *source* package 'MERIDIAN' ...
+** using staged installation
+** libs
+using C++ compiler: 'G__~1.EXE (GCC) 13.2.0'
+g++ -std=gnu++17  -I"C:/PROGRA~1/R/R-44~1.1/include" -DNDEBUG  -I'C:/Program Files/R/R-4.4.1/library/Rcpp/include'   -I"C:/Program Files/RTools/x86_64-w64-mingw32.static.posix/include"     -O2 -Wall  -mfpmath=sse -msse2 -mstackrealign  -c RcppExports-salvador-usask-safeBackup-0001.cpp -o RcppExports-salvador-usask-safeBackup-0001.o
+g++ -std=gnu++17  -I"C:/PROGRA~1/R/R-44~1.1/include" -DNDEBUG  -I'C:/Program Files/R/R-4.4.1/library/Rcpp/include'   -I"C:/Program Files/RTools/x86_64-w64-mingw32.static.posix/include"     -O2 -Wall  -mfpmath=sse -msse2 -mstackrealign  -c RcppExports.cpp -o RcppExports.o
+g++ -std=gnu++17  -I"C:/PROGRA~1/R/R-44~1.1/include" -DNDEBUG  -I'C:/Program Files/R/R-4.4.1/library/Rcpp/include'   -I"C:/Program Files/RTools/x86_64-w64-mingw32.static.posix/include"     -O2 -Wall  -mfpmath=sse -msse2 -mstackrealign  -c fast_pruning.cpp -o fast_pruning.o
+g++ -std=gnu++17 -shared -s -static-libgcc -o MERIDIAN.dll tmp.def RcppExports-salvador-usask-safeBackup-0001.o RcppExports.o fast_pruning.o -LC:/Program Files/RTools/x86_64-w64-mingw32.static.posix/lib/x64 -LC:/Program Files/RTools/x86_64-w64-mingw32.static.posix/lib -LC:/PROGRA~1/R/R-44~1.1/bin/x64 -lR
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0x260): multiple definition of `R_init_MERIDIAN'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0x260): first defined here
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0xcf0): multiple definition of `_MERIDIAN_cpp_er_statistics'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0xcf0): first defined here
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0x12b0): multiple definition of `_MERIDIAN_cpp_impute_additive_gxe'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0x12b0): first defined here
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0x1800): multiple definition of `_MERIDIAN_cpp_find_balanced_subset'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0x1800): first defined here
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0x1e00): multiple definition of `_MERIDIAN_cpp_ge_means'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0x1e00): first defined here
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0x24a0): multiple definition of `_MERIDIAN_cpp_ammi_stability'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0x24a0): first defined here
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0x2b20): multiple definition of `_MERIDIAN_cpp_fw_regression'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0x2b20): first defined here
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0x31a0): multiple definition of `_MERIDIAN_cpp_group_numeric_summary'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0x31a0): first defined here
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0x3770): multiple definition of `_MERIDIAN_cpp_spatial_cell_summary'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0x3770): first defined here
+C:\Program Files\RTools\x86_64-w64-mingw32.static.posix\bin/ld.exe: RcppExports.o:RcppExports.cp:(.text+0x4120): multiple definition of `_MERIDIAN_cpp_detect_outliers'; RcppExports-salvador-usask-safeBackup-0001.o:RcppExports-salvador-usask-safeBackup-0001.cpp:(.text+0x4120): first defined here
+collect2.exe: error: ld returned 1 exit status
+no DLL was created
+ERROR: compilation failed for package 'MERIDIAN'
+* removing 'C:/Users/tlv329/AppData/Local/Temp/Rtmp8sRfaW/MERIDIAN-review-4f9c72992ecb/library/MERIDIAN'

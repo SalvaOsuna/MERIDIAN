@@ -18,6 +18,8 @@ mod_stability_ui <- function(id) {
       title = shiny::tagList(shiny::icon("balance-scale"), " ", LABELS$m4_title),
 
       shiny::selectInput(ns("trait"), LABELS$m2_select_trait, choices = NULL),
+      shiny::uiOutput(ns("preprocessing_status")),
+      shiny::actionButton(ns("send_processing_report"), "Send processing details to Reports", class = "btn-sm w-100"),
 
       shiny::tags$hr(),
 
@@ -353,7 +355,7 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
 
     db <- shiny::reactive({
       req(data_result$data_bundle())
-      data_result$data_bundle()
+      require_valid_bundle(data_result$data_bundle())
     })
 
     shiny::observeEvent(db(), {
@@ -364,7 +366,7 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
     })
 
     # ---- Run all stability analyses on button click ----
-    stab_results <- shiny::eventReactive(input$run_stability, {
+    stab_results <- analysis_event(input$run_stability, list(make_dataset_signature(db()), input$trait, input$ammi_n_axes), {
       req(db(), input$trait)
       shiny::withProgress(message = "Running Stability Analyses...", value = 0, {
 
@@ -385,7 +387,7 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
             env    = db()$env_col,
             rep    = db()$rep_col,
             trait  = input$trait,
-            n_axis = input$ammi_n_axes
+            n_axis = input$ammi_n_axes, block_col = db()$block_col, design_type = db()$design$design, augmented_checks = db()$augmented_checks
           ),
           session
         )
@@ -410,7 +412,7 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
         # Native stability kernels share one precomputed GxE matrix
         shiny::incProgress(0.05, detail = "Precomputing GxE matrices")
         ge_cache <- safe_analysis(
-          build_ge_matrices(df_prepared, db()$gen_col, db()$env_col, input$trait),
+          build_ge_matrices(df_prepared, db()$gen_col, db()$env_col, input$trait, db()$rep_col, db()$block_col),
           session
         )
 
@@ -438,8 +440,7 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
         # Combined stability table (native fast)
         shiny::incProgress(0.15, detail = "Combined stability stats")
         all_res <- safe_analysis(
-          run_all_stability_fast(df_prepared, db()$gen_col, db()$env_col,
-                            db()$rep_col, input$trait),
+          combine_stability_from_ge(ge_cache),
           session
         )
 
@@ -452,6 +453,7 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
           wricke = wricke_res,
           shukla = shukla_res,
           all    = all_res,
+          preprocessing = attr(df_prepared, "preprocessing"),
           trait  = input$trait
         )
       })
@@ -553,8 +555,9 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
       if (is.null(anova_df)) return(NULL)
 
       # Round numeric columns
-      num_cols <- sapply(anova_df, is.numeric)
+      num_cols <- sapply(anova_df, is.numeric) & names(anova_df) != "P_value"
       anova_df[num_cols] <- lapply(anova_df[num_cols], round, 4)
+      anova_df$P_value <- ifelse(is.na(anova_df$P_value), "", formatC(anova_df$P_value, format = "e", digits = 3))
 
       DT::datatable(
         anova_df,
@@ -824,6 +827,24 @@ mod_stability_server <- function(id, data_result, report_registry = NULL) {
       )
     })
 
+    output$preprocessing_status <- shiny::renderUI({
+      res <- stab_results()
+      if (is.null(res)) return(shiny::tags$p("Run Analysis for the current data and settings."))
+      info <- res$preprocessing
+      shiny::tags$p(sprintf("Classical indices retain %s/%s observed rows; AMMI/GGE predict %s missing cells by least-squares additive imputation. Export processing details before comparing indices.", info$retained_rows, info$observed_rows, res$gge$n_imputed))
+    })
+    shiny::observeEvent(input$send_processing_report, {
+      res <- stab_results(); req(res, report_registry)
+      info <- res$preprocessing
+      summary <- data.frame(Type = c("Observed rows", "Retained rows", "Missing trait rows", "Imputed GE cells"),
+        Level = as.character(c(info$observed_rows, info$retained_rows, info$missing_trait_rows, res$gge$n_imputed)))
+      register_report_table(report_registry, make_report_item_id("Stability", "table", res$trait, "processing"),
+        paste("Stability processing -", res$trait), "Stability Analysis", res$trait, frozen_builder(rbind(summary, info$excluded)),
+        list(dataset_signature = make_dataset_signature(db()), imputation = res$gge$method))
+      if (res$gge$n_imputed > 0) register_report_table(report_registry,
+        make_report_item_id("Stability", "table", res$trait, "imputed_cells"), paste("Imputed cells -", res$trait),
+        "Stability Analysis", res$trait, frozen_builder(res$gge$imputed_cells), list(dataset_signature = make_dataset_signature(db())))
+    })
     # ---- Return ----
     return(list(
       stab_results = stab_results
