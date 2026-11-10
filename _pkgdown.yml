@@ -1,0 +1,57 @@
+url: https://salvaosuna.github.io/MERIDIAN/
+destination: docs
+template:
+  bootstrap: 5
+  theme: github-light
+  bslib:
+    bg: "#ffffff"
+    fg: "#212529"
+    primary: "#276749"
+navbar:
+  bg: light
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github]
+  components:
+    intro:
+      text: Get started
+      href: articles/MERIDIAN.html
+home:
+  title: Multi-environment trial analysis with an R Shiny application
+  description: >
+    Explore crop trial data, fit design-aware models, study genotype-by-environment
+    interactions and export registered results with MERIDIAN.
+reference:
+- title: Launch the application
+  contents:
+  - run_app
+- title: Explore trial data
+  contents:
+  - plot_env_correlation
+- title: Environmental data and weather
+  contents:
+  - parse_date_robustly
+  - calculate_enviromic_indices
+  - fetch_nasa_weather
+  - process_environmental_covariates
+- title: internal
+  contents:
+  - matches(".*", internal = TRUE)
+  - -run_app
+  - -plot_env_correlation
+  - -parse_date_robustly
+  - -calculate_enviromic_indices
+  - -fetch_nasa_weather
+  - -process_environmental_covariates
+articles:
+- title: Guides
+  navbar: ~
+  contents:
+  - articles/installation
+  - articles/analysis-workflow
+figures:
+  dev: grDevices::png
+  dpi: 96
+  fig.width: 7
+  fig.height: 4.5
+  fig.retina: 2

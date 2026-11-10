@@ -25,17 +25,20 @@ build_methods_text <- function(db, anova_res = NULL, stab_res = NULL, adapt_res 
     paste(unique(parts), collapse = ". "), ". Results describe the registered executions only.")
 }
 
-report_pandoc_available <- function() {
+report_pandoc_available <- function(candidates = NULL) {
   if (rmarkdown::pandoc_available()) return(TRUE)
   # RStudio bundles Pandoc even when the app is launched from a terminal.
-  candidates <- c(
+  if (is.null(candidates)) candidates <- c(
     file.path(Sys.getenv("ProgramFiles"), "RStudio/resources/app/bin/quarto/bin/tools"),
     file.path(Sys.getenv("ProgramFiles"), "RStudio/bin/pandoc"),
     "/Applications/RStudio.app/Contents/Resources/app/bin/quarto/bin/tools",
     "/usr/lib/rstudio/resources/app/bin/quarto/bin/tools",
-    "/usr/lib/rstudio/resources/app/bin/quarto/bin/tools/x86_64",
     "/usr/lib/rstudio/resources/app/resources/pandoc"
   )
+  # Recent RStudio bundles use architecture-specific subdirectories on macOS
+  # and Linux. Also retain the direct tools directory used by older releases.
+  candidates <- unique(c(candidates, file.path(candidates, "aarch64"),
+                         file.path(candidates, "x86_64")))
   for (path in candidates[dir.exists(candidates)]) {
     found <- rmarkdown::find_pandoc(dir = path, cache = FALSE)
     if (length(found$dir) == 1L && nzchar(found$dir)) return(TRUE)

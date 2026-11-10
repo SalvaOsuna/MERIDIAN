@@ -16,8 +16,16 @@ fetch_nasa_weather(lat, lon, start_date, end_date)
 \item{end_date}{R Date object}
 }
 \value{
-A data frame with daily weather variables, or NULL if query fails
+A data frame with daily weather variables, or NULL for missing
+coordinates or dates. Raises an error when the weather service is unavailable.
 }
 \description{
 Fetch daily weather parameters from NASA POWER API
+}
+\examples{
+\dontrun{
+weather <- fetch_nasa_weather(
+  52.13, -106.63, as.Date("2025-05-10"), as.Date("2025-05-15")
+)
+}
 }

@@ -1,6 +1,8 @@
 Package: MERIDIAN
 Title: Multi-Environment Research Integration: Data Intelligence and Agronomic Networks
 Version: 0.1.2
+URL: https://salvaosuna.github.io/MERIDIAN/, https://github.com/SalvaOsuna/MERIDIAN
+BugReports: https://github.com/SalvaOsuna/MERIDIAN/issues
 Authors@R: person("Salva", "Osuna", email = "salvadorosunacaballero@gmail.com",
     role = c("aut", "cre"))
 Description: An interactive Shiny application for comprehensive analysis of
@@ -63,3 +65,4 @@ Suggests:
 Config/testthat/edition: 3
 NeedsCompilation: yes
 Config/roxygen2/version: 8.1.1
+Config/Needs/website: pkgdown

@@ -1,4 +1,4 @@
-# MERIDIAN <img src="inst/app/www/logo.png" align="right" height="140"/>
+# MERIDIAN <img src="man/figures/meridian-mark.png" class="logo" align="right" width="100" style="width:100px;height:auto;" alt="MERIDIAN logo"/>
 
 `MERIDIAN` (**M**ulti-**E**nvironment **R**esearch **I**ntegration: **D**ata **I**ntelligence & **A**gronomic **N**etworks) is a comprehensive **R Shiny** application for Multi-Environment Trial (MET) phenotypic data analysis. It is packaged with the `golem` framework so it can be installed, documented, tested, and launched like a regular R package.
 
@@ -95,7 +95,42 @@ The registry stores immutable snapshots of the selected tables and static plots.
 - Pandoc for HTML reports (the RStudio-bundled copy is detected automatically)
 - Optional `pagedown` and Chrome/Edge for PDF reports; no LaTeX installation is needed
 
-#### Linux system libraries
+MERIDIAN is intended for **Windows, macOS and Linux**. The same R commands below
+install and launch the app on each platform. Because GitHub distributes source
+code, the compiler requirements differ by operating system. The automated checks
+build the package, run its tests and check the installed app on all three systems.
+
+#### Windows
+
+1. Install [R for Windows](https://cran.r-project.org/bin/windows/base/) and RStudio.
+2. Install the [Rtools version matching your R release](https://cran.r-project.org/bin/windows/Rtools/).
+   Rtools supplies the C/C++ compiler required by MERIDIAN. Restart RStudio after
+   installing it and use the default Rtools installation location.
+3. Run the GitHub installation commands below in the R console. `pak` can use
+   available Windows binaries for dependencies; MERIDIAN itself is compiled.
+
+If installation reports that build tools are unavailable, verify them with
+`pkgbuild::has_build_tools(debug = TRUE)` after installing `pkgbuild`.
+
+#### macOS (Apple Silicon and Intel)
+
+1. Install the [CRAN build of R](https://cran.r-project.org/bin/macosx/) for your
+   Mac's architecture and RStudio for the same architecture.
+2. Install Apple's Command Line Tools from Terminal:
+
+   ```sh
+   xcode-select --install
+   ```
+
+3. Run the GitHub installation commands below in R. Available CRAN dependency
+   binaries normally avoid compiling their system libraries.
+
+If a dependency must compile Fortran, install the compiler matching your R build
+from the [official R for macOS tools page](https://mac.r-project.org/tools/).
+Keep R, compiler tools and dependency binaries on the same architecture; do not
+mix an Intel R session with Apple Silicon libraries.
+
+#### Linux (Ubuntu and Debian)
 
 Installing from GitHub compiles MERIDIAN and some of its dependencies. On Ubuntu
 or Debian, install the build tools and development libraries in a terminal first:
@@ -159,6 +194,24 @@ source("run_app_dev.R")
 ```
 
 Dependencies are declared in `DESCRIPTION`. When adding a runtime dependency, use `usethis::use_package("package_name")`; for development-only tooling, use `usethis::use_package("package_name", type = "Suggests")`.
+
+## Documentation website
+
+The [MERIDIAN documentation](https://salvaosuna.github.io/MERIDIAN/) includes a
+getting-started guide, installation instructions, an analysis workflow and
+examples using the exported functions. It uses the standard `pkgdown` layout.
+
+To rebuild it from the repository root:
+
+```r
+install.packages("pkgdown")
+source("tools/build_docs.R")
+```
+
+The editable sources are `_pkgdown.yml`, `pkgdown/index.md` and
+`vignettes/articles/`. Generated files are saved in `docs/`. Commit the updated
+sources and generated files together; the existing GitHub Pages configuration
+publishes `docs/` from `main`.
 
 ## Input Data Format
 

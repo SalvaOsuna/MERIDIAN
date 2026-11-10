@@ -16,3 +16,6 @@ safeBackup
 ^token\.txt$
 ^CRAN-SUBMISSION$
 ^__pycache__$
+^_pkgdown\.yml$
+^pkgdown$
+^vignettes/articles$

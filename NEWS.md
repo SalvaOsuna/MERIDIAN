@@ -1,5 +1,8 @@
 # MERIDIAN 0.1.2
 
+* Document installation on Windows, macOS (Apple Silicon and Intel) and Linux; add package checks and installed-app smoke tests on all three operating systems.
+* Replace the promotional landing page with reproducible pkgdown documentation, including installation, workflow, function reference and runnable examples.
+* Discover architecture-specific Pandoc directories in RStudio bundles on macOS and Linux.
 * Integrate the local statistical and export fixes with NASA POWER weather retrieval, phenology-aware covariates and the latest spatial controls.
 * Declare runtime dependencies for clean GitHub installations and document Linux build requirements, including libuv for fs.
 * Keep the bundled example usable offline, retain uploaded environmental data when weather retrieval fails, and avoid downloading fonts on the R server during startup.

@@ -15,3 +15,8 @@ A Shiny application object.
 \description{
 Launches the MERIDIAN Shiny application.
 }
+\examples{
+\dontrun{
+MERIDIAN::run_app()
+}
+}

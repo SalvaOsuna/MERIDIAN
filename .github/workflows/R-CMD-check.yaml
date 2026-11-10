@@ -2,7 +2,12 @@ name: R-CMD-check
 on: [push, pull_request]
 jobs:
   install-smoke:
-    runs-on: ubuntu-latest
+    name: Installed app (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -13,23 +18,18 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           dependencies: 'NA'
+          extra-packages: any::callr
       - name: Install the package with required dependencies only
         run: R CMD INSTALL .
       - name: Verify installed app and static assets over HTTP
-        shell: bash
-        run: |
-          Rscript -e 'shiny::runApp(MERIDIAN::run_app(), host = "127.0.0.1", port = 3876, launch.browser = FALSE)' > /tmp/meridian-startup.log 2>&1 &
-          app_pid=$!
-          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
-          if ! curl --fail --retry 20 --retry-delay 2 --retry-connrefused http://127.0.0.1:3876/ -o /tmp/meridian.html; then
-            cat /tmp/meridian-startup.log
-            exit 1
-          fi
-          grep -q MERIDIAN /tmp/meridian.html
-          curl --fail http://127.0.0.1:3876/assets/styles.css -o /dev/null
-          curl --fail http://127.0.0.1:3876/assets/logo.png -o /dev/null
+        run: Rscript tools/smoke_installed_app.R
   check:
-    runs-on: ubuntu-latest
+    name: Package check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     steps:

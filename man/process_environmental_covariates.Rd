@@ -26,3 +26,12 @@ Processed data frame with computed environmental indices
 \description{
 Process environmental covariates table and calculate derived indices
 }
+\examples{
+\dontrun{
+environments <- data.frame(
+  Environment = "E1", Latitude = 52.13, Longitude = -106.63,
+  PlantingDate = "2025-05-10", HarvestDate = "2025-09-15"
+)
+process_environmental_covariates(environments)
+}
+}

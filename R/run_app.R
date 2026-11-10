@@ -5,6 +5,10 @@
 #' @param ... Options passed to [golem::with_golem_options()].
 #'
 #' @return A Shiny application object.
+#' @examples
+#' \dontrun{
+#' MERIDIAN::run_app()
+#' }
 #' @export
 run_app <- function(...) {
   golem::with_golem_options(

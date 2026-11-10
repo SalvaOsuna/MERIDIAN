@@ -19,3 +19,16 @@ A single-row data frame with computed indices
 \description{
 Calculate summary agroclimatic indices from daily weather series
 }
+\details{
+Growing degree days use a base temperature of 10 degrees Celsius.
+Reproductive heat-stress days count maximum temperatures above 30 degrees
+Celsius. These fixed thresholds are not crop-specific calibrations.
+}
+\examples{
+daily <- data.frame(
+  T2M_MAX = c(25, 27, 24), T2M_MIN = c(15, 17, 14),
+  PRECTOTCORR = c(2, 5, 0), RH2M = c(60, 70, 50),
+  ALLSKY_SFC_SW_DWN = c(18, 20, 15)
+)
+calculate_enviromic_indices(daily)
+}

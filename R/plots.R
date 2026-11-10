@@ -154,6 +154,9 @@ plot_ge_heatmap <- function(df, gen_col, env_col, trait,
 #' @param trait Trait column
 #' @param method Correlation method: "pearson", "spearman", or "kendall"
 #' @return plotly object
+#' @examples
+#' trial <- read.csv(system.file("extdata", "example_phenotypic.csv", package = "MERIDIAN"))
+#' plot_env_correlation(trial, "Genotype", "Environment", "GrainYield")
 #' @export
 plot_env_correlation <- function(df, gen_col, env_col, trait, method = "pearson") {
   ge_matrix <- pivot_ge_means(df, gen_col, env_col, trait)

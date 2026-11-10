@@ -6,7 +6,18 @@
 \alias{MERIDIAN-package}
 \title{MERIDIAN}
 \description{
+\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+
 An interactive Shiny application for comprehensive analysis of Multi-Environment Trial (MET) phenotypic data. Provides exploratory data analysis, ANOVA with variance components, stability analysis (AMMI, GGE, Eberhart-Russell, Wricke, Shukla), adaptation analysis with mega-environment identification, and automated report generation.
+}
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://salvaosuna.github.io/MERIDIAN/}
+  \item \url{https://github.com/SalvaOsuna/MERIDIAN}
+  \item Report bugs at \url{https://github.com/SalvaOsuna/MERIDIAN/issues}
+}
+
 }
 \author{
 \strong{Maintainer}: Salva Osuna \email{salvadorosunacaballero@gmail.com}

@@ -23,3 +23,7 @@ plotly object
 \description{
 Create an environment correlation matrix plot
 }
+\examples{
+trial <- read.csv(system.file("extdata", "example_phenotypic.csv", package = "MERIDIAN"))
+plot_env_correlation(trial, "Genotype", "Environment", "GrainYield")
+}

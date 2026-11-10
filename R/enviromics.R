@@ -116,6 +116,8 @@ validate_covariate_keys <- function(data, env_col) {
 #' Parse dates robustly from various formats
 #' @param date_val Vector or single value of dates in char, factor, numeric, or date format
 #' @return Date vector
+#' @examples
+#' parse_date_robustly(c("2026-05-21", "21/05/2026", "46163"))
 #' @export
 parse_date_robustly <- function(date_val) {
   if (is.null(date_val) || length(date_val) == 0) return(as.Date(character(0)))
@@ -179,7 +181,14 @@ parse_date_robustly <- function(date_val) {
 #' @param lon Numeric longitude
 #' @param start_date R Date object
 #' @param end_date R Date object
-#' @return A data frame with daily weather variables, or NULL if query fails
+#' @return A data frame with daily weather variables, or NULL for missing
+#'   coordinates or dates. Raises an error when the weather service is unavailable.
+#' @examples
+#' \dontrun{
+#' weather <- fetch_nasa_weather(
+#'   52.13, -106.63, as.Date("2025-05-10"), as.Date("2025-05-15")
+#' )
+#' }
 #' @export
 fetch_nasa_weather <- function(lat, lon, start_date, end_date) {
   if (is.na(lat) || is.na(lon) || is.na(start_date) || is.na(end_date)) {
@@ -223,6 +232,16 @@ fetch_nasa_weather <- function(lat, lon, start_date, end_date) {
 #' @param dtf_mean Mean days to flowering (optional)
 #' @param dtm_mean Mean days to maturity (optional)
 #' @return A single-row data frame with computed indices
+#' @details Growing degree days use a base temperature of 10 degrees Celsius.
+#'   Reproductive heat-stress days count maximum temperatures above 30 degrees
+#'   Celsius. These fixed thresholds are not crop-specific calibrations.
+#' @examples
+#' daily <- data.frame(
+#'   T2M_MAX = c(25, 27, 24), T2M_MIN = c(15, 17, 14),
+#'   PRECTOTCORR = c(2, 5, 0), RH2M = c(60, 70, 50),
+#'   ALLSKY_SFC_SW_DWN = c(18, 20, 15)
+#' )
+#' calculate_enviromic_indices(daily)
 #' @export
 calculate_enviromic_indices <- function(daily_weather, dtf_mean = NULL, dtm_mean = NULL) {
   if (is.null(daily_weather) || nrow(daily_weather) == 0) {
@@ -330,6 +349,14 @@ calculate_enviromic_indices <- function(daily_weather, dtf_mean = NULL, dtm_mean
 #' @param dtm_means Optional named numeric vector of mean days to maturity per environment
 #' @param session Optional Shiny session object
 #' @return Processed data frame with computed environmental indices
+#' @examples
+#' \dontrun{
+#' environments <- data.frame(
+#'   Environment = "E1", Latitude = 52.13, Longitude = -106.63,
+#'   PlantingDate = "2025-05-10", HarvestDate = "2025-09-15"
+#' )
+#' process_environmental_covariates(environments)
+#' }
 #' @export
 process_environmental_covariates <- function(env_data, dtf_means = NULL, dtm_means = NULL, session = NULL) {
   if (is.null(env_data) || nrow(env_data) == 0) return(env_data)

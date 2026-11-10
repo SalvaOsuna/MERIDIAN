@@ -15,3 +15,6 @@ Date vector
 \description{
 Parse dates robustly from various formats
 }
+\examples{
+parse_date_robustly(c("2026-05-21", "21/05/2026", "46163"))
+}
